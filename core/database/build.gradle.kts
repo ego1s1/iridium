@@ -11,6 +11,15 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(libs.kotlinx.coroutines.core)
-    testImplementation(libs.junit)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    testImplementation(libs.bundles.test.common)
+    testImplementation(libs.turbine)
+    testImplementation(project(":core:testing"))
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

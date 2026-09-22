@@ -20,6 +20,7 @@ fun IridiumApp() {
         NavHost(navController = navController, startDestination = LibraryRoute) {
             libraryScreen(
                 onBookClick = { navController.navigateToDetail(it) },
+                onBookLongClick = { navController.navigateToDetail(it) },
             )
             detailScreen(
                 onBackClick = { navController.popBackStack() },

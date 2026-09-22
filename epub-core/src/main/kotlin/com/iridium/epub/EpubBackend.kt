@@ -1,15 +1,26 @@
 package com.iridium.epub
 
 /**
- * Thin seam over the Readium Kotlin toolkit (streamer/navigator land here in
- * Phase 3). Scaffold keeps it dependency-free so the build stays green.
+ * Seam over EPUB parsing. Phase 2 uses the built-in ZIP+DOM parser below;
+ * Phase 3 may delegate to the Readium Streamer behind this same interface
+ * without touching callers.
  */
 interface EpubBackend {
-    suspend fun inspect(sourceUri: String): InspectedEpub
+    /** Parses [epubBytes] and returns metadata, cover bytes, and TOC. */
+    fun inspect(epubBytes: ByteArray, fallbackTitle: String): InspectedEpub
 }
+
+/** A chapter entry from the EPUB navigation document. */
+data class EpubChapter(
+    val href: String,
+    val title: String,
+)
 
 data class InspectedEpub(
     val title: String,
-    val author: String?,
+    val author: String? = null,
     val coverBytes: ByteArray? = null,
+    val coverMime: String? = null,
+    val spineCount: Int = 0,
+    val chapters: List<EpubChapter> = emptyList(),
 )

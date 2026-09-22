@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.iridium.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -14,7 +15,15 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":epub-core"))
+    implementation(libs.androidx.documentfile)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    testImplementation(libs.junit)
+    implementation(libs.coil.compose)
+
+    testImplementation(libs.bundles.test.common)
+    testImplementation(libs.turbine)
+    testImplementation(libs.androidx.room.runtime)
+    testImplementation(libs.androidx.room.ktx)
+    testImplementation(project(":core:testing"))
 }

@@ -1,0 +1,14 @@
+<resources>
+    <string name="detail_bookmark">Bookmark</string>
+    <string name="detail_remove">Remove</string>
+    <string name="detail_progress">%1$d%% read</string>
+    <string name="detail_unread">Unread</string>
+    <string name="detail_resume">Resume</string>
+    <string name="detail_start">Start reading</string>
+    <string name="detail_chapters">Chapters (%1$d)</string>
+    <string name="detail_highlights">Highlights (%1$d)</string>
+    <string name="detail_remove_title">Remove book?</string>
+    <string name="detail_remove_body">“%1$s” and its highlights, notes and bookmarks will be deleted from this device.</string>
+    <string name="detail_remove_confirm">Remove</string>
+    <string name="detail_remove_cancel">Cancel</string>
+</resources>

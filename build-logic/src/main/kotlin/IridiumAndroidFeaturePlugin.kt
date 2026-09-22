@@ -19,6 +19,7 @@ class IridiumAndroidFeaturePlugin : Plugin<Project> {
                 add("implementation", project(":core:designsystem"))
                 add("implementation", libs.findLibrary("androidx-activity-compose").get())
                 add("implementation", libs.findLibrary("androidx-compose-material-icons-core").get())
+                add("implementation", libs.findLibrary("androidx-compose-material-icons-extended").get())
                 add("implementation", libs.findLibrary("androidx-hilt-navigation-compose").get())
                 add("implementation", libs.findLibrary("androidx-lifecycle-runtime-compose").get())
                 add("implementation", libs.findLibrary("androidx-lifecycle-viewmodel-compose").get())
