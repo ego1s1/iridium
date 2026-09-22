@@ -10,6 +10,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /** App-wide chrome state: theme + motion personality. */
@@ -22,6 +23,18 @@ data class AppUiState(
 class IridiumAppViewModel @Inject constructor(
     preferences: IridiumPreferencesDataSource,
 ) : ViewModel() {
+
+    /**
+     * Null until the first preference emission: the onboarding gate must not
+     * flash the wizard for a returning user while DataStore is still loading.
+     */
+    val onboardingCompleted: StateFlow<Boolean?> = preferences.onboardingCompleted
+        .map { it as Boolean? }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     val uiState: StateFlow<AppUiState> = combine(
         preferences.themePreferences,

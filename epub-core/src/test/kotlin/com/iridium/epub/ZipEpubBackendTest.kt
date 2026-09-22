@@ -66,6 +66,26 @@ class ZipEpubBackendTest {
         assertTrue(result.chapters.isEmpty())
     }
 
+    @Test
+    fun `streaming skips unrelated large entries`() {
+        val bytes = buildEpub(
+            opf = OPF_EPUB3,
+            extra = mapOf(
+                "OEBPS/nav.xhtml" to NAV_XHTML.toByteArray(),
+                "OEBPS/cover.jpg" to byteArrayOf(1, 2, 3),
+                "OEBPS/ch1.xhtml" to "<html/>".toByteArray(),
+                "OEBPS/ch2.xhtml" to "<html/>".toByteArray(),
+                // Oversized non-target entry: must be skipped, never buffered.
+                "OEBPS/assets/huge.bin" to ByteArray(12 * 1024 * 1024),
+            ),
+        )
+        val result = backend.inspect(bytes, "fallback.epub")
+
+        assertEquals("Treasure Island", result.title)
+        assertNotNull(result.coverBytes)
+        assertEquals(2, result.chapters.size)
+    }
+
     private fun buildEpub(opf: String, extra: Map<String, ByteArray>): ByteArray {
         val bos = ByteArrayOutputStream()
         ZipOutputStream(bos).use { zip ->

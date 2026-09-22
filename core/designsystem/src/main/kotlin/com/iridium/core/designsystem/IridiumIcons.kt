@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.FormatPaint
 import androidx.compose.material.icons.rounded.Highlight
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.List
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MotionPhotosOn
@@ -41,6 +42,7 @@ object IridiumIcons {
     val Delete = Icons.Rounded.Delete
     val FormatPaint = Icons.Rounded.FormatPaint
     val Highlight = Icons.Rounded.Highlight
+    val History = Icons.Rounded.History
     val ImportFile = Icons.Rounded.UploadFile
     val ImportFolder = Icons.Rounded.CreateNewFolder
     val List = Icons.Rounded.List

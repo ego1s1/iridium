@@ -17,12 +17,12 @@ enum class MotionStyle { EXPRESSIVE, CALM }
 data class Book(
     val id: String,
     val title: String,
-    val author: String?,
+    val author: String? = null,
     val format: BookFormat = BookFormat.EPUB,
     val spineCount: Int = 0,
     /** User document URI (`content://`) or absolute file path; read in place. */
     val sourcePath: String,
-    val coverPath: String?,
+    val coverPath: String? = null,
     val progress: Float = 0f,
     val lastLocator: String? = null,
     val sourceDisplayName: String,

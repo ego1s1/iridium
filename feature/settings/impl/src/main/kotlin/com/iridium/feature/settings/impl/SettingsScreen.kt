@@ -1,10 +1,6 @@
 package com.iridium.feature.settings.impl
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,73 +8,59 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
+import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
+import com.iridium.core.designsystem.IridiumSettingRow
 import com.iridium.core.designsystem.IridiumSettingSwitch
-import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
-import com.iridium.core.designsystem.screenEnter
-import com.iridium.core.designsystem.screenExit
-import com.iridium.core.designsystem.screenPopEnter
-import com.iridium.core.designsystem.screenPopExit
-import com.iridium.core.model.AppColorScheme
+import com.iridium.core.designsystem.SchemePickerRow
+import com.iridium.core.model.LibraryFilter
+import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ThemeMode
-import kotlinx.serialization.Serializable
 
-@Serializable
-data object SettingsRoute
-
-fun NavGraphBuilder.settingsScreen(onBackClick: () -> Unit) {
-    composable<SettingsRoute>(
-        enterTransition = { screenEnter() },
-        exitTransition = { screenExit() },
-        popEnterTransition = { screenPopEnter() },
-        popExitTransition = { screenPopExit() },
-    ) {
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-            SettingsRoute(onBackClick = onBackClick)
-        }
-    }
+/** Public tab content for the main viewport. */
+@Composable
+fun SettingsTabContent(
+    appVersion: String,
+    modifier: Modifier = Modifier,
+) {
+    SettingsRoute(appVersion = appVersion, modifier = modifier)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsRoute(
-    onBackClick: () -> Unit,
+    appVersion: String,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
+        appVersion = appVersion,
         onAction = viewModel::onAction,
-        onBackClick = onBackClick,
         modifier = modifier,
     )
 }
@@ -87,19 +69,15 @@ internal fun SettingsRoute(
 @Composable
 internal fun SettingsScreen(
     state: SettingsUiState,
+    appVersion: String,
     onAction: (SettingsAction) -> Unit,
-    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(IridiumIcons.Back, contentDescription = "Back")
-                    }
-                },
+                title = { Text("Settings", style = IridiumEmphasized.headlineSmall) },
+                actions = { Icon(IridiumIcons.Settings, contentDescription = null) },
             )
         },
         modifier = modifier,
@@ -113,17 +91,22 @@ internal fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             IridiumSectionCard(title = "Appearance") {
-                Text("Theme", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(8.dp))
-                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
-                    ThemeMode.entries.forEach { mode ->
-                        ToggleButton(
-                            checked = state.theme.mode == mode,
-                            onCheckedChange = { onAction(SettingsAction.SetThemeMode(mode)) },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(mode.name.lowercase().replaceFirstChar { it.uppercase() })
-                        }
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    ThemeMode.entries.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            selected = state.theme.mode == mode,
+                            onClick = { onAction(SettingsAction.SetThemeMode(mode)) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = ThemeMode.entries.size,
+                            ),
+                            label = {
+                                Text(
+                                    mode.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -140,18 +123,12 @@ internal fun SettingsScreen(
                     onCheckedChange = { onAction(SettingsAction.SetAmoled(it)) },
                     enabled = state.theme.mode != ThemeMode.LIGHT,
                 )
-                Spacer(Modifier.height(12.dp))
-                Text("Preset", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AppColorScheme.entries.forEach { scheme ->
-                        SchemeSwatch(
-                            scheme = scheme,
-                            selected = state.theme.colorScheme == scheme,
-                            onClick = { onAction(SettingsAction.SetColorScheme(scheme)) },
-                        )
-                    }
-                }
+                SchemePickerRow(
+                    theme = state.theme,
+                    onDynamic = { onAction(SettingsAction.SetDynamicColor(true)) },
+                    onScheme = { onAction(SettingsAction.SetColorScheme(it)) },
+                )
             }
 
             IridiumSectionCard(title = "Motion") {
@@ -175,6 +152,34 @@ internal fun SettingsScreen(
                 )
             }
 
+            IridiumSectionCard(title = "Library") {
+                Text("Sort by", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
+                    ToggleButton(
+                        checked = state.libraryDisplay.sortOrder == LibrarySortOrder.RECENTLY_ADDED,
+                        onCheckedChange = { onAction(SettingsAction.SetSortOrder(LibrarySortOrder.RECENTLY_ADDED)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Added", style = MaterialTheme.typography.labelSmall) }
+                    ToggleButton(
+                        checked = state.libraryDisplay.sortOrder == LibrarySortOrder.RECENTLY_READ,
+                        onCheckedChange = { onAction(SettingsAction.SetSortOrder(LibrarySortOrder.RECENTLY_READ)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Read", style = MaterialTheme.typography.labelSmall) }
+                    ToggleButton(
+                        checked = state.libraryDisplay.sortOrder == LibrarySortOrder.TITLE,
+                        onCheckedChange = { onAction(SettingsAction.SetSortOrder(LibrarySortOrder.TITLE)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Title", style = MaterialTheme.typography.labelSmall) }
+                }
+                Spacer(Modifier.height(8.dp))
+                IridiumSettingSwitch(
+                    title = "Hide unreadable books",
+                    checked = state.libraryDisplay.hideErrors,
+                    onCheckedChange = { onAction(SettingsAction.SetHideErrors(it)) },
+                )
+            }
+
             IridiumSectionCard(title = "Reading") {
                 IridiumSettingSwitch(
                     title = "Keep screen on",
@@ -192,43 +197,22 @@ internal fun SettingsScreen(
                     onCheckedChange = { onAction(SettingsAction.SetVolumeKeys(it)) },
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun SchemeSwatch(
-    scheme: AppColorScheme,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val color = when (scheme) {
-        AppColorScheme.IRIDIUM -> Color(0xFF6445A8)
-        AppColorScheme.OCEAN -> Color(0xFF00639B)
-        AppColorScheme.FOREST -> Color(0xFF2E7D32)
-        AppColorScheme.SUNSET -> Color(0xFFB14A00)
-    }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(color)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
-                shape = CircleShape,
-            )
-            .clickable(onClick = onClick),
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = IridiumIcons.Check,
-                contentDescription = "Selected",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp),
-            )
+            IridiumSectionCard(title = "About") {
+                IridiumSettingRow(
+                    title = "Version",
+                    subtitle = appVersion,
+                    onClick = {},
+                )
+                HorizontalDivider()
+                IridiumSettingRow(
+                    title = "Storage",
+                    subtitle = "Books are read in place. Only covers and reading state are stored on device.",
+                    onClick = {},
+                )
+            }
+
+            Spacer(Modifier.height(96.dp))
         }
     }
 }

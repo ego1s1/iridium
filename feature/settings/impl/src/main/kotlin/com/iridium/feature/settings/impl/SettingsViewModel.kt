@@ -3,6 +3,9 @@ package com.iridium.feature.settings.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
+import com.iridium.core.model.LibraryDisplay
+import com.iridium.core.model.ReaderPreferences
+import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +23,7 @@ class SettingsViewModel @Inject constructor(
         preferences.themePreferences,
         preferences.motionStyle,
         preferences.readerPreferences,
+        preferences.libraryDisplay,
         ::SettingsUiState,
     ).stateIn(
         scope = viewModelScope,
@@ -29,31 +33,33 @@ class SettingsViewModel @Inject constructor(
 
     fun onAction(action: SettingsAction) {
         when (action) {
-            is SettingsAction.SetThemeMode ->
-                updateTheme { it.copy(mode = action.mode) }
-            is SettingsAction.SetDynamicColor ->
-                updateTheme { it.copy(dynamicColor = action.enabled) }
+            is SettingsAction.SetThemeMode -> updateTheme { it.copy(mode = action.mode) }
+            is SettingsAction.SetDynamicColor -> updateTheme { it.copy(dynamicColor = action.enabled) }
             is SettingsAction.SetColorScheme ->
-                updateTheme { it.copy(colorScheme = action.scheme) }
-            is SettingsAction.SetAmoled ->
-                updateTheme { it.copy(amoled = action.enabled) }
+                updateTheme { it.copy(colorScheme = action.scheme, dynamicColor = false) }
+            is SettingsAction.SetAmoled -> updateTheme { it.copy(amoled = action.enabled) }
             is SettingsAction.SetMotionStyle -> viewModelScope.launch {
                 preferences.updateMotionStyle(action.style)
             }
-            is SettingsAction.SetKeepScreenOn ->
-                updateReader { it.copy(keepScreenOn = action.enabled) }
-            is SettingsAction.SetShowPageCounter ->
-                updateReader { it.copy(showPageCounter = action.enabled) }
-            is SettingsAction.SetVolumeKeys ->
-                updateReader { it.copy(volumeKeys = action.enabled) }
+            is SettingsAction.SetSortOrder ->
+                updateDisplay { it.copy(sortOrder = action.order) }
+            is SettingsAction.SetFilter -> updateDisplay { it.copy(filter = action.filter) }
+            is SettingsAction.SetHideErrors -> updateDisplay { it.copy(hideErrors = action.hide) }
+            is SettingsAction.SetKeepScreenOn -> updateReader { it.copy(keepScreenOn = action.enabled) }
+            is SettingsAction.SetShowPageCounter -> updateReader { it.copy(showPageCounter = action.enabled) }
+            is SettingsAction.SetVolumeKeys -> updateReader { it.copy(volumeKeys = action.enabled) }
         }
     }
 
-    private fun updateTheme(transform: (com.iridium.core.model.ThemePreferences) -> com.iridium.core.model.ThemePreferences) {
+    private fun updateTheme(transform: (ThemePreferences) -> ThemePreferences) {
         viewModelScope.launch { preferences.updateThemePreferences(transform) }
     }
 
-    private fun updateReader(transform: (com.iridium.core.model.ReaderPreferences) -> com.iridium.core.model.ReaderPreferences) {
+    private fun updateReader(transform: (ReaderPreferences) -> ReaderPreferences) {
         viewModelScope.launch { preferences.updateReaderPreferences(transform) }
+    }
+
+    private fun updateDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
+        viewModelScope.launch { preferences.updateLibraryDisplay(transform) }
     }
 }

@@ -198,8 +198,13 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val coverId = linkedCoverId(uri)
         return try {
-            val bytes = readBytes(doc.uri) ?: throw IOException("Unable to read ${doc.name}")
-            val inspected = backend.inspect(bytes, doc.name.substringBeforeLast('.'))
+            val inspected = backend.inspect(
+                openStream = {
+                    context.contentResolver.openInputStream(doc.uri)
+                        ?: throw IOException("Unable to read ${doc.name}")
+                },
+                fallbackTitle = doc.name.substringBeforeLast('.'),
+            )
             val coverPath = covers.generate(inspected.coverBytes, coverId)
                 ?: existing?.coverPath?.takeIf { File(it).isFile }
             BookEntity(
@@ -248,12 +253,6 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 bookmarked = existing?.bookmarked ?: false,
             )
         }
-    }
-
-    private suspend fun readBytes(uri: Uri): ByteArray? = withContext(Dispatchers.IO) {
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull()
     }
 
     private fun deleteCover(coverPath: String?) {

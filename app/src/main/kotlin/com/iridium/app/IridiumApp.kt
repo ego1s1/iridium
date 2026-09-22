@@ -5,32 +5,46 @@ package com.iridium.app
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumTheme
+import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
 import com.iridium.core.designsystem.LocalSharedTransitionScope
 import com.iridium.core.designsystem.rememberSystemReduceMotion
 import com.iridium.core.designsystem.resolveExpressiveMotionEnabled
+import com.iridium.core.designsystem.screenEnter
+import com.iridium.core.designsystem.screenExit
+import com.iridium.core.designsystem.screenPopEnter
+import com.iridium.core.designsystem.screenPopExit
 import com.iridium.core.model.ThemeMode
 import com.iridium.feature.detail.api.navigateToDetail
 import com.iridium.feature.detail.impl.detailScreen
-import com.iridium.feature.library.impl.LibraryRoute
-import com.iridium.feature.library.impl.libraryScreen
+import com.iridium.feature.onboarding.api.OnboardingRoute
+import com.iridium.feature.onboarding.impl.onboardingScreen
 import com.iridium.feature.reader.api.navigateToReader
 import com.iridium.feature.reader.impl.readerScreen
-import com.iridium.feature.settings.impl.SettingsRoute
-import com.iridium.feature.settings.impl.settingsScreen
 
+/**
+ * App entry point: theme + top-level navigation. Onboarding shows until the
+ * user finishes (or skips); afterwards Main hosts Library/History/Settings.
+ */
 @Composable
 fun IridiumApp(
+    modifier: Modifier = Modifier,
     viewModel: IridiumAppViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val completed by viewModel.onboardingCompleted.collectAsStateWithLifecycle()
     val systemReduceMotion = rememberSystemReduceMotion()
 
     val darkTheme = when (state.theme.mode) {
@@ -47,29 +61,47 @@ fun IridiumApp(
         amoled = state.theme.amoled,
         expressiveMotion = expressiveMotion,
     ) {
-        // SharedTransitionLayout lets the book cover morph between screens;
-        // the scope is exposed so feature modules can register shared elements.
-        SharedTransitionLayout {
-            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+        CompositionLocalProvider(LocalExpressiveMotionEnabled provides expressiveMotion) {
+            Surface(modifier = modifier.fillMaxSize()) {
+                // Null until DataStore's first emission: never flash the wizard.
+                if (completed == null) {
+                    IridiumLoading()
+                    return@Surface
+                }
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = LibraryRoute) {
-                    libraryScreen(
-                        onBookClick = { navController.navigateToDetail(it) },
-                        onBookLongClick = { navController.navigateToDetail(it) },
-                        onSettingsClick = { navController.navigate(SettingsRoute) },
-                    )
-                    detailScreen(
-                        onBackClick = { navController.popBackStack() },
-                        onReadClick = { navController.navigateToReader(it) },
-                    )
-                    readerScreen(
-                        onBackClick = { navController.popBackStack() },
-                    )
-                    settingsScreen(
-                        onBackClick = { navController.popBackStack() },
-                    )
+                SharedTransitionLayout {
+                    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = if (completed == true) MainRoute else OnboardingRoute,
+                            enterTransition = { screenEnter() },
+                            exitTransition = { screenExit() },
+                            popEnterTransition = { screenPopEnter() },
+                            popExitTransition = { screenPopExit() },
+                        ) {
+                            onboardingScreen(
+                                onOnboardingComplete = { navController.navigateToMain() },
+                            )
+                            mainScreen(
+                                onReadClick = { navController.navigateToDetail(it) },
+                                onBookLongClick = { navController.navigateToDetail(it) },
+                                appVersion = BuildConfig.VERSION_NAME,
+                            )
+                            detailScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onReadClick = { navController.navigateToReader(it) },
+                            )
+                            readerScreen(
+                                onBackClick = { navController.popBackStack() },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+@Suppress("unused")
+private fun NavDestination.isOnboarding(): Boolean =
+    route?.substringAfterLast('.') == "OnboardingRoute"

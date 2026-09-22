@@ -2,92 +2,170 @@ package com.iridium.epub
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Document
 import org.w3c.dom.Element
-import org.w3c.dom.NodeList
 
 /**
- * Minimal EPUB 2/3 parser over raw bytes: container.xml → OPF → metadata,
- * cover, spine count, and TOC (EPUB3 nav or EPUB2 NCX). Defensive: XXE
- * disabled, size caps, never throws — failures yield an [InspectedEpub]
- * with the fallback title and zero chapters.
+ * Minimal EPUB 2/3 parser over a re-openable ZIP stream.
+ *
+ * The archive is read in bounded passes instead of being loaded whole: pass
+ * one pulls only the container/OPF XML, pass two pulls only the navigation
+ * document and cover image named by the manifest. Bytes for everything else
+ * are skipped, never materialized, so a large book costs the same memory as a
+ * small one. Defensive throughout: XXE disabled, per-entry and total caps,
+ * never throws — failures yield the fallback title.
  */
 class ZipEpubBackend : EpubBackend {
 
-    override fun inspect(epubBytes: ByteArray, fallbackTitle: String): InspectedEpub {
+    override fun inspect(openStream: () -> InputStream, fallbackTitle: String): InspectedEpub {
         return try {
-            inspectOrThrow(epubBytes, fallbackTitle)
+            inspectStreaming(openStream, fallbackTitle)
         } catch (_: Exception) {
             InspectedEpub(title = fallbackTitle.ifBlank { "Unknown" })
         }
     }
 
-    private fun inspectOrThrow(epubBytes: ByteArray, fallbackTitle: String): InspectedEpub {
-        val entries = readZip(epubBytes)
-        if (entries.isEmpty()) return InspectedEpub(title = fallbackTitle.ifBlank { "Unknown" })
+    private fun inspectStreaming(
+        openStream: () -> InputStream,
+        fallbackTitle: String,
+    ): InspectedEpub {
+        val fallback = fallbackTitle.ifBlank { "Unknown" }
 
-        val containerXml = entries["META-INF/container.xml"] ?: return InspectedEpub(
-            title = fallbackTitle.ifBlank { "Unknown" },
+        // Pass 1: container.xml + the package document (both small XML).
+        var containerBytes: ByteArray? = null
+        var opfBytes: ByteArray? = null
+        var opfPath: String? = null
+        scan(
+            openStream = openStream,
+            shouldRead = { name ->
+                name == CONTAINER_PATH || name.endsWith(".opf", ignoreCase = true)
+            },
+            onEntry = { name, bytes ->
+                when {
+                    name == CONTAINER_PATH -> containerBytes = bytes
+                    name.endsWith(".opf", ignoreCase = true) && opfBytes == null -> {
+                        opfBytes = bytes
+                        opfPath = name
+                    }
+                }
+            },
         )
-        val opfPath = parseOpfPath(containerXml) ?: return InspectedEpub(
-            title = fallbackTitle.ifBlank { "Unknown" },
-        )
-        val opfBytes = entries[opfPath] ?: entries.entries
-            .firstOrNull { it.key.endsWith(".opf", ignoreCase = true) }?.value
-            ?: return InspectedEpub(title = fallbackTitle.ifBlank { "Unknown" })
-        val base = opfPath.substringBeforeLast('/', "")
 
-        val opf = parseXml(opfBytes)
-        val title = opf.getElementsByTag("title").ifBlank { fallbackTitle.ifBlank { "Unknown" } }
-        val author = opf.getElementsByTag("creator").ifBlank { null }
+        // Prefer the OPF named by the container; otherwise the first one found.
+        val containerPath = containerBytes?.let(::parseRootfilePath)
+        val effectiveOpfPath = containerPath ?: opfPath ?: return InspectedEpub(title = fallback)
+        val effectiveOpfBytes = when {
+            containerPath != null && containerPath == opfPath -> opfBytes
+            containerPath != null -> readSingleEntry(openStream, containerPath)
+            else -> opfBytes
+        } ?: return InspectedEpub(title = fallback)
 
+        val base = effectiveOpfPath.substringBeforeLast('/', "")
+        val opf = parseXml(effectiveOpfBytes)
+        val title = opf.firstText("title").ifBlank { fallback }
+        val author = opf.firstText("creator").ifBlank { null }
         val manifest = readManifest(opf, base)
         val spine = readSpine(opf)
 
-        val coverBytes = findCover(opf, manifest, entries)
-        val chapters = readToc(opf, manifest, entries, spine)
+        // Names we still need: navigation document, NCX, and cover image.
+        val navHref = manifest.values.firstOrNull { it.properties.contains("nav") }?.href
+        val ncxHref = manifest.values.firstOrNull {
+            it.mime == "application/x-dtbncx+xml"
+        }?.href
+        val coverHref = resolveCoverHref(opf, manifest)
+
+        val wanted = setOfNotNull(navHref, ncxHref, coverHref).toSet()
+        val bodies = mutableMapOf<String, ByteArray>()
+        if (wanted.isNotEmpty()) {
+            scan(
+                openStream = openStream,
+                shouldRead = { it in wanted },
+                onEntry = { name, bytes -> bodies[name] = bytes },
+            )
+        }
+
+        val cover = coverHref?.let { href ->
+            bodies[href]?.let { bytes ->
+                val mime = manifest.values.firstOrNull { it.href == href }?.mime ?: "image/jpeg"
+                bytes to mime
+            }
+        }
+
+        val chapters = readToc(opf, manifest, bodies, spine, navHref, ncxHref)
 
         return InspectedEpub(
             title = title,
             author = author,
-            coverBytes = coverBytes?.first,
-            coverMime = coverBytes?.second,
+            coverBytes = cover?.first,
+            coverMime = cover?.second,
             spineCount = spine.size,
             chapters = chapters,
         )
     }
 
-    private data class ManifestItem(val href: String, val mime: String)
+    // MARK: ZIP scanning
 
-    private fun readZip(bytes: ByteArray): Map<String, ByteArray> {
-        val out = LinkedHashMap<String, ByteArray>()
-        var total = 0L
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+    /**
+     * Streams [input] once, invoking [shouldRead] per entry name and
+     * [onEntry] only for entries it approves (and that fit the caps).
+     */
+    private inline fun scan(
+        openStream: () -> InputStream,
+        shouldRead: (String) -> Boolean,
+        onEntry: (String, ByteArray) -> Unit,
+    ) {
+        ZipInputStream(openStream()).use { zip ->
+            var total = 0L
             var entry = zip.nextEntry
             while (entry != null) {
-                if (!entry.isDirectory) {
-                    val bos = ByteArrayOutputStream()
-                    val buf = ByteArray(8192)
-                    var n = zip.read(buf)
-                    var size = 0L
-                    while (n != -1) {
-                        size += n
-                        if (size > MAX_ENTRY_BYTES) break
-                        bos.write(buf, 0, n)
-                        n = zip.read(buf)
-                    }
-                    total += size
-                    if (total > MAX_TOTAL_BYTES) break
-                    if (size <= MAX_ENTRY_BYTES) out[entry.name] = bos.toByteArray()
+                val name = entry.name
+                if (!entry.isDirectory && shouldRead(name)) {
+                    val bytes = readCapped(zip) ?: return
+                    total += bytes.size
+                    if (total > MAX_TOTAL_BYTES) return
+                    onEntry(name, bytes)
                 }
                 entry = zip.nextEntry
             }
         }
-        return out
     }
 
-    private fun parseOpfPath(containerXml: ByteArray): String? {
+    private fun readSingleEntry(openStream: () -> InputStream, path: String): ByteArray? {
+        var result: ByteArray? = null
+        scan(
+            openStream = openStream,
+            shouldRead = { it == path },
+            onEntry = { _, bytes -> result = bytes },
+        )
+        return result
+    }
+
+    private inline fun readCapped(zip: ZipInputStream): ByteArray? {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        var size = 0L
+        var n = zip.read(buf)
+        while (n != -1) {
+            size += n
+            if (size > MAX_SINGLE_ENTRY_BYTES) return null
+            out.write(buf, 0, n)
+            n = zip.read(buf)
+        }
+        return out.toByteArray()
+    }
+
+    // MARK: OPF
+
+    private data class ManifestItem(
+        val href: String,
+        val mime: String,
+        val properties: Set<String>,
+    )
+
+    private fun parseRootfilePath(containerXml: ByteArray): String? {
         val doc = parseXml(containerXml)
         val nodes = doc.getElementsByTagNameNS("*", "rootfile")
         for (i in 0 until nodes.length) {
@@ -98,22 +176,24 @@ class ZipEpubBackend : EpubBackend {
         return null
     }
 
-    private fun readManifest(opf: org.w3c.dom.Document, base: String): Map<String, ManifestItem> {
+    private fun readManifest(opf: Document, base: String): Map<String, ManifestItem> {
         val items = LinkedHashMap<String, ManifestItem>()
         val nodes = opf.getElementsByTagNameNS("*", "item")
         for (i in 0 until nodes.length) {
             val el = nodes.item(i) as? Element ?: continue
             val id = el.getAttribute("id")
             val href = el.getAttribute("href").trim()
-            val mime = el.getAttribute("media-type").trim()
             if (id.isEmpty() || href.isEmpty()) continue
-            val resolved = resolve(base, href)
-            items[id] = ManifestItem(resolved, mime)
+            items[id] = ManifestItem(
+                href = resolve(base, href),
+                mime = el.getAttribute("media-type").trim(),
+                properties = el.getAttribute("properties").split(Regex("\\s+")).filter { it.isNotEmpty() }.toSet(),
+            )
         }
         return items
     }
 
-    private fun readSpine(opf: org.w3c.dom.Document): List<String> {
+    private fun readSpine(opf: Document): List<String> {
         val ids = ArrayList<String>()
         val nodes = opf.getElementsByTagNameNS("*", "itemref")
         for (i in 0 until nodes.length) {
@@ -124,116 +204,60 @@ class ZipEpubBackend : EpubBackend {
         return ids
     }
 
-    private fun findCover(
-        opf: org.w3c.dom.Document,
-        manifest: Map<String, ManifestItem>,
-        entries: Map<String, ByteArray>,
-    ): Pair<ByteArray, String>? {
-        // 1. <meta name="cover" content="id"/>
+    private fun resolveCoverHref(opf: Document, manifest: Map<String, ManifestItem>): String? {
+        // EPUB3: manifest properties="cover-image".
+        manifest.values.firstOrNull { it.properties.contains("cover-image") }?.let { return it.href }
+        // EPUB2: <meta name="cover" content="id"/>.
         val metas = opf.getElementsByTagNameNS("*", "meta")
         for (i in 0 until metas.length) {
             val el = metas.item(i) as? Element ?: continue
-            if (!el.getAttribute("name").equals("cover", ignoreCase = true)) continue
-            val id = el.getAttribute("content")
-            val item = manifest[id] ?: continue
-            entries[item.href]?.let { return it to item.mime }
+            if (el.getAttribute("name").equals("cover", ignoreCase = true)) {
+                manifest[el.getAttribute("content")]?.let { return it.href }
+            }
         }
-        // 2. manifest properties="cover-image" (EPUB3)
-        val items = opf.getElementsByTagNameNS("*", "item")
-        for (i in 0 until items.length) {
-            val el = items.item(i) as? Element ?: continue
-            val props = el.getAttribute("properties")
-            if (!props.split(Regex("\\s+")).contains("cover-image")) continue
-            val href = el.getAttribute("href")
-            val resolved = resolve(opfBase(opf, manifest), href)
-            val bytes = entries[resolved] ?: entries[href]
-            if (bytes != null) return bytes to el.getAttribute("media-type")
-        }
-        // 3. guide <reference type="cover"/>
+        // guide <reference type="cover"/>.
         val refs = opf.getElementsByTagNameNS("*", "reference")
         for (i in 0 until refs.length) {
             val el = refs.item(i) as? Element ?: continue
-            if (!el.getAttribute("type").equals("cover", ignoreCase = true)) continue
-            val href = el.getAttribute("href")
-            entries[resolve(opfBase(opf, manifest), href)]?.let { return it to "image/jpeg" }
-        }
-        // 4. first image in manifest
-        for ((_, item) in manifest) {
-            if (item.mime.startsWith("image/")) {
-                entries[item.href]?.let { return it to item.mime }
+            if (el.getAttribute("type").equals("cover", ignoreCase = true)) {
+                val href = el.getAttribute("href")
+                if (href.isNotEmpty()) {
+                    val base = manifest.values.firstOrNull()?.href?.substringBeforeLast('/', "") ?: ""
+                    return resolve(base, href)
+                }
             }
         }
-        return null
+        // Last resort: first image in the manifest.
+        return manifest.values.firstOrNull { it.mime.startsWith("image/") }?.href
     }
 
-    private fun opfBase(opf: org.w3c.dom.Document, manifest: Map<String, ManifestItem>): String {
-        // Best-effort: derive from any manifest href's directory.
-        val first = manifest.values.firstOrNull()?.href ?: return ""
-        return first.substringBeforeLast('/', "")
-    }
+    // MARK: TOC
 
     private fun readToc(
-        opf: org.w3c.dom.Document,
+        opf: Document,
         manifest: Map<String, ManifestItem>,
-        entries: Map<String, ByteArray>,
+        bodies: Map<String, ByteArray>,
         spine: List<String>,
+        navHref: String?,
+        ncxHref: String?,
     ): List<EpubChapter> {
-        // EPUB3 nav document
-        val navItem = manifest.values.firstOrNull {
-            it.mime == "application/xhtml+xml" && navHasToc(entries[it.href])
-        } ?: manifest.entries.firstOrNull { (id, _) ->
-            opfItemHasNavProps(opf, id)
-        }?.value
-        if (navItem != null) {
-            entries[navItem.href]?.let { bytes ->
-                val chapters = parseNavToc(bytes, navItem.href.substringBeforeLast('/', ""))
+        if (navHref != null) {
+            bodies[navHref]?.let { bytes ->
+                val chapters = parseNavToc(bytes, navHref.substringBeforeLast('/', ""))
                 if (chapters.isNotEmpty()) return chapters
             }
         }
-        // EPUB2 NCX
-        val ncx = manifest.values.firstOrNull { it.mime == "application/x-dtbncx+xml" }
-        if (ncx != null) {
-            entries[ncx.href]?.let { bytes ->
-                val chapters = parseNcxToc(bytes, ncx.href.substringBeforeLast('/', ""))
+        if (ncxHref != null) {
+            bodies[ncxHref]?.let { bytes ->
+                val chapters = parseNcxToc(bytes, ncxHref.substringBeforeLast('/', ""))
                 if (chapters.isNotEmpty()) return chapters
             }
         }
-        // Fallback: spine order with file-name labels
+        // Fallback: spine order with file-name labels.
         return spine.mapNotNull { id ->
             val item = manifest[id] ?: return@mapNotNull null
             val label = item.href.substringAfterLast('/').substringBefore('#')
             EpubChapter(href = item.href, title = label.ifBlank { "Chapter" })
-        }
-    }
-
-    private fun opfItemHasNavProps(opf: org.w3c.dom.Document, id: String): Boolean {
-        val items = opf.getElementsByTagNameNS("*", "item")
-        for (i in 0 until items.length) {
-            val el = items.item(i) as? Element ?: continue
-            if (el.getAttribute("id") != id) continue
-            if (el.getAttribute("properties").split(Regex("\\s+")).contains("nav")) return true
-        }
-        return false
-    }
-
-    private fun navHasToc(bytes: ByteArray?): Boolean {
-        if (bytes == null || bytes.size > MAX_ENTRY_BYTES) return false
-        return try {
-            val doc = parseXml(bytes)
-            val navs = doc.getElementsByTagNameNS("*", "nav")
-            var found = false
-            for (i in 0 until navs.length) {
-                val el = navs.item(i) as? Element ?: continue
-                val type = el.getAttributeNS("http://www.idpf.org/2007/ops", "type")
-                    .ifEmpty { el.getAttribute("type") }
-                if (type.split(Regex("\\s+")).contains("toc")) {
-                    found = true
-                    break
-                }
-            }
-            found
-        } catch (_: Exception) {
-            false
         }
     }
 
@@ -246,24 +270,19 @@ class ZipEpubBackend : EpubBackend {
             val type = el.getAttributeNS("http://www.idpf.org/2007/ops", "type")
                 .ifEmpty { el.getAttribute("type") }
             if (!type.split(Regex("\\s+")).contains("toc")) continue
-            collectNavLinks(el, base, out)
+            val links = el.getElementsByTagNameNS("*", "a")
+            for (j in 0 until links.length) {
+                if (out.size >= MAX_TOC_ENTRIES) break
+                val a = links.item(j) as? Element ?: continue
+                val href = a.getAttribute("href").trim()
+                val title = a.textContent.trim().replace(Regex("\\s+"), " ")
+                if (href.isNotEmpty() && title.isNotEmpty()) {
+                    out += EpubChapter(href = resolve(base, href), title = title)
+                }
+            }
             break
         }
         return out
-    }
-
-    private fun collectNavLinks(el: Element, base: String, out: MutableList<EpubChapter>) {
-        val links = el.getElementsByTagNameNS("*", "a")
-        for (i in 0 until links.length) {
-            val a = links.item(i) as? Element ?: continue
-            val href = a.getAttribute("href").trim()
-            // Only top-level list items to avoid duplicates from nested lists.
-            val title = a.textContent.trim().replace(Regex("\\s+"), " ")
-            if (href.isNotEmpty() && title.isNotEmpty()) {
-                out += EpubChapter(href = resolve(base, href), title = title)
-            }
-            if (out.size >= MAX_TOC_ENTRIES) break
-        }
     }
 
     private fun parseNcxToc(ncxBytes: ByteArray, base: String): List<EpubChapter> {
@@ -273,7 +292,6 @@ class ZipEpubBackend : EpubBackend {
         for (i in 0 until points.length) {
             if (out.size >= MAX_TOC_ENTRIES) break
             val el = points.item(i) as? Element ?: continue
-            // Skip nested navPoints (they appear as descendants too).
             val parent = el.parentNode
             if (parent is Element && parent.tagName.endsWith("navPoint")) continue
             collectNcxPoint(el, base, out)
@@ -294,7 +312,6 @@ class ZipEpubBackend : EpubBackend {
         if (title != null && src != null && out.size < MAX_TOC_ENTRIES) {
             out += EpubChapter(href = resolve(base, src), title = title)
         }
-        // Recurse into nested navPoints for full depth.
         val children = el.childNodes
         for (i in 0 until children.length) {
             val child = children.item(i)
@@ -304,8 +321,9 @@ class ZipEpubBackend : EpubBackend {
         }
     }
 
-    private fun parseXml(bytes: ByteArray): org.w3c.dom.Document {
-        val capped = if (bytes.size > MAX_XML_BYTES) bytes.copyOf(MAX_XML_BYTES) else bytes
+    // MARK: XML helpers
+
+    private fun parseXml(bytes: ByteArray): Document {
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
@@ -314,11 +332,11 @@ class ZipEpubBackend : EpubBackend {
             isXIncludeAware = false
             isExpandEntityReferences = false
         }
-        return factory.newDocumentBuilder().parse(ByteArrayInputStream(capped))
+        return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
     }
 
-    private fun org.w3c.dom.Document.getElementsByTag(local: String): String {
-        val nodes: NodeList = getElementsByTagNameNS("*", local)
+    private fun Document.firstText(local: String): String {
+        val nodes = getElementsByTagNameNS("*", local)
         for (i in 0 until nodes.length) {
             val text = nodes.item(i).textContent.trim().replace(Regex("\\s+"), " ")
             if (text.isNotEmpty()) return text
@@ -329,10 +347,8 @@ class ZipEpubBackend : EpubBackend {
     private fun resolve(base: String, href: String): String {
         val clean = href.substringBefore('#').trim()
         if (clean.isEmpty()) return ""
-        // Strip leading "/" (OPF hrefs are relative to the OPF, never root).
         val rel = clean.removePrefix("/")
         if (base.isEmpty()) return rel
-        // Normalize ./ and ../ segments without touching the filesystem.
         val parts = ArrayList<String>()
         for (seg in (base.split('/') + rel.split('/'))) {
             when (seg) {
@@ -345,9 +361,13 @@ class ZipEpubBackend : EpubBackend {
     }
 
     private companion object {
-        const val MAX_ENTRY_BYTES = 8 * 1024 * 1024L
-        const val MAX_TOTAL_BYTES = 256 * 1024 * 1024L
-        const val MAX_XML_BYTES = 512 * 1024
+        const val CONTAINER_PATH = "META-INF/container.xml"
+
+        /** Per-entry materialization cap (nav docs and covers only). */
+        const val MAX_SINGLE_ENTRY_BYTES = 8 * 1024 * 1024L
+
+        /** Total materialized per pass. */
+        const val MAX_TOTAL_BYTES = 16 * 1024 * 1024L
         const val MAX_TOC_ENTRIES = 2000
     }
 }

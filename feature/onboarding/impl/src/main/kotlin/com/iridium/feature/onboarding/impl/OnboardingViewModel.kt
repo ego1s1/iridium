@@ -1,0 +1,87 @@
+package com.iridium.feature.onboarding.impl
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.iridium.core.datastore.IridiumPreferencesDataSource
+import com.iridium.core.model.ThemePreferences
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * Link-only step wizard: Welcome → Folder → Appearance. Theme choices persist
+ * immediately so quitting mid-wizard never loses them; Skip finishes without
+ * linking. Nothing is copied or indexed here — the library picks up the
+ * persisted tree on arrival.
+ */
+@HiltViewModel
+internal class OnboardingViewModel @Inject constructor(
+    private val preferences: IridiumPreferencesDataSource,
+) : ViewModel() {
+
+    private enum class Step { WELCOME, FOLDER, APPEARANCE }
+
+    private val step = MutableStateFlow(Step.WELCOME)
+    private val folderHintVisible = MutableStateFlow(false)
+
+    val uiState: StateFlow<OnboardingUiState> = combine(
+        step,
+        preferences.themePreferences,
+        folderHintVisible,
+        ::toUiState,
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = OnboardingUiState.Welcome,
+    )
+
+    private fun toUiState(
+        step: Step,
+        theme: ThemePreferences,
+        folderHintVisible: Boolean,
+    ): OnboardingUiState = when (step) {
+        Step.WELCOME -> OnboardingUiState.Welcome
+        Step.FOLDER -> OnboardingUiState.Folder(pickerHintVisible = folderHintVisible)
+        Step.APPEARANCE -> OnboardingUiState.Appearance(theme)
+    }
+
+    fun onAction(action: OnboardingAction) {
+        when (action) {
+            OnboardingAction.GetStarted -> step.value = Step.FOLDER
+            OnboardingAction.Skip -> finish()
+            OnboardingAction.BackStep -> step.value = when (step.value) {
+                Step.WELCOME -> Step.WELCOME
+                Step.FOLDER -> Step.WELCOME
+                Step.APPEARANCE -> Step.FOLDER
+            }
+            is OnboardingAction.FolderSelected -> {
+                viewModelScope.launch {
+                    preferences.setSourceTreeUri(action.uri.toString())
+                }
+                folderHintVisible.value = false
+                step.value = Step.APPEARANCE
+            }
+            OnboardingAction.FolderPickerDismissed -> folderHintVisible.value = true
+            is OnboardingAction.SetThemeMode -> updateTheme { it.copy(mode = action.mode) }
+            is OnboardingAction.SetDynamicColor -> updateTheme { it.copy(dynamicColor = action.enabled) }
+            is OnboardingAction.SetColorScheme -> updateTheme {
+                it.copy(colorScheme = action.scheme, dynamicColor = false)
+            }
+            is OnboardingAction.SetAmoled -> updateTheme { it.copy(amoled = action.enabled) }
+            OnboardingAction.Finish -> finish()
+        }
+    }
+
+    private fun updateTheme(transform: (ThemePreferences) -> ThemePreferences) {
+        viewModelScope.launch { preferences.updateThemePreferences(transform) }
+    }
+
+    private fun finish() {
+        viewModelScope.launch { preferences.setOnboardingCompleted(true) }
+    }
+}

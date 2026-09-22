@@ -40,7 +40,6 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,51 +57,33 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumIcons
-import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
-import com.iridium.core.designsystem.screenEnter
-import com.iridium.core.designsystem.screenExit
-import com.iridium.core.designsystem.screenPopEnter
-import com.iridium.core.designsystem.screenPopExit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryQuery
-import kotlinx.serialization.Serializable
 
-@Serializable
-data object LibraryRoute
-
-fun NavGraphBuilder.libraryScreen(
-    onBookClick: (String) -> Unit,
+/** Public tab content for the main viewport. The ViewModel type never appears here. */
+@Composable
+fun LibraryTabContent(
+    onReadClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
-    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onResumeAvailable: (Book?) -> Unit = {},
 ) {
-    composable<LibraryRoute>(
-        enterTransition = { screenEnter() },
-        exitTransition = { screenExit() },
-        popEnterTransition = { screenPopEnter() },
-        popExitTransition = { screenPopExit() },
-    ) {
-        // Expose the nav visibility scope so covers register as shared
-        // elements that morph into the detail hero.
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-            LibraryRoute(
-                onBookClick = onBookClick,
-                onBookLongClick = onBookLongClick,
-                onSettingsClick = onSettingsClick,
-            )
-        }
-    }
+    LibraryRoute(
+        onBookClick = onReadClick,
+        onBookLongClick = onBookLongClick,
+        modifier = modifier,
+        onResumeAvailable = onResumeAvailable,
+    )
 }
 
 @Composable
 internal fun LibraryRoute(
     onBookClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
-    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onResumeAvailable: (Book?) -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,6 +113,9 @@ internal fun LibraryRoute(
             snackbarHost.showSnackbar(text)
         }
     }
+    // Resume rides its own cached flow so chrome-only changes never rescan.
+    val resumeTarget by viewModel.resumeTarget.collectAsStateWithLifecycle()
+    LaunchedEffect(resumeTarget) { onResumeAvailable(resumeTarget) }
     LibraryScreen(
         uiState = uiState,
         onAction = viewModel::onAction,
@@ -140,7 +124,6 @@ internal fun LibraryRoute(
         },
         onDetailsClick = { onBookLongClick(it.id) },
         onLinkFolder = { folderLauncher.launch(null) },
-        onSettingsClick = onSettingsClick,
         snackbarHost = snackbarHost,
         modifier = modifier,
     )
@@ -155,7 +138,6 @@ internal fun LibraryScreen(
     onDetailsClick: (Book) -> Unit,
     modifier: Modifier = Modifier,
     onLinkFolder: () -> Unit = {},
-    onSettingsClick: () -> Unit = {},
     snackbarHost: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -163,7 +145,6 @@ internal fun LibraryScreen(
             LibraryTopBar(
                 searchOpen = uiState.searchOpen,
                 onSearchClick = { onAction(LibraryAction.ToggleSearch) },
-                onSettingsClick = onSettingsClick,
                 onAction = onAction,
             )
         },
@@ -241,7 +222,6 @@ private fun queryToDisplay(query: LibraryQuery) = com.iridium.core.model.Library
 private fun LibraryTopBar(
     searchOpen: Boolean,
     onSearchClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     onAction: (LibraryAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -265,12 +245,6 @@ private fun LibraryTopBar(
                 Icon(
                     imageVector = IridiumIcons.Tune,
                     contentDescription = stringResource(R.string.library_action_sort_filter),
-                )
-            }
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    imageVector = IridiumIcons.Settings,
-                    contentDescription = stringResource(R.string.library_action_settings),
                 )
             }
         },
