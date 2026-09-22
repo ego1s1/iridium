@@ -14,6 +14,7 @@ import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.TocEntry
 import com.iridium.core.model.applyQuery
 import com.iridium.epub.EpubBackend
+import com.iridium.epub.EpubSource
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -198,13 +199,9 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val coverId = linkedCoverId(uri)
         return try {
-            val inspected = backend.inspect(
-                openStream = {
-                    context.contentResolver.openInputStream(doc.uri)
-                        ?: throw IOException("Unable to read ${doc.name}")
-                },
-                fallbackTitle = doc.name.substringBeforeLast('.'),
-            )
+            val inspected = openSource(doc).use { source ->
+                backend.inspect(source, doc.name.substringBeforeLast('.'))
+            }
             val coverPath = covers.generate(inspected.coverBytes, coverId)
                 ?: existing?.coverPath?.takeIf { File(it).isFile }
             BookEntity(
@@ -255,6 +252,32 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         }
     }
 
+    /**
+     * Opens a seekable source for a linked document. When the provider exposes
+     * a real file descriptor the engine random-accesses it and nothing is
+     * copied; only pipe-like providers fall back to spooling into the cache.
+     */
+    private fun openSource(doc: LinkedDocument): EpubSource {
+        runCatching {
+            val pfd = context.contentResolver.openFileDescriptor(doc.uri, "r")
+            if (pfd != null) {
+                val channel = java.io.FileInputStream(pfd.fileDescriptor).channel
+                if (channel.size() > 0L) {
+                    return EpubSource.ofChannel(channel) { runCatching { pfd.close() } }
+                }
+                runCatching { channel.close() }
+                runCatching { pfd.close() }
+            }
+        }
+        return EpubSource.ofStream(
+            openStream = {
+                context.contentResolver.openInputStream(doc.uri)
+                    ?: throw IOException("Unable to read ${doc.name}")
+            },
+            cacheDir = File(context.cacheDir, "epub-index"),
+        )
+    }
+
     private fun deleteCover(coverPath: String?) {
         if (coverPath != null) runCatching { File(coverPath).delete() }
     }
@@ -277,7 +300,7 @@ internal object EpubModule {
 
     @Provides
     @Singleton
-    fun provideEpubBackend(): EpubBackend = com.iridium.epub.ZipEpubBackend()
+    fun provideEpubBackend(): EpubBackend = com.iridium.epub.engine.IridiumEpubEngine()
 
     @Provides
     @Singleton

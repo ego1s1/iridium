@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":epub-core"))
+    implementation(project(":epub-engine"))
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)
     implementation(libs.androidx.documentfile)

@@ -26,6 +26,7 @@ rootProject.name = "iridium"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":epub-core")
+include(":epub-engine")
 include(":app")
 include(":core:model")
 include(":core:common")

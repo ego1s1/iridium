@@ -1,16 +1,18 @@
-package com.iridium.epub
+package com.iridium.epub.engine
 
+import com.iridium.epub.EpubSource
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ZipEpubBackendTest {
+class IridiumEpubEngineTest {
 
-    private val backend = ZipEpubBackend()
+    private val engine = IridiumEpubEngine()
 
     @Test
     fun `parses epub3 metadata cover and nav toc`() {
@@ -23,7 +25,7 @@ class ZipEpubBackendTest {
                 "OEBPS/ch2.xhtml" to "<html/>".toByteArray(),
             ),
         )
-        val result = backend.inspect(bytes, "fallback.epub")
+        val result = engine.inspect(bytes, "fallback.epub")
 
         assertEquals("Treasure Island", result.title)
         assertEquals("Robert Louis Stevenson", result.author)
@@ -43,7 +45,7 @@ class ZipEpubBackendTest {
                 "OEBPS/ch1.xhtml" to "<html/>".toByteArray(),
             ),
         )
-        val result = backend.inspect(bytes, "fallback.epub")
+        val result = engine.inspect(bytes, "fallback.epub")
 
         assertEquals("Huck Finn", result.title)
         assertEquals(1, result.spineCount)
@@ -54,20 +56,20 @@ class ZipEpubBackendTest {
 
     @Test
     fun `garbage bytes yield fallback title without throwing`() {
-        val result = backend.inspect(byteArrayOf(0, 1, 2, 3), "mybook.epub")
+        val result = engine.inspect(byteArrayOf(0, 1, 2, 3), "mybook.epub")
         assertEquals("mybook.epub", result.title)
         assertTrue(result.chapters.isEmpty())
     }
 
     @Test
-    fun `empty bytes yield empty error signal`() {
-        val result = backend.inspect(ByteArray(0), "mybook.epub")
+    fun `empty bytes yield fallback`() {
+        val result = engine.inspect(ByteArray(0), "mybook.epub")
         assertEquals(0, result.spineCount)
         assertTrue(result.chapters.isEmpty())
     }
 
     @Test
-    fun `streaming skips unrelated large entries`() {
+    fun `single central-directory pass skips unrelated large entries`() {
         val bytes = buildEpub(
             opf = OPF_EPUB3,
             extra = mapOf(
@@ -75,15 +77,107 @@ class ZipEpubBackendTest {
                 "OEBPS/cover.jpg" to byteArrayOf(1, 2, 3),
                 "OEBPS/ch1.xhtml" to "<html/>".toByteArray(),
                 "OEBPS/ch2.xhtml" to "<html/>".toByteArray(),
-                // Oversized non-target entry: must be skipped, never buffered.
                 "OEBPS/assets/huge.bin" to ByteArray(12 * 1024 * 1024),
             ),
         )
-        val result = backend.inspect(bytes, "fallback.epub")
+        val result = engine.inspect(bytes, "fallback.epub")
 
         assertEquals("Treasure Island", result.title)
         assertNotNull(result.coverBytes)
         assertEquals(2, result.chapters.size)
+    }
+
+    @Test
+    fun `chapter pipeline reads bodies on demand`() {
+        val bytes = buildEpub(
+            opf = OPF_EPUB3,
+            extra = mapOf(
+                "OEBPS/nav.xhtml" to NAV_XHTML.toByteArray(),
+                "OEBPS/cover.jpg" to byteArrayOf(1, 2, 3),
+                "OEBPS/ch1.xhtml" to "<html>one</html>".toByteArray(),
+                "OEBPS/ch2.xhtml" to "<html>two</html>".toByteArray(),
+            ),
+        )
+        val book = engine.open(EpubSource.ofBytes(bytes), "fallback.epub")
+        assertNotNull(book)
+        book!!.use {
+            assertEquals(2, it.chapterCount)
+            assertEquals("<html>one</html>", String(it.chapterBytes(0)!!))
+            assertEquals("<html>two</html>", String(it.chapterBytes("OEBPS/ch2.xhtml")!!))
+            assertNull(it.chapterBytes(99))
+        }
+    }
+
+    @Test
+    fun `resource reads honour the byte cap`() {
+        val bytes = buildEpub(
+            opf = OPF_EPUB3,
+            extra = mapOf(
+                "OEBPS/nav.xhtml" to NAV_XHTML.toByteArray(),
+                "OEBPS/ch1.xhtml" to ByteArray(4096) { 1 },
+                "OEBPS/ch2.xhtml" to "<html/>".toByteArray(),
+            ),
+        )
+        val book = engine.open(EpubSource.ofBytes(bytes), "fallback.epub")!!
+        book.use {
+            assertNull(it.readResource("OEBPS/ch1.xhtml", maxBytes = 1024))
+            assertNotNull(it.readResource("OEBPS/ch1.xhtml", maxBytes = 8192))
+        }
+    }
+
+    @Test
+    fun `doctype payload is refused and degrades to fallback`() {
+        val xxeOpf = """<?xml version="1.0"?>
+<!DOCTYPE package [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>&xxe;</dc:title>
+  </metadata>
+  <manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="ch1"/></spine>
+</package>"""
+        val bytes = buildEpub(opf = xxeOpf, extra = mapOf("OEBPS/ch1.xhtml" to "<html/>".toByteArray()))
+        val result = engine.inspect(bytes, "safe.epub")
+        assertEquals("safe.epub", result.title)
+    }
+
+    @Test
+    fun `truncated archive yields fallback`() {
+        val full = buildEpub(
+            opf = OPF_EPUB3,
+            extra = mapOf("OEBPS/ch1.xhtml" to "<html/>".toByteArray()),
+        )
+        val truncated = full.copyOf(full.size / 2)
+        val result = engine.inspect(truncated, "cut.epub")
+        assertEquals("cut.epub", result.title)
+    }
+
+    @Test
+    fun `corrupt local header is tolerated for that entry only`() {
+        val bytes = buildEpub(
+            opf = OPF_EPUB3,
+            extra = mapOf(
+                "OEBPS/nav.xhtml" to NAV_XHTML.toByteArray(),
+                "OEBPS/ch1.xhtml" to "<html>one</html>".toByteArray(),
+                "OEBPS/ch2.xhtml" to "<html/>".toByteArray(),
+            ),
+        )
+        // Corrupt the "PK\u0003\u0004" local signature of ch1 so only its read fails.
+        val signature = byteArrayOf(0x50, 0x4B, 0x03, 0x04)
+        val index = indexOf(bytes, signature, from = 12)
+        if (index >= 0) bytes[index] = 0x00
+
+        val book = engine.open(EpubSource.ofBytes(bytes), "fallback.epub")
+        // Metadata still resolves; only the corrupted chapter body is null.
+        assertNotNull(book)
+    }
+
+    private fun indexOf(haystack: ByteArray, needle: ByteArray, from: Int): Int {
+        outer@ for (i in from..haystack.size - needle.size) {
+            for (j in needle.indices) if (haystack[i + j] != needle[j]) continue@outer
+            return i
+        }
+        return -1
     }
 
     private fun buildEpub(opf: String, extra: Map<String, ByteArray>): ByteArray {

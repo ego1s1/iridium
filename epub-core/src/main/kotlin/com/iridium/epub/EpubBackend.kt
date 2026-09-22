@@ -1,25 +1,16 @@
 package com.iridium.epub
 
-import java.io.InputStream
-
 /**
- * Seam over EPUB parsing. Streaming is the primary contract: callers hand a
- * factory that opens a fresh stream, so large archives are read in bounded
- * passes instead of being loaded whole into memory.
+ * Seam over EPUB parsing. Implementations read a [EpubSource] (random access)
+ * and must never throw for malformed input — failures degrade to a fallback
+ * title so a bad file can never crash a folder scan.
  */
 interface EpubBackend {
-    /**
-     * Parses the EPUB produced by [openStream]. [openStream] may be invoked
-     * more than once (the parser reads the archive in bounded passes).
-     */
-    fun inspect(openStream: () -> InputStream, fallbackTitle: String): InspectedEpub
+    fun inspect(source: EpubSource, fallbackTitle: String): InspectedEpub
 
-    /**
-     * Byte-array convenience used by tests and small in-memory sources.
-     * The default reads the array once and delegates to the stream path.
-     */
+    /** Byte-array convenience for tests and small in-memory sources. */
     fun inspect(epubBytes: ByteArray, fallbackTitle: String): InspectedEpub =
-        inspect({ epubBytes.inputStream() }, fallbackTitle)
+        EpubSource.ofBytes(epubBytes).use { inspect(it, fallbackTitle) }
 }
 
 /** A chapter entry from the EPUB navigation document. */
@@ -28,6 +19,7 @@ data class EpubChapter(
     val title: String,
 )
 
+/** Everything the library needs to index a book without opening it again. */
 data class InspectedEpub(
     val title: String,
     val author: String? = null,
