@@ -1,0 +1,20 @@
+plugins {
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.iridium.android.feature)
+}
+
+group = "com.iridium.feature.library.impl"
+
+android {
+    namespace = "com.iridium.feature.library.impl"
+}
+
+dependencies {
+    implementation(project(":core:model"))
+    implementation(project(":core:data"))
+    implementation(project(":core:datastore"))
+    implementation(libs.kotlinx.serialization.json)
+}

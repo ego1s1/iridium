@@ -1,0 +1,25 @@
+.gradle/
+build/
+local.properties
+.idea/
+.vscode/
+*.iml
+*.hprof
+*.log
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+.kotlin/
+out/
+# Design-reference drops at the repo root (screenshots, mockups).
+# Real assets live in module res/ dirs; these must never be committed.
+/*.png
+/*.jpg
+/*.jpeg
+/*.avif
