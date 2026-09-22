@@ -2,12 +2,14 @@
     <string name="library_title">My books</string>
     <string name="library_action_search">Search</string>
     <string name="library_action_sort_filter">Sort and filter</string>
+    <string name="library_action_settings">Settings</string>
     <string name="library_search_label">Search title or author</string>
-    <string name="library_import">Import EPUB</string>
+    <string name="library_fab_actions">Library actions</string>
+    <string name="library_link_folder">Link folder</string>
+    <string name="library_rescan">Rescan folder</string>
     <string name="library_continue_title">Continue reading</string>
     <string name="library_empty_title">No books yet</string>
-    <string name="library_empty_body">Import an EPUB file to start your library. Everything stays on this device.</string>
-    <string name="library_empty_import">Import EPUB</string>
+    <string name="library_empty_body">Link a folder to read the EPUBs already on your device. Nothing is copied — files stay exactly where they are.</string>
     <string name="library_empty_search_title">No matches</string>
     <string name="library_empty_search_body">Try a different title or author.</string>
 </resources>

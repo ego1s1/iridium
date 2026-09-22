@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -77,7 +75,7 @@ fun BookCoverArt(
 @Composable
 private fun CoverPlaceholder() {
     Icon(
-        imageVector = Icons.Rounded.MenuBook,
+        imageVector = IridiumIcons.MenuBook,
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         modifier = Modifier.size(40.dp),

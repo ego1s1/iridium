@@ -15,16 +15,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,12 +35,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.TocEntry
 
 /** Table-of-contents sheet: chapters navigate via Readium locators. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderTocSheet(
     toc: List<TocEntry>,
@@ -52,7 +49,7 @@ internal fun ReaderTocSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
             "Contents",
             style = MaterialTheme.typography.titleMedium,
@@ -82,7 +79,6 @@ internal fun ReaderTocSheet(
 }
 
 /** Highlights + notes sheet: color dots, notes, delete. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderHighlightsSheet(
     highlights: List<Highlight>,
@@ -91,7 +87,7 @@ internal fun ReaderHighlightsSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
             "Highlights (${highlights.size})",
             style = MaterialTheme.typography.titleMedium,
@@ -171,7 +167,7 @@ private fun HighlightRow(
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Rounded.Delete, contentDescription = "Delete highlight")
+            Icon(IridiumIcons.Delete, contentDescription = "Delete highlight")
         }
     }
 }

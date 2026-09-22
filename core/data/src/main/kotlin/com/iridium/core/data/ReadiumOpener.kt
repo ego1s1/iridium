@@ -1,14 +1,18 @@
 package com.iridium.core.data
 
 import android.content.Context
+import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.Try
+import org.readium.r2.shared.util.asset.Asset
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.toAbsoluteUrl
+import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 
@@ -20,9 +24,9 @@ sealed interface OpenResult {
 }
 
 /**
- * Opens app-private EPUB files with the Readium Streamer. Import-time
- * metadata stays on the lightweight [com.iridium.epub.ZipEpubBackend];
- * this is only for rendering, so the reader pays the Streamer cost lazily.
+ * Opens books with the Readium Streamer. Linked rows are SAF document URIs,
+ * so Readium reads them in place through the ContentResolver — the app never
+ * copies the user's file. Legacy absolute paths still resolve.
  */
 @Singleton
 class ReadiumOpener @Inject constructor(
@@ -34,15 +38,7 @@ class ReadiumOpener @Inject constructor(
     private val opener = PublicationOpener(parser, emptyList())
 
     suspend fun open(sourcePath: String): OpenResult {
-        val file = File(sourcePath)
-        if (!file.exists()) return OpenResult.FileMissing
-        val asset = when (val result = assetRetriever.retrieve(file)) {
-            is Try.Success<*, *> -> {
-                @Suppress("UNCHECKED_CAST")
-                (result as Try.Success<org.readium.r2.shared.util.asset.Asset, *>).value
-            }
-            else -> return OpenResult.ParseFailed
-        }
+        val asset = retrieveAsset(sourcePath) ?: return OpenResult.ParseFailed
         return when (val result = opener.open(asset, allowUserInteraction = false)) {
             is Try.Success<*, *> -> {
                 // The publication borrows the asset's resources lazily: it must
@@ -51,6 +47,24 @@ class ReadiumOpener @Inject constructor(
                 OpenResult.Opened((result as Try.Success<Publication, *>).value)
             }
             else -> OpenResult.ParseFailed
+        }
+    }
+
+    private suspend fun retrieveAsset(sourcePath: String): Asset? {
+        val result = if (isLinkedSourcePath(sourcePath)) {
+            val url = Uri.parse(sourcePath).toAbsoluteUrl() ?: return null
+            assetRetriever.retrieve(url)
+        } else {
+            val file = File(sourcePath)
+            if (!file.exists()) return null
+            assetRetriever.retrieve(file)
+        }
+        return when (result) {
+            is Try.Success<*, *> -> {
+                @Suppress("UNCHECKED_CAST")
+                (result as Try.Success<Asset, *>).value
+            }
+            else -> null
         }
     }
 }

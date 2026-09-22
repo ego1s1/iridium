@@ -20,11 +20,14 @@ data class Book(
     val author: String?,
     val format: BookFormat = BookFormat.EPUB,
     val spineCount: Int = 0,
+    /** User document URI (`content://`) or absolute file path; read in place. */
     val sourcePath: String,
     val coverPath: String?,
     val progress: Float = 0f,
     val lastLocator: String? = null,
     val sourceDisplayName: String,
+    /** Source document's last-modified marker, for the rescan fast path. */
+    val sourceModified: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
     val error: BookError? = null,

@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.Flow
  * Persisted user preferences. Implemented by DataStore; faked in tests.
  */
 interface IridiumPreferencesDataSource {
-    /** True once the user completes onboarding (first book imported). */
+    /** True once the user completes onboarding (first folder linked). */
     val onboardingCompleted: Flow<Boolean>
+
+    /** The last-linked SAF source tree URI, if the user granted one for rescans. */
+    val sourceTreeUri: Flow<String?>
 
     /** Reader preferences (flow, font scale, align, theme, brightness). */
     val readerPreferences: Flow<ReaderPreferences>
@@ -26,6 +29,8 @@ interface IridiumPreferencesDataSource {
     val libraryDisplay: Flow<LibraryDisplay>
 
     suspend fun setOnboardingCompleted(completed: Boolean)
+
+    suspend fun setSourceTreeUri(uri: String?)
 
     suspend fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences)
 

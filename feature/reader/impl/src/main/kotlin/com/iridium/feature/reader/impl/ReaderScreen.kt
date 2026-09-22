@@ -17,14 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.NavigateBefore
-import androidx.compose.material.icons.automirrored.rounded.NavigateNext
-import androidx.compose.material.icons.rounded.Highlight
-import androidx.compose.material.icons.rounded.List
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,12 +56,24 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumLoading
+import com.iridium.core.designsystem.IridiumScrimPill
+import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
+import com.iridium.core.designsystem.readerEnter
+import com.iridium.core.designsystem.readerExit
 import com.iridium.feature.reader.api.ReaderRoute
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
-    composable<ReaderRoute> {
-        ReaderRoute(onBackClick = onBackClick)
+    composable<ReaderRoute>(
+        enterTransition = { readerEnter() },
+        exitTransition = { readerExit() },
+        popEnterTransition = { readerEnter() },
+        popExitTransition = { readerExit() },
+    ) {
+        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+            ReaderRoute(onBackClick = onBackClick)
+        }
     }
 }
 
@@ -196,22 +201,22 @@ internal fun ReaderScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(IridiumIcons.Back, contentDescription = "Back")
                         }
                     },
                     actions = {
                         IconButton(onClick = { onAction(ReaderAction.OpenToc) }) {
-                            Icon(Icons.Rounded.List, contentDescription = "Contents")
+                            Icon(IridiumIcons.List, contentDescription = "Contents")
                         }
                         IconButton(onClick = { onAction(ReaderAction.OpenHighlights) }) {
-                            Icon(Icons.Rounded.Highlight, contentDescription = "Highlights")
+                            Icon(IridiumIcons.Highlight, contentDescription = "Highlights")
                         }
                         IconButton(onClick = { onAction(ReaderAction.OpenSettings) }) {
-                            Icon(Icons.Rounded.Settings, contentDescription = "Reading settings")
+                            Icon(IridiumIcons.Settings, contentDescription = "Reading settings")
                         }
                         var menuOpen by remember { mutableStateOf(false) }
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                            Icon(IridiumIcons.More, contentDescription = "More")
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
@@ -246,18 +251,10 @@ internal fun ReaderScreen(
             NavigatorHost(bookId = state.book.id)
             if (!state.chromeVisible && state.prefs.showPageCounter) {
                 state.positionText?.let {
-                    androidx.compose.material3.Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = Color.Black.copy(alpha = 0.6f),
+                    IridiumScrimPill(
+                        text = it,
                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
-                    ) {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -341,7 +338,7 @@ private fun ReaderBottomBar(
     var scrubbing by remember { mutableStateOf(false) }
     BottomAppBar(modifier = modifier) {
         IconButton(onClick = { onAction(ReaderAction.GoBackward()) }) {
-            Icon(Icons.AutoMirrored.Rounded.NavigateBefore, contentDescription = "Previous")
+            Icon(IridiumIcons.Previous, contentDescription = "Previous")
         }
         Column(Modifier.weight(1f)) {
             Slider(
@@ -365,7 +362,7 @@ private fun ReaderBottomBar(
             }
         }
         IconButton(onClick = { onAction(ReaderAction.GoForward()) }) {
-            Icon(Icons.AutoMirrored.Rounded.NavigateNext, contentDescription = "Next")
+            Icon(IridiumIcons.Next, contentDescription = "Next")
         }
     }
 }

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.iridium.android.feature)
 }
 
@@ -14,4 +15,5 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:datastore"))
+    implementation(libs.kotlinx.serialization.json)
 }

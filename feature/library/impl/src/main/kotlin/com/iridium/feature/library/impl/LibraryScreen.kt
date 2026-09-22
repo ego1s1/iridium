@@ -1,5 +1,6 @@
 package com.iridium.feature.library.impl
 
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -7,30 +8,27 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,16 +36,21 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -58,7 +61,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.iridium.core.designsystem.IridiumEmptyState
-import com.iridium.core.designsystem.IridiumLoading
+import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
+import com.iridium.core.designsystem.screenEnter
+import com.iridium.core.designsystem.screenExit
+import com.iridium.core.designsystem.screenPopEnter
+import com.iridium.core.designsystem.screenPopExit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryQuery
 import kotlinx.serialization.Serializable
@@ -69,12 +77,23 @@ data object LibraryRoute
 fun NavGraphBuilder.libraryScreen(
     onBookClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
-    composable<LibraryRoute> {
-        LibraryRoute(
-            onBookClick = onBookClick,
-            onBookLongClick = onBookLongClick,
-        )
+    composable<LibraryRoute>(
+        enterTransition = { screenEnter() },
+        exitTransition = { screenExit() },
+        popEnterTransition = { screenPopEnter() },
+        popExitTransition = { screenPopExit() },
+    ) {
+        // Expose the nav visibility scope so covers register as shared
+        // elements that morph into the detail hero.
+        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+            LibraryRoute(
+                onBookClick = onBookClick,
+                onBookLongClick = onBookLongClick,
+                onSettingsClick = onSettingsClick,
+            )
+        }
     }
 }
 
@@ -82,19 +101,35 @@ fun NavGraphBuilder.libraryScreen(
 internal fun LibraryRoute(
     onBookClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
+    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
+    val context = LocalContext.current
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
-        if (uri != null) viewModel.onAction(LibraryAction.ImportSelected(uri))
+        if (uri != null) {
+            // Persist the grant so rescans keep working across restarts.
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            viewModel.onAction(LibraryAction.LinkFolder(uri))
+        }
     }
     LaunchedEffect(Unit) {
-        viewModel.messages.collect {
-            snackbarHost.showSnackbar("Couldn't import that EPUB")
+        viewModel.messages.collect { message ->
+            val text = when (message) {
+                is LibraryMessage.IndexFailed ->
+                    "${message.failed} book(s) couldn't be read"
+                LibraryMessage.ScanFailed -> "Couldn't scan that folder"
+            }
+            snackbarHost.showSnackbar(text)
         }
     }
     LibraryScreen(
@@ -104,7 +139,8 @@ internal fun LibraryRoute(
             if (book.error != null) onBookLongClick(book.id) else onBookClick(book.id)
         },
         onDetailsClick = { onBookLongClick(it.id) },
-        onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "application/epub")) },
+        onLinkFolder = { folderLauncher.launch(null) },
+        onSettingsClick = onSettingsClick,
         snackbarHost = snackbarHost,
         modifier = modifier,
     )
@@ -118,49 +154,77 @@ internal fun LibraryScreen(
     onReadClick: (Book) -> Unit,
     onDetailsClick: (Book) -> Unit,
     modifier: Modifier = Modifier,
-    onImportClick: () -> Unit = {},
+    onLinkFolder: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     snackbarHost: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
         topBar = {
-            if (uiState is LibraryUiState.Success) {
-                LibraryTopBar(
-                    searchOpen = uiState.searchOpen,
-                    onSearchClick = { onAction(LibraryAction.ToggleSearch) },
-                    onAction = onAction,
-                )
-            }
+            LibraryTopBar(
+                searchOpen = uiState.searchOpen,
+                onSearchClick = { onAction(LibraryAction.ToggleSearch) },
+                onSettingsClick = onSettingsClick,
+                onAction = onAction,
+            )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onImportClick) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.library_import))
+            var expanded by remember { mutableStateOf(false) }
+            FloatingActionButtonMenu(
+                expanded = expanded,
+                button = {
+                    ToggleFloatingActionButton(
+                        checked = expanded,
+                        onCheckedChange = { expanded = it },
+                    ) {
+                        Icon(
+                            imageVector = if (expanded) IridiumIcons.Close else IridiumIcons.Add,
+                            contentDescription = stringResource(R.string.library_fab_actions),
+                        )
+                    }
+                },
+            ) {
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        expanded = false
+                        onLinkFolder()
+                    },
+                    icon = { Icon(IridiumIcons.ImportFolder, contentDescription = null) },
+                    text = { Text(stringResource(R.string.library_link_folder)) },
+                )
+                if (uiState.linked) {
+                    FloatingActionButtonMenuItem(
+                        onClick = {
+                            expanded = false
+                            onAction(LibraryAction.Rescan)
+                        },
+                        icon = { Icon(IridiumIcons.Search, contentDescription = null) },
+                        text = { Text(stringResource(R.string.library_rescan)) },
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHost) },
         modifier = modifier,
     ) { padding ->
         Surface(Modifier.fillMaxSize().padding(padding)) {
-            when (uiState) {
-                LibraryUiState.Loading -> IridiumLoading()
-                is LibraryUiState.Success -> {
-                    LibraryContent(
-                        books = uiState.books,
-                        query = uiState.query,
-                        refreshing = uiState.refreshing,
-                        searchOpen = uiState.searchOpen,
-                        shelf = uiState.continueReading,
-                        onAction = onAction,
-                        onReadClick = onReadClick,
-                        onDetailsClick = onDetailsClick,
-                        onImportClick = onImportClick,
-                    )
-                    if (uiState.filterOpen) {
-                        LibrarySortFilterSheet(
-                            display = queryToDisplay(uiState.query),
-                            onAction = onAction,
-                        )
-                    }
-                }
+            LibraryContent(
+                books = uiState.books,
+                query = uiState.query,
+                refreshing = uiState.refreshing,
+                indexProgress = uiState.indexProgress,
+                searchOpen = uiState.searchOpen,
+                linked = uiState.linked,
+                shelf = uiState.continueReading,
+                onAction = onAction,
+                onReadClick = onReadClick,
+                onDetailsClick = onDetailsClick,
+                onLinkFolder = onLinkFolder,
+            )
+            if (uiState.filterOpen) {
+                LibrarySortFilterSheet(
+                    display = queryToDisplay(uiState.query),
+                    onAction = onAction,
+                )
             }
         }
     }
@@ -177,6 +241,7 @@ private fun queryToDisplay(query: LibraryQuery) = com.iridium.core.model.Library
 private fun LibraryTopBar(
     searchOpen: Boolean,
     onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onAction: (LibraryAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -192,14 +257,20 @@ private fun LibraryTopBar(
         actions = {
             IconButton(onClick = onSearchClick) {
                 Icon(
-                    imageVector = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                    imageVector = if (searchOpen) IridiumIcons.Close else IridiumIcons.Search,
                     contentDescription = stringResource(R.string.library_action_search),
                 )
             }
             IconButton(onClick = { onAction(LibraryAction.OpenFilter) }) {
                 Icon(
-                    imageVector = Icons.Rounded.Tune,
+                    imageVector = IridiumIcons.Tune,
                     contentDescription = stringResource(R.string.library_action_sort_filter),
+                )
+            }
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = IridiumIcons.Settings,
+                    contentDescription = stringResource(R.string.library_action_settings),
                 )
             }
         },
@@ -213,102 +284,97 @@ private fun LibraryContent(
     books: List<Book>,
     query: LibraryQuery,
     refreshing: Boolean,
+    indexProgress: IndexProgress?,
     searchOpen: Boolean,
+    linked: Boolean,
     shelf: List<Book>,
     onAction: (LibraryAction) -> Unit,
     onReadClick: (Book) -> Unit,
     onDetailsClick: (Book) -> Unit,
-    onImportClick: () -> Unit,
+    onLinkFolder: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            AnimatedVisibility(visible = searchOpen) {
-                val searchFocus = remember { FocusRequester() }
-                val keyboard = LocalSoftwareKeyboardController.current
-                LaunchedEffect(searchOpen) {
-                    if (searchOpen) {
-                        searchFocus.requestFocus()
-                        keyboard?.show()
-                    } else {
-                        keyboard?.hide()
-                    }
-                }
-                OutlinedTextField(
-                    value = query.text,
-                    onValueChange = { onAction(LibraryAction.SearchTextChanged(it)) },
-                    label = { Text(stringResource(R.string.library_search_label)) },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { onAction(LibraryAction.ToggleSearch) }),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 8.dp)
-                        .focusRequester(searchFocus)
-                        .focusable(),
-                )
-            }
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = { onAction(LibraryAction.Refresh) },
-                modifier = Modifier.weight(1f).fillMaxSize(),
-            ) {
-                if (books.isEmpty()) {
-                    IridiumEmptyState(
-                        icon = Icons.Rounded.MenuBook,
-                        title = if (query.text.isNotBlank()) {
-                            stringResource(R.string.library_empty_search_title)
-                        } else {
-                            stringResource(R.string.library_empty_title)
-                        },
-                        body = if (query.text.isNotBlank()) {
-                            stringResource(R.string.library_empty_search_body)
-                        } else {
-                            stringResource(R.string.library_empty_body)
-                        },
-                        actionLabel = stringResource(R.string.library_empty_import),
-                        onAction = onImportClick,
-                    )
+    Column(modifier.fillMaxSize()) {
+        // Thin determinate bar: scanning never hides the books already on
+        // screen, and large rescans never read as a stuck spinner.
+        val progress = indexProgress
+        if (refreshing && progress != null && progress.total > 0) {
+            LinearProgressIndicator(
+                progress = { progress.done.coerceAtMost(progress.total).toFloat() / progress.total },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        AnimatedVisibility(visible = searchOpen) {
+            val searchFocus = remember { FocusRequester() }
+            val keyboard = LocalSoftwareKeyboardController.current
+            LaunchedEffect(searchOpen) {
+                if (searchOpen) {
+                    searchFocus.requestFocus()
+                    keyboard?.show()
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(128.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            start = 12.dp, top = 12.dp, end = 12.dp, bottom = 112.dp,
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        if (shelf.isNotEmpty() && query.text.isBlank()) {
-                            item(
-                                span = { GridItemSpan(maxLineSpan) },
-                                contentType = "continueShelf",
-                            ) {
-                                ContinueShelf(
-                                    books = shelf,
-                                    onReadClick = onReadClick,
-                                    onDetailsClick = onDetailsClick,
-                                )
-                            }
-                        }
-                        items(
-                            books,
-                            key = { it.id },
-                            contentType = { book ->
-                                (if (book.error != null) 4 else 0) +
-                                    (if (book.isInProgress) 2 else 0) +
-                                    (if (book.isFinished) 1 else 0)
-                            },
-                        ) { book ->
-                            BookCard(
-                                book = book,
-                                onRead = onReadClick,
-                                onDetails = onDetailsClick,
+                    keyboard?.hide()
+                }
+            }
+            OutlinedTextField(
+                value = query.text,
+                onValueChange = { onAction(LibraryAction.SearchTextChanged(it)) },
+                label = { Text(stringResource(R.string.library_search_label)) },
+                leadingIcon = { Icon(IridiumIcons.Search, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onAction(LibraryAction.ToggleSearch) }),
+                shape = MaterialTheme.shapes.extraLarge,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp)
+                    .focusRequester(searchFocus)
+                    .focusable(),
+            )
+        }
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { onAction(LibraryAction.Rescan) },
+            modifier = Modifier.weight(1f).fillMaxSize(),
+        ) {
+            if (books.isEmpty()) {
+                LibraryEmptyState(
+                    searching = query.text.isNotBlank(),
+                    linked = linked,
+                    onRescan = { onAction(LibraryAction.Rescan) },
+                    onLinkFolder = onLinkFolder,
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(128.dp),
+                    contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 112.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (shelf.isNotEmpty() && query.text.isBlank()) {
+                        item(span = { GridItemSpan(maxLineSpan) }, contentType = "continueShelf") {
+                            ContinueShelf(
+                                books = shelf,
+                                onReadClick = onReadClick,
+                                onDetailsClick = onDetailsClick,
                             )
                         }
+                    }
+                    items(
+                        books,
+                        key = { it.id },
+                        contentType = { book ->
+                            (if (book.error != null) 4 else 0) +
+                                (if (book.isInProgress) 2 else 0) +
+                                (if (book.isFinished) 1 else 0)
+                        },
+                    ) { book ->
+                        BookCard(
+                            book = book,
+                            onRead = onReadClick,
+                            onDetails = onDetailsClick,
+                        )
                     }
                 }
             }
@@ -344,4 +410,37 @@ private fun ContinueShelf(
         }
         Spacer(Modifier.height(4.dp))
     }
+}
+
+@Composable
+private fun LibraryEmptyState(
+    searching: Boolean,
+    linked: Boolean,
+    onRescan: () -> Unit,
+    onLinkFolder: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Unlinked and not searching, rescan is a dead end: offer folder linking.
+    val link = !searching && !linked
+    IridiumEmptyState(
+        icon = IridiumIcons.MenuBook,
+        title = if (searching) {
+            stringResource(R.string.library_empty_search_title)
+        } else {
+            stringResource(R.string.library_empty_title)
+        },
+        body = if (searching) {
+            stringResource(R.string.library_empty_search_body)
+        } else {
+            stringResource(R.string.library_empty_body)
+        },
+        actionLabel = if (link) {
+            stringResource(R.string.library_link_folder)
+        } else {
+            stringResource(R.string.library_rescan)
+        },
+        onAction = if (link) onLinkFolder else onRescan,
+        modifier = modifier,
+        bottomPadding = 112.dp,
+    )
 }

@@ -1,28 +1,39 @@
 package com.iridium.core.data
 
+import android.content.Context
 import android.net.Uri
 import com.iridium.core.database.BookDao
+import com.iridium.core.database.BookEntity
 import com.iridium.core.database.BookmarkDao
 import com.iridium.core.database.HighlightDao
 import com.iridium.core.model.Book
+import com.iridium.core.model.BookError
 import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.TocEntry
+import com.iridium.core.model.applyQuery
 import com.iridium.epub.EpubBackend
-import com.iridium.epub.ZipEpubBackend
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+
+/** Outcome of one linked-tree scan. */
+data class IndexReport(val total: Int, val failed: Int)
 
 interface BooksRepository {
     fun observeLibrary(query: LibraryQuery): Flow<List<Book>>
@@ -30,44 +41,60 @@ interface BooksRepository {
     fun observeToc(bookId: String): Flow<List<TocEntry>>
     fun observeHighlights(bookId: String): Flow<List<Highlight>>
     fun observeBookmarks(bookId: String): Flow<List<Bookmark>>
-    suspend fun importEpub(uri: Uri): ImportResult
+
+    /** Links a user folder in place and indexes every EPUB under it. */
+    suspend fun indexLinkedTree(
+        treeUri: Uri,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): IndexReport
+
     suspend fun updateProgress(id: String, progress: Float, locator: String?)
     suspend fun setBookmarked(id: String, bookmarked: Boolean)
     suspend fun upsertHighlight(highlight: Highlight)
     suspend fun deleteHighlight(id: String)
     suspend fun upsertBookmark(bookmark: Bookmark)
     suspend fun deleteBookmark(id: String)
+
+    /** Unlinks a book: removes the row + its thumbnail. The original is untouched. */
     suspend fun removeBook(id: String)
 }
 
 /**
- * Offline-first repository: Room is the source of truth, queries apply
- * in-memory over observed rows. Import copies EPUB bytes into app-private
- * storage — nothing is ever read in place from shared storage.
+ * Offline-first, link-only repository (Mori's storage model): Room is the
+ * source of truth and books are addressed by their SAF document URI — bytes
+ * are read in place, never copied into the app. Only cover thumbnails and
+ * reading state live on-device.
  */
 @Singleton
-class OfflineFirstBooksRepository @Inject constructor(
+internal class OfflineFirstBooksRepository @Inject constructor(
     private val bookDao: BookDao,
     private val highlightDao: HighlightDao,
     private val bookmarkDao: BookmarkDao,
-    private val importer: EpubImporter,
+    private val backend: EpubBackend,
+    private val covers: EpubCoverGenerator,
+    private val treeLister: LinkedTreeLister,
+    @ApplicationContext private val context: Context,
 ) : BooksRepository {
 
+    /**
+     * Library rows, mapped/filtered/sorted off the main thread. Room re-emits
+     * on every write, so the transform rides [Dispatchers.Default] and
+     * [distinctUntilChanged] drops equal lists before they can recompose.
+     */
     override fun observeLibrary(query: LibraryQuery): Flow<List<Book>> =
-        bookDao.observeAll().map { entities ->
-            entities.map { it.toModel() }.forQuery(query)
-                .let { books ->
-                    // Errors sort last unless the query says otherwise; cheap
-                    // stability win for the grid when hideErrors is off.
-                    books
-                }
-        }
+        bookDao.observeAll()
+            .map { entities -> entities.map { it.toModel() }.applyQuery(query) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override fun observeBook(id: String): Flow<Book?> =
-        bookDao.observeById(id).map { it?.toModel() }
+        bookDao.observeById(id)
+            .map { it?.toModel() }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override fun observeToc(bookId: String): Flow<List<TocEntry>> =
-        bookDao.observeById(bookId).map { it?.tocEntries().orEmpty() }
+        bookDao.observeById(bookId).map { it?.tocEntries().orEmpty() }.flowOn(Dispatchers.Default)
 
     override fun observeHighlights(bookId: String): Flow<List<Highlight>> =
         highlightDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
@@ -75,7 +102,54 @@ class OfflineFirstBooksRepository @Inject constructor(
     override fun observeBookmarks(bookId: String): Flow<List<Bookmark>> =
         bookmarkDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
 
-    override suspend fun importEpub(uri: Uri): ImportResult = importer.import(uri)
+    override suspend fun indexLinkedTree(
+        treeUri: Uri,
+        onProgress: (done: Int, total: Int) -> Unit,
+    ): IndexReport = withContext(Dispatchers.IO) {
+        val (docs, walkFailed) = treeLister.listBooks(treeUri)
+        // Batch: one table fetch, one upsert, one emission.
+        val knownById = bookDao.getAll().associateBy { it.id }
+        val rows = mutableListOf<BookEntity>()
+        var failed = 0
+        docs.forEachIndexed { index, doc ->
+            val uri = doc.uri.toString()
+            try {
+                val known = knownById[uri]
+                val row = if (
+                    known != null &&
+                    known.sourceModified == doc.modified &&
+                    known.coverPath?.let { File(it).isFile } == true
+                ) {
+                    // Fast path: unchanged file with a live thumbnail.
+                    known
+                } else {
+                    indexDocument(doc, known)
+                }
+                rows += row
+                if (row.error != null) failed += 1
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                failed += 1
+            }
+            onProgress(index + 1, docs.size)
+        }
+        if (rows.isNotEmpty()) bookDao.upsertAll(rows)
+        // Prune rows deleted from the tree out from under us — never on a
+        // failed walk, which would read as an empty folder and wipe rows the
+        // user still owns. Pruned covers go with their rows.
+        if (!walkFailed) {
+            val foundIds = rows.map { it.id }.toSet()
+            val pruned = knownById.values.filter { isLinkedSourcePath(it.sourcePath) && it.id !in foundIds }
+            if (rows.isEmpty() && pruned.isNotEmpty()) {
+                bookDao.deleteAllLinked()
+            } else if (pruned.isNotEmpty()) {
+                bookDao.deleteMissingLinked(foundIds.toList())
+            }
+            pruned.forEach { deleteCover(it.coverPath) }
+        }
+        IndexReport(total = docs.size, failed = failed)
+    }
 
     override suspend fun updateProgress(id: String, progress: Float, locator: String?) {
         bookDao.updateProgress(id, progress.coerceIn(0f, 1f), locator, System.currentTimeMillis())
@@ -101,19 +175,89 @@ class OfflineFirstBooksRepository @Inject constructor(
         bookmarkDao.deleteById(id)
     }
 
-    override suspend fun removeBook(id: String) {
-        val book = bookDao.getById(id)
-        withContext(Dispatchers.IO) {
+    override suspend fun removeBook(id: String) = withContext(Dispatchers.IO) {
+        // Unlink only: the user's original file must survive removal.
+        val row = bookDao.getById(id)
+        if (row != null) {
             highlightDao.deleteForBook(id)
             bookmarkDao.deleteForBook(id)
             bookDao.deleteById(id)
+            deleteCover(row.coverPath)
         }
-        // Delete private files last: DB removal is the atomic user-visible
-        // effect; orphaned files on crash are reaped on next launch.
-        book?.let {
-            runCatching { File(it.sourcePath).delete() }
-            runCatching { it.coverPath?.let { path -> File(path).delete() } }
+        Unit
+    }
+
+    /**
+     * Inspects one linked document and builds its row WITHOUT writing, so the
+     * caller batches every row into a single upsert. The URI is the stable id,
+     * so rescans refresh rows instead of duplicating them, and progress /
+     * bookmarks carry over via [existing].
+     */
+    private suspend fun indexDocument(doc: LinkedDocument, existing: BookEntity?): BookEntity {
+        val uri = doc.uri.toString()
+        val now = System.currentTimeMillis()
+        val coverId = linkedCoverId(uri)
+        return try {
+            val bytes = readBytes(doc.uri) ?: throw IOException("Unable to read ${doc.name}")
+            val inspected = backend.inspect(bytes, doc.name.substringBeforeLast('.'))
+            val coverPath = covers.generate(inspected.coverBytes, coverId)
+                ?: existing?.coverPath?.takeIf { File(it).isFile }
+            BookEntity(
+                id = uri,
+                title = inspected.title,
+                author = inspected.author,
+                format = com.iridium.core.model.BookFormat.EPUB.name,
+                spineCount = inspected.spineCount,
+                sourcePath = uri,
+                coverPath = coverPath,
+                progress = existing?.progress ?: 0f,
+                lastLocator = existing?.lastLocator,
+                sourceDisplayName = doc.name,
+                sourceModified = doc.modified,
+                tocJson = encodeToc(inspected.chapters.map { TocEntry(it.href, it.title) }),
+                error = if (inspected.spineCount == 0 && inspected.chapters.isEmpty()) {
+                    BookError.CORRUPT.name
+                } else {
+                    null
+                },
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = existing?.updatedAt ?: now,
+                bookmarked = existing?.bookmarked ?: false,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Typed failure, not silence: keep the row so the user sees the
+            // book, flagged for the detail screen's retry/remove path.
+            BookEntity(
+                id = uri,
+                title = existing?.title ?: doc.name.substringBeforeLast('.'),
+                author = existing?.author,
+                format = com.iridium.core.model.BookFormat.EPUB.name,
+                spineCount = 0,
+                sourcePath = uri,
+                coverPath = existing?.coverPath,
+                progress = existing?.progress ?: 0f,
+                lastLocator = existing?.lastLocator,
+                sourceDisplayName = doc.name,
+                sourceModified = doc.modified,
+                tocJson = existing?.tocJson,
+                error = BookError.CORRUPT.name,
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now,
+                bookmarked = existing?.bookmarked ?: false,
+            )
         }
+    }
+
+    private suspend fun readBytes(uri: Uri): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        }.getOrNull()
+    }
+
+    private fun deleteCover(coverPath: String?) {
+        if (coverPath != null) runCatching { File(coverPath).delete() }
     }
 }
 
@@ -134,5 +278,11 @@ internal object EpubModule {
 
     @Provides
     @Singleton
-    fun provideEpubBackend(): EpubBackend = ZipEpubBackend()
+    fun provideEpubBackend(): EpubBackend = com.iridium.epub.ZipEpubBackend()
+
+    @Provides
+    @Singleton
+    fun provideLinkedTreeLister(
+        @ApplicationContext context: Context,
+    ): LinkedTreeLister = DocumentLinkedTreeLister(context)
 }

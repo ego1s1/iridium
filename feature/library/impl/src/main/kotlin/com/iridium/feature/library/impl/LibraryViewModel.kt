@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.data.BooksRepository
-import com.iridium.core.data.ImportResult
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryDisplay
@@ -12,6 +11,7 @@ import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.continueShelf
 import com.iridium.core.model.resumeTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -21,13 +21,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -58,9 +62,19 @@ class LibraryViewModel @Inject constructor(
     private val searchOpen = MutableStateFlow(false)
 
     /**
+     * Serializes scans: a folder pick is never dropped behind a running scan,
+     * and rapid rescan taps queue instead of overlapping index writes. The
+     * counter keeps the progress bar up across queued runs.
+     */
+    private val scanMutex = Mutex()
+    private val scanPending = AtomicInteger(0)
+    private val scanQueued = AtomicBoolean(false)
+    private val indexProgress = MutableStateFlow<IndexProgress?>(null)
+
+    /**
      * Database subscription query: the text field echoes instantly through
-     * [query], but the grid re-queries at most once per typing pause instead
-     * of once per keystroke. Empty text passes through with no delay.
+     * [query], but the grid re-queries at most once per typing pause. Empty
+     * text passes through with no delay.
      */
     private val dbQuery: Flow<LibraryQuery> = combine(
         preferences.libraryDisplay,
@@ -68,7 +82,7 @@ class LibraryViewModel @Inject constructor(
         LibraryDisplay::toQuery,
     )
 
-    /** One-shot messages (import failures). A channel, not state. */
+    /** One-shot messages (scan failures). A channel, not state. */
     private val messageChannel = Channel<LibraryMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
 
@@ -86,19 +100,31 @@ class LibraryViewModel @Inject constructor(
         books,
         query,
         combine(refreshing, filterOpen, searchOpen, ::Chrome),
-    ) { books, query, chrome ->
-        LibraryUiState.Success(
+        preferences.sourceTreeUri,
+        indexProgress,
+    ) { books, query, chrome, treeUri, progress ->
+        LibraryUiState(
             books = books,
             query = query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
             searchOpen = chrome.searchOpen,
+            linked = treeUri != null,
             continueReading = books.continueShelf(),
+            indexProgress = progress,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = LibraryUiState.Loading,
+        initialValue = LibraryUiState(
+            books = emptyList(),
+            query = LibraryQuery(),
+            refreshing = false,
+            filterOpen = false,
+            searchOpen = false,
+            linked = false,
+            continueReading = emptyList(),
+        ),
     )
 
     /** Most recently touched book; backs a resume affordance in the shell. */
@@ -113,6 +139,15 @@ class LibraryViewModel @Inject constructor(
             initialValue = null,
         )
 
+    init {
+        // Rescan on launch: the library reads user folders in place, so a
+        // launch pass picks up files added, moved or removed outside the app.
+        viewModelScope.launch {
+            if (preferences.sourceTreeUri.first() == null) return@launch
+            scan()
+        }
+    }
+
     fun onAction(action: LibraryAction) {
         when (action) {
             is LibraryAction.SearchTextChanged -> {
@@ -125,8 +160,8 @@ class LibraryViewModel @Inject constructor(
             LibraryAction.OpenFilter -> filterOpen.value = true
             LibraryAction.CloseFilter -> filterOpen.value = false
             LibraryAction.ToggleSearch -> searchOpen.update { !it }
-            LibraryAction.Refresh -> pruneMissing()
-            is LibraryAction.ImportSelected -> import(action.uri)
+            LibraryAction.Rescan -> scan()
+            is LibraryAction.LinkFolder -> scan(linkUri = action.uri.toString())
             is LibraryAction.RemoveBook -> remove(action.bookId)
         }
     }
@@ -139,51 +174,52 @@ class LibraryViewModel @Inject constructor(
     )
 
     private fun updateDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
-        viewModelScope.launch {
-            preferences.updateLibraryDisplay(transform)
-        }
-    }
-
-    private fun import(uri: android.net.Uri) {
-        viewModelScope.launch {
-            refreshing.value = true
-            try {
-                when (repository.importEpub(uri)) {
-                    is ImportResult.Imported,
-                    is ImportResult.AlreadyInLibrary,
-                    -> {
-                        preferences.setOnboardingCompleted(true)
-                    }
-                    is ImportResult.Failed -> messageChannel.send(LibraryMessage.ImportFailed)
-                }
-            } finally {
-                refreshing.value = false
-            }
-        }
+        viewModelScope.launch { preferences.updateLibraryDisplay(transform) }
     }
 
     private fun remove(bookId: String) {
-        viewModelScope.launch {
-            repository.removeBook(bookId)
-        }
+        viewModelScope.launch { repository.removeBook(bookId) }
     }
 
     /**
-     * Lightweight refresh: drops rows whose private files vanished (restores,
-     * failed writes). No folder rescan — books are imported file-by-file.
+     * Link-only scan: re-indexes a tree in place — nothing is ever copied.
+     * [linkUri] persists a freshly picked folder first, so a pick during a
+     * running scan folds into at most one follow-up run.
      */
-    private fun pruneMissing() {
+    private fun scan(linkUri: String? = null) {
         viewModelScope.launch {
+            if (linkUri != null) {
+                preferences.setSourceTreeUri(linkUri)
+                preferences.setOnboardingCompleted(true)
+            }
+            if (scanMutex.isLocked) {
+                scanQueued.set(true)
+                return@launch
+            }
+            scanPending.incrementAndGet()
             refreshing.value = true
             try {
-                val current = books.value
-                for (book in current) {
-                    if (!java.io.File(book.sourcePath).exists()) {
-                        repository.removeBook(book.id)
+                do {
+                    scanQueued.set(false)
+                    scanMutex.withLock {
+                        try {
+                            val treeUri = preferences.sourceTreeUri.first() ?: return@withLock
+                            val report = repository.indexLinkedTree(android.net.Uri.parse(treeUri)) { done, total ->
+                                indexProgress.value = IndexProgress(done, total)
+                            }
+                            if (report.failed > 0) {
+                                messageChannel.send(LibraryMessage.IndexFailed(report.failed))
+                            }
+                        } catch (_: Exception) {
+                            messageChannel.send(LibraryMessage.ScanFailed)
+                        }
                     }
-                }
+                } while (scanQueued.getAndSet(false))
             } finally {
-                refreshing.value = false
+                if (scanPending.decrementAndGet() == 0) {
+                    refreshing.value = false
+                    indexProgress.value = null
+                }
             }
         }
     }

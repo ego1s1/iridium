@@ -1,5 +1,6 @@
 package com.iridium.core.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -23,6 +24,9 @@ data class BookEntity(
     /** Last stable locator JSON (href + progression), for resume. */
     val lastLocator: String?,
     val sourceDisplayName: String,
+    /** Source document's last-modified marker, for the rescan fast path. */
+    @ColumnInfo(defaultValue = "0")
+    val sourceModified: Long = 0L,
     /** Chapter TOC as JSON ([TocEntryDto] list), for the detail screen. */
     val tocJson: String?,
     /** [com.iridium.core.model.BookError] name, or null when healthy. */

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.LibraryDisplay
 import com.iridium.core.model.LibraryFilter
@@ -29,6 +30,15 @@ internal class DataStorePreferencesDataSource @Inject constructor(
 
     override val onboardingCompleted: Flow<Boolean> =
         dataStore.data.map { it[ONBOARDING_COMPLETED] ?: false }
+
+    override val sourceTreeUri: Flow<String?> =
+        dataStore.data.map { it[SOURCE_TREE_URI] }
+
+    override suspend fun setSourceTreeUri(uri: String?) {
+        dataStore.edit {
+            if (uri == null) it.remove(SOURCE_TREE_URI) else it[SOURCE_TREE_URI] = uri
+        }
+    }
 
     override val readerPreferences: Flow<ReaderPreferences> =
         dataStore.data.map { prefs ->
@@ -71,6 +81,10 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                     runCatching { ThemeMode.valueOf(it) }.getOrDefault(ThemeMode.SYSTEM)
                 } ?: ThemeMode.SYSTEM,
                 dynamicColor = prefs[DYNAMIC_COLOR] ?: true,
+                colorScheme = prefs[APP_COLOR_SCHEME]?.let {
+                    runCatching { AppColorScheme.valueOf(it) }
+                        .getOrDefault(AppColorScheme.IRIDIUM)
+                } ?: AppColorScheme.IRIDIUM,
                 amoled = prefs[AMOLED] ?: false,
             )
         }
@@ -80,6 +94,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         dataStore.edit {
             it[THEME_MODE] = updated.mode.name
             it[DYNAMIC_COLOR] = updated.dynamicColor
+            it[APP_COLOR_SCHEME] = updated.colorScheme.name
             it[AMOLED] = updated.amoled
         }
     }
@@ -124,6 +139,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
 
     private companion object {
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val SOURCE_TREE_URI = stringPreferencesKey("source_tree_uri")
         val READING_FLOW = stringPreferencesKey("reading_flow")
         val FONT_SCALE = floatPreferencesKey("font_scale")
         val TEXT_ALIGN = stringPreferencesKey("text_align")
@@ -134,6 +150,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val APP_COLOR_SCHEME = stringPreferencesKey("app_color_scheme")
         val AMOLED = booleanPreferencesKey("amoled")
         val MOTION_STYLE = stringPreferencesKey("motion_style")
         val LIBRARY_SORT = stringPreferencesKey("library_sort")
