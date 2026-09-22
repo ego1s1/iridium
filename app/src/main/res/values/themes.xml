@@ -1,5 +1,6 @@
 <resources>
-    <style name="Theme.Iridium" parent="android:Theme.Material.NoActionBar">
+    <!-- AppCompat parent: the Readium navigator inflates AppCompat widgets. -->
+    <style name="Theme.Iridium" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">?android:attr/colorBackground</item>
     </style>
 </resources>

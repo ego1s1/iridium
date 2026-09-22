@@ -16,4 +16,8 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:datastore"))
     implementation(project(":feature:reader:api"))
+    implementation(libs.readium.shared)
+    implementation(libs.readium.navigator)
+    implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.core.ktx)
 }

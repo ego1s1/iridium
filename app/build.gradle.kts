@@ -14,6 +14,10 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    compileOptions {
+        // Required by the Readium toolkit.
+        isCoreLibraryDesugaringEnabled = true
+    }
     defaultConfig {
         applicationId = "com.iridium.reader"
         versionCode = 1
@@ -55,6 +59,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.appcompat)
+    coreLibraryDesugaring(libs.desugar.libs)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
