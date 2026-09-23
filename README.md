@@ -10,7 +10,13 @@ Fast, native EPUB reading on your phone or tablet. No account, no ads, no tracki
 
 </div>
 
-> **Status:** active development — scaffolding through the reader is in place, expect rough edges.
+> **Status:** 0.1.0 alpha — the core reader, library and search are in place; expect rough edges.
+
+## Download
+
+Grab the latest APK from [GitHub Releases](https://github.com/ego1s1/iridium/releases) (Android 7.0+). Alpha tags are published as prereleases.
+
+[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="80">](obtainium://app/%7B%22id%22%3A%20%22com.iridium.reader%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fego1s1%2Firidium%22%2C%20%22author%22%3A%20%22ego1s1%22%2C%20%22name%22%3A%20%22Iridium%22%7D)
 
 ## Why Iridium
 
@@ -36,7 +42,17 @@ Requires JDK 17 and the Android SDK (with NDK 27.2 and CMake 3.22 for the native
 ```bash
 ./gradlew :app:assembleDebug     # debug APK
 ./gradlew test                   # unit tests
-./gradlew :app:assembleDebug test
+./gradlew detekt                 # static analysis
+./gradlew :app:lintDebug         # Android lint
+
+# full gate
+./gradlew :app:assembleDebug :app:lintDebug test detekt
+```
+
+Releases are cut by tag; CI builds, signs and publishes them:
+
+```bash
+./scripts/new-release.sh 0.1.0   # verify, tag and push; CI publishes the release
 ```
 
 The native core is optional: JVM unit tests compile a host build of the same C++

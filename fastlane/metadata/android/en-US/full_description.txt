@@ -1,0 +1,25 @@
+Iridium is an EPUB reader that gets out of the way.
+
+Read EPUBs already on your device. Point Iridium at a folder and your shelf fills in with covers, search, sorts and a continue-reading shelf — your files stay exactly where they are, nothing is copied or uploaded.
+
+READING
+• Paged and scrolled flow
+• Per-book themes: light, sepia, grey, dark and pure black for AMOLED
+• Text size, alignment, brightness and volume-key paging
+• Immersive full-screen mode with a progress slider
+
+HIGHLIGHTS AND NOTES
+• Highlight in six colours and attach a note
+• Jump back to any highlight from the book's details
+• Bookmarks for the places you want to return to
+
+SEARCH
+• Full-text search inside your books, not just titles
+• Results show the sentence around each match and open straight to that chapter
+
+PRIVATE BY DESIGN
+• No account, no ads, no tracking
+• Everything stays on your device and works fully offline
+• Crash reporting is opt-in and nothing is ever sent automatically
+
+Iridium hosts zero content — it only reads EPUB files you already own.

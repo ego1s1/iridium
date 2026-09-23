@@ -20,8 +20,14 @@ android {
     }
     defaultConfig {
         applicationId = "com.iridium.reader"
-        versionCode = 1
-        versionName = "0.1.0"
+        // Version precedence: explicit -PappVersionName/-PappVersionCode (used
+        // by the release workflow) win; otherwise every commit gets an
+        // incremental 0.1.x build derived from the git commit count.
+        val commitCount = gitCommitCount()
+        versionCode = (project.findProperty("appVersionCode") as String?)
+            ?.toIntOrNull() ?: commitCount.coerceAtLeast(1)
+        versionName = (project.findProperty("appVersionName") as String?)
+            ?.removePrefix("v") ?: "0.1.$commitCount"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -69,4 +75,23 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.compose.ui.test.junit4)
+}
+
+/**
+ * Number of commits reachable from HEAD; drives the incremental dev version so
+ * every commit produces a distinct, monotonically increasing versionCode and a
+ * `0.1.N` versionName. Returns 0 when git is unavailable (shallow checkouts
+ * should use fetch-depth 0; see .github/workflows).
+ */
+fun gitCommitCount(): Int {
+    return try {
+        val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        if (process.waitFor() == 0) output.toInt() else 0
+    } catch (_: Exception) {
+        0
+    }
 }

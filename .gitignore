@@ -17,6 +17,11 @@ captures/
 *.class
 .kotlin/
 out/
+# Release signing material must never be committed.
+*.jks
+*.keystore
+/store.pass
+/key.pass
 # Design-reference drops at the repo root (screenshots, mockups).
 # Real assets live in module res/ dirs; these must never be committed.
 /*.png

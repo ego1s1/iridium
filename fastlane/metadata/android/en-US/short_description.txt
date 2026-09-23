@@ -1,0 +1,1 @@
+A fast, private EPUB reader that reads your books in place.
