@@ -1,0 +1,92 @@
+# Iridium detekt configuration.
+#
+# Starts from detekt's defaults and relaxes only what conflicts with this
+# codebase: Compose UI functions are legitimately long/large, and the EPUB
+# engines deliberately catch broad exceptions so a malformed file can never
+# crash the app.
+config:
+  validation: true
+
+complexity:
+  LongMethod:
+    # Compose screens and the parser entry points are long by nature.
+    threshold: 120
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    functionThreshold: 10
+    constructorThreshold: 12
+    ignoreDefaultParameters: true
+  CyclomaticComplexMethod:
+    threshold: 30
+    ignoreAnnotated: ['Composable']
+  NestedBlockDepth:
+    threshold: 8
+  TooManyFunctions:
+    thresholdInFiles: 25
+    thresholdInClasses: 25
+    thresholdInInterfaces: 25
+    thresholdInObjects: 30
+  ComplexCondition:
+    threshold: 6
+
+style:
+  # Byte/character scanners legitimately break out of the loop from several
+  # guards (end of buffer, malformed structure, cap exceeded).
+  LoopWithTooManyJumpStatements:
+    active: false
+  # Off by design: the ZIP/EPUB engines are full of format constants (0xFF,
+  # 0xFFFFFFFF, signature values) where a named constant would add noise
+  # rather than clarity.
+  MagicNumber:
+    active: false
+  ForbiddenComment:
+    active: false
+  MaxLineLength:
+    maxLineLength: 140
+    excludeCommentStatements: true
+    # Test fixtures embed long XML/HTML literals on purpose.
+    excludes: ['**/test/**', '**/androidTest/**']
+  ReturnCount:
+    max: 8
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Composable', 'Preview']
+  UnusedParameter:
+    ignoreAnnotated: ['Composable']
+  UnnecessaryAbstractClass:
+    active: false
+  DataClassContainsFunctions:
+    active: false
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Za-z0-9]*'
+    privatePropertyPattern: '([A-Z][_A-Za-z0-9]*|[a-z][A-Za-z0-9]*)'
+  MatchingDeclarationName:
+    active: false
+
+exceptions:
+  # Defensive parsing: broad catches are the contract, not an oversight.
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false
+  InstanceOfCheckForException:
+    active: false
+  ThrowingExceptionsWithoutMessageOrCause:
+    active: false
+
+coroutines:
+  GlobalCoroutineUsage:
+    active: true
+  InjectDispatcher:
+    active: false
+
+performance:
+  SpreadOperator:
+    active: false
+
+empty-blocks:
+  EmptyFunctionBlock:
+    ignoreOverridden: true

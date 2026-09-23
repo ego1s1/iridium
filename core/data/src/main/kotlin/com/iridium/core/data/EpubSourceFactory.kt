@@ -43,7 +43,13 @@ class EpubSourceFactory @Inject constructor(
                 cacheDir = File(context.cacheDir, "epub-index"),
             )
         }
-        return EpubSource.ofFile(File(sourcePath))
+        // Plain paths, plus file:// URIs (which callers such as tests produce).
+        val file = if (sourcePath.startsWith("file://")) {
+            android.net.Uri.parse(sourcePath).path?.let(::File) ?: File(sourcePath)
+        } else {
+            File(sourcePath)
+        }
+        return EpubSource.ofFile(file)
     }
 
     /**

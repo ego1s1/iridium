@@ -209,15 +209,7 @@ internal fun LibraryScreen(
     ) { padding ->
         Surface(Modifier.fillMaxSize().padding(padding)) {
             LibraryContent(
-                books = uiState.books,
-                query = uiState.query,
-                refreshing = uiState.refreshing,
-                indexProgress = uiState.indexProgress,
-                searchOpen = uiState.searchOpen,
-                linked = uiState.linked,
-                shelf = uiState.continueReading,
-                contentHits = uiState.contentHits,
-                indexing = uiState.indexing,
+                state = uiState,
                 onAction = onAction,
                 onReadClick = onReadClick,
                 onDetailsClick = onDetailsClick,
@@ -278,15 +270,7 @@ private fun LibraryTopBar(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryContent(
-    books: List<Book>,
-    query: LibraryQuery,
-    refreshing: Boolean,
-    indexProgress: IndexProgress?,
-    searchOpen: Boolean,
-    linked: Boolean,
-    shelf: List<Book>,
-    contentHits: List<ContentHit>,
-    indexing: Boolean,
+    state: LibraryUiState,
     onAction: (LibraryAction) -> Unit,
     onReadClick: (Book) -> Unit,
     onDetailsClick: (Book) -> Unit,
@@ -294,6 +278,15 @@ private fun LibraryContent(
     onOpenChapter: (bookId: String, href: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val books = state.books
+    val query = state.query
+    val refreshing = state.refreshing
+    val indexProgress = state.indexProgress
+    val searchOpen = state.searchOpen
+    val linked = state.linked
+    val shelf = state.continueReading
+    val contentHits = state.contentHits
+    val indexing = state.indexing
     Column(modifier.fillMaxSize()) {
         // Thin determinate bar: scanning never hides the books already on
         // screen, and large rescans never read as a stuck spinner.

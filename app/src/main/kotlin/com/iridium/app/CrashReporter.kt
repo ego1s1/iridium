@@ -29,11 +29,18 @@ class CrashReporter @Inject constructor(
 ) {
     private val directory: File get() = File(context.cacheDir, DIR).apply { mkdirs() }
 
-    private val previousHandler = AtomicReference<Thread.UncaughtExceptionHandler?>(null)
+    private val previousHandler = AtomicReference<Thread.UncaughtExceptionHandler?>()
+
+    /**
+     * Explicit installed flag rather than a null sentinel: the platform's
+     * default handler is itself null on a fresh process, so "previous != null"
+     * would wrongly report "not installed" and wrap the handler twice.
+     */
+    private val installed = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Chains a handler that records the crash, then defers to the platform. */
     fun install() {
-        if (previousHandler.get() != null) return
+        if (!installed.compareAndSet(false, true)) return
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         previousHandler.set(previous)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -44,8 +51,8 @@ class CrashReporter @Inject constructor(
     }
 
     fun uninstall() {
-        val previous = previousHandler.getAndSet(null) ?: return
-        Thread.setDefaultUncaughtExceptionHandler(previous)
+        if (!installed.compareAndSet(true, false)) return
+        Thread.setDefaultUncaughtExceptionHandler(previousHandler.getAndSet(null))
     }
 
     /** Tombstones waiting to be offered to the user, newest first. */
