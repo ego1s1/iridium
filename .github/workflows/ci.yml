@@ -39,23 +39,28 @@ jobs:
 
       - name: Install missing SDK packages
         # Guarded so a preinstalled copy is reused instead of re-downloaded;
-        # `yes |` also answers any licence prompt the install raises.
+        # `yes |` answers any licence prompt the install raises.
+        #
+        # Deliberately NOT `set -o pipefail`: `yes` is killed by SIGPIPE the
+        # moment sdkmanager exits, so pipefail reports 141 and fails the step
+        # even when the install succeeded.
         run: |
-          set -euo pipefail
+          set -eu
           SDK="${ANDROID_HOME}"
           if [ ! -d "$SDK/ndk/27.2.12479018" ]; then
             echo "Installing NDK 27.2.12479018..."
-            yes | sdkmanager "ndk;27.2.12479018"
+            yes | sdkmanager --sdk_root="$SDK" "ndk;27.2.12479018"
           else
             echo "NDK 27.2.12479018 already present."
           fi
           if [ ! -d "$SDK/cmake/3.22.1" ]; then
             echo "Installing CMake 3.22.1..."
-            yes | sdkmanager "cmake;3.22.1"
+            yes | sdkmanager --sdk_root="$SDK" "cmake;3.22.1"
           else
             echo "CMake 3.22.1 already present."
           fi
-          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          df -h / | tail -1
 
       - name: Verify toolchain
         run: |

@@ -88,16 +88,18 @@ jobs:
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
       - name: Install missing SDK packages
+        # No `pipefail`: `yes` exits 141 on SIGPIPE when sdkmanager finishes,
+        # which would fail the step despite a successful install.
         run: |
-          set -euo pipefail
+          set -eu
           SDK="${ANDROID_HOME}"
           if [ ! -d "$SDK/ndk/27.2.12479018" ]; then
-            yes | sdkmanager "ndk;27.2.12479018"
+            yes | sdkmanager --sdk_root="$SDK" "ndk;27.2.12479018"
           fi
           if [ ! -d "$SDK/cmake/3.22.1" ]; then
-            yes | sdkmanager "cmake;3.22.1"
+            yes | sdkmanager --sdk_root="$SDK" "cmake;3.22.1"
           fi
-          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
           test -d "$SDK/ndk/27.2.12479018" \
             || { echo "::error::NDK 27.2.12479018 not available"; exit 1; }
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
