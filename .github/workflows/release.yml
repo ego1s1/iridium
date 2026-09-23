@@ -76,33 +76,52 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Inspect preinstalled Android toolchain
+      - name: Locate Android SDK tooling
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-          echo "sdkmanager: $(command -v sdkmanager || echo MISSING)"
-          echo "--- disk ---"; df -h / | tail -1
-          echo "--- preinstalled NDK ---"; ls "${ANDROID_HOME}/ndk" 2>/dev/null || echo none
-          echo "--- preinstalled CMake ---"; ls "${ANDROID_HOME}/cmake" 2>/dev/null || echo none
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            for candidate in /usr/local/lib/android/sdk "$HOME/Android/Sdk"; do
+              if [ -d "$candidate" ]; then SDK="$candidate"; break; fi
+            done
+          fi
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            echo "::error::Could not find an Android SDK directory"; exit 1
+          fi
+          SDKMANAGER=""
+          for candidate in "$SDK"/cmdline-tools/*/bin/sdkmanager "$SDK"/tools/bin/sdkmanager; do
+            if [ -x "$candidate" ]; then SDKMANAGER="$candidate"; break; fi
+          done
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found under $SDK"; ls -la "$SDK" || true; exit 1
+          fi
+          echo "sdkmanager=$SDKMANAGER"
+          "$SDKMANAGER" --version || true
+          df -h / | tail -1
+          ls "$SDK/ndk" 2>/dev/null || echo "no NDK preinstalled"
+          {
+            echo "ANDROID_SDK_ROOT=$SDK"
+            echo "ANDROID_HOME=$SDK"
+            echo "SDKMANAGER=$SDKMANAGER"
+          } >> "$GITHUB_ENV"
 
       - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+        run: yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
 
       - name: Install missing SDK packages
         # No `pipefail`: `yes` exits 141 on SIGPIPE when sdkmanager finishes,
         # which would fail the step despite a successful install.
         run: |
           set -eu
-          SDK="${ANDROID_HOME}"
-          if [ ! -d "$SDK/ndk/27.2.12479018" ]; then
-            yes | sdkmanager --sdk_root="$SDK" "ndk;27.2.12479018"
+          if [ ! -d "$ANDROID_SDK_ROOT/ndk/27.2.12479018" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" "ndk;27.2.12479018"
           fi
-          if [ ! -d "$SDK/cmake/3.22.1" ]; then
-            yes | sdkmanager --sdk_root="$SDK" "cmake;3.22.1"
+          if [ ! -d "$ANDROID_SDK_ROOT/cmake/3.22.1" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" "cmake;3.22.1"
           fi
-          yes | sdkmanager --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
-          test -d "$SDK/ndk/27.2.12479018" \
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
+            "platforms;android-35" "build-tools;35.0.0"
+          test -d "$ANDROID_SDK_ROOT/ndk/27.2.12479018" \
             || { echo "::error::NDK 27.2.12479018 not available"; exit 1; }
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
