@@ -27,6 +27,7 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":epub-core")
 include(":epub-engine")
+include(":epub-native")
 include(":app")
 include(":core:model")
 include(":core:common")

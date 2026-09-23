@@ -15,6 +15,8 @@ import com.iridium.core.model.TocEntry
 import com.iridium.core.model.applyQuery
 import com.iridium.epub.EpubBackend
 import com.iridium.epub.EpubSource
+import com.iridium.epub.InspectedEpub
+import com.iridium.epub.nativecore.NativeEpub
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -199,9 +201,7 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val coverId = linkedCoverId(uri)
         return try {
-            val inspected = openSource(doc).use { source ->
-                backend.inspect(source, doc.name.substringBeforeLast('.'))
-            }
+            val inspected = inspectDocument(doc)
             val coverPath = covers.generate(inspected.coverBytes, coverId)
                 ?: existing?.coverPath?.takeIf { File(it).isFile }
             BookEntity(
@@ -250,6 +250,26 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 bookmarked = existing?.bookmarked ?: false,
             )
         }
+    }
+
+    /**
+     * Reads metadata/cover/TOC for one document.
+     *
+     * Prefers the native core when the provider exposes a real file descriptor
+     * and the native scan actually understood the book; otherwise falls back to
+     * the JVM engine, which handles ZIP64 and every archive the native core
+     * declines. Both paths are never-throw.
+     */
+    private fun inspectDocument(doc: LinkedDocument): InspectedEpub {
+        val fallback = doc.name.substringBeforeLast('.')
+        if (NativeEpub.isAvailable) {
+            runCatching {
+                context.contentResolver.openFileDescriptor(doc.uri, "r")?.use { descriptor ->
+                    NativeEpub.inspectFd(descriptor.fd, fallback)?.let { return it }
+                }
+            }
+        }
+        return openSource(doc).use { source -> backend.inspect(source, fallback) }
     }
 
     /**

@@ -30,7 +30,7 @@ Iridium links the folders you choose through Android's Storage Access Framework 
 
 ## Build it yourself
 
-Requires JDK 17 and the Android SDK:
+Requires JDK 17 and the Android SDK (with NDK 27.2 and CMake 3.22 for the native EPUB core):
 
 ```bash
 ./gradlew :app:assembleDebug     # debug APK
@@ -38,13 +38,18 @@ Requires JDK 17 and the Android SDK:
 ./gradlew :app:assembleDebug test
 ```
 
+The native core is optional: JVM unit tests compile a host build of the same C++
+and skip themselves when no C++ toolchain is present, and the app always keeps a
+pure-Kotlin EPUB engine as a fallback.
+
 ## Project layout
 
 ```
 app/                 app shell: navigation, theming, main tabs
 core/                model, database (Room), datastore, designsystem, data
-epub-core/           EPUB parsing API + models
-epub-engine/         high-performance EPUB engine (central-directory ZIP + SAX)
+epub-core/           EPUB parsing API + models (seekable source abstraction)
+epub-engine/         high-performance JVM EPUB engine (central-directory ZIP + SAX)
+epub-native/         native C++ EPUB core (NDK) with a JVM fallback
 feature/             onboarding, library, history, detail, reader, settings
 ```
 
