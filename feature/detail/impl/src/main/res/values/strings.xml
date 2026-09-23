@@ -7,6 +7,11 @@
     <string name="detail_start">Start reading</string>
     <string name="detail_chapters">Chapters (%1$d)</string>
     <string name="detail_highlights">Highlights (%1$d)</string>
+    <string name="detail_bookmarks">Bookmarks (%1$d)</string>
+    <string name="detail_bookmark_untitled">Bookmark</string>
+    <string name="detail_delete">Delete</string>
+    <string name="detail_unreadable_title">This book can\'t be opened</string>
+    <string name="detail_unreadable_body">Iridium couldn\'t read %1$s. The file may be corrupted, encrypted, or in a format we don\'t support yet.</string>
     <string name="detail_remove_title">Remove book?</string>
     <string name="detail_remove_body">“%1$s” and its highlights, notes and bookmarks will be deleted from this device.</string>
     <string name="detail_remove_confirm">Remove</string>

@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -144,6 +145,32 @@ internal fun DetailScreen(
             item(contentType = "hero") {
                 DetailHero(book = book, onReadClick = onReadClick)
             }
+            if (book.error != null) {
+                item(contentType = "error") {
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.detail_unreadable_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(
+                                    R.string.detail_unreadable_body,
+                                    book.sourceDisplayName,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
+                }
+            }
             if (state.toc.isNotEmpty()) {
                 item(contentType = "tocHeader") {
                     Text(
@@ -163,11 +190,39 @@ internal fun DetailScreen(
                     }
                 }
             }
+            if (state.bookmarks.isNotEmpty()) {
+                item(contentType = "bmHeader") {
+                    Text(
+                        text = stringResource(R.string.detail_bookmarks, state.bookmarks.size),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                items(state.bookmarks, key = { it.id }) { bookmark ->
+                    AnnotationRow(
+                        label = bookmark.label.orEmpty().ifBlank {
+                            stringResource(R.string.detail_bookmark_untitled)
+                        },
+                        secondary = null,
+                        onDelete = { onAction(DetailAction.DeleteBookmark(bookmark.id)) },
+                    )
+                }
+            }
             if (state.highlights.isNotEmpty()) {
                 item(contentType = "hlHeader") {
                     Text(
                         text = stringResource(R.string.detail_highlights, state.highlights.size),
                         style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                items(state.highlights, key = { it.id }) { highlight ->
+                    AnnotationRow(
+                        label = highlight.note.orEmpty().ifBlank {
+                            highlight.selectedText.ifBlank {
+                                highlight.href.substringAfterLast('/')
+                            }
+                        },
+                        secondary = highlight.note?.let { highlight.selectedText.takeIf { t -> t.isNotBlank() } },
+                        onDelete = { onAction(DetailAction.DeleteHighlight(highlight.id)) },
                     )
                 }
             }
@@ -257,4 +312,40 @@ private fun DetailHero(
             }
         }
     }
+}
+
+/** One annotation (highlight or bookmark) with a delete action. */
+@Composable
+private fun AnnotationRow(
+    label: String,
+    secondary: String?,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (secondary != null) {
+                Text(
+                    text = secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(onClick = onDelete) {
+            Icon(IridiumIcons.Delete, contentDescription = stringResource(R.string.detail_delete))
+        }
+    }
+    HorizontalDivider()
 }
