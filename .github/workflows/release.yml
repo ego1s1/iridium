@@ -76,12 +76,31 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK and NDK
+      - name: Inspect preinstalled Android toolchain
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" \
-                     "ndk;27.2.12479018" "cmake;3.22.1"
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          echo "sdkmanager: $(command -v sdkmanager || echo MISSING)"
+          echo "--- disk ---"; df -h / | tail -1
+          echo "--- preinstalled NDK ---"; ls "${ANDROID_HOME}/ndk" 2>/dev/null || echo none
+          echo "--- preinstalled CMake ---"; ls "${ANDROID_HOME}/cmake" 2>/dev/null || echo none
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install missing SDK packages
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME}"
+          if [ ! -d "$SDK/ndk/27.2.12479018" ]; then
+            yes | sdkmanager "ndk;27.2.12479018"
+          fi
+          if [ ! -d "$SDK/cmake/3.22.1" ]; then
+            yes | sdkmanager "cmake;3.22.1"
+          fi
+          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          test -d "$SDK/ndk/27.2.12479018" \
+            || { echo "::error::NDK 27.2.12479018 not available"; exit 1; }
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

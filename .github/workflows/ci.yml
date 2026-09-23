@@ -20,14 +20,52 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK and NDK
-        # Runners preinstall the SDK; accept licenses and ensure the compile
-        # platform plus the NDK/CMake the native EPUB core needs.
+      # The Android SDK ships with the runner image; only the NDK/CMake the
+      # native core needs may be missing, so inspect before downloading
+      # anything (the NDK alone is ~1GB and runners have a tight disk budget).
+      - name: Inspect preinstalled Android toolchain
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" \
-                     "ndk;27.2.12479018" "cmake;3.22.1"
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-unset}"
+          echo "sdkmanager: $(command -v sdkmanager || echo MISSING)"
+          sdkmanager --version || true
+          echo "--- disk ---"; df -h / | tail -1
+          echo "--- preinstalled NDK ---"; ls "${ANDROID_HOME}/ndk" 2>/dev/null || echo none
+          echo "--- preinstalled CMake ---"; ls "${ANDROID_HOME}/cmake" 2>/dev/null || echo none
+          echo "--- platforms ---"; ls "${ANDROID_HOME}/platforms" 2>/dev/null || echo none
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install missing SDK packages
+        # Guarded so a preinstalled copy is reused instead of re-downloaded;
+        # `yes |` also answers any licence prompt the install raises.
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME}"
+          if [ ! -d "$SDK/ndk/27.2.12479018" ]; then
+            echo "Installing NDK 27.2.12479018..."
+            yes | sdkmanager "ndk;27.2.12479018"
+          else
+            echo "NDK 27.2.12479018 already present."
+          fi
+          if [ ! -d "$SDK/cmake/3.22.1" ]; then
+            echo "Installing CMake 3.22.1..."
+            yes | sdkmanager "cmake;3.22.1"
+          else
+            echo "CMake 3.22.1 already present."
+          fi
+          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Verify toolchain
+        run: |
+          set -euo pipefail
+          test -d "${ANDROID_HOME}/ndk/27.2.12479018" \
+            || { echo "::error::NDK 27.2.12479018 not available"; exit 1; }
+          test -d "${ANDROID_HOME}/cmake/3.22.1" \
+            || { echo "::error::CMake 3.22.1 not available"; exit 1; }
+          echo "ANDROID_SDK_ROOT=${ANDROID_HOME}" >> "$GITHUB_ENV"
+          df -h / | tail -1
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
