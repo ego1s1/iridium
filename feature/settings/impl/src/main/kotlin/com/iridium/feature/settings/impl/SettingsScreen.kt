@@ -205,6 +205,13 @@ internal fun SettingsScreen(
                     onClick = {},
                 )
                 HorizontalDivider()
+                IridiumSettingSwitch(
+                    title = "Send crash reports",
+                    subtitle = "Off by default. Reports stay on device until you share them.",
+                    checked = state.crashReportingEnabled,
+                    onCheckedChange = { onAction(SettingsAction.SetCrashReporting(it)) },
+                )
+                HorizontalDivider()
                 IridiumSettingRow(
                     title = "Storage",
                     subtitle = "Books are read in place. Only covers and reading state are stored on device.",

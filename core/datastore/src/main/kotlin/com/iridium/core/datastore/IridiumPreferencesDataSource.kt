@@ -28,6 +28,12 @@ interface IridiumPreferencesDataSource {
     /** Persisted library display options (sort, filter, error visibility). */
     val libraryDisplay: Flow<LibraryDisplay>
 
+    /** True when the user opted in to sending crash reports. Defaults to off. */
+    val crashReportingEnabled: Flow<Boolean>
+
+    /** True once the user has answered the crash-reporting prompt. */
+    val crashReportingAsked: Flow<Boolean>
+
     suspend fun setOnboardingCompleted(completed: Boolean)
 
     suspend fun setSourceTreeUri(uri: String?)
@@ -39,4 +45,8 @@ interface IridiumPreferencesDataSource {
     suspend fun updateMotionStyle(style: MotionStyle)
 
     suspend fun updateLibraryDisplay(transform: (LibraryDisplay) -> LibraryDisplay)
+
+    suspend fun setCrashReporting(enabled: Boolean)
+
+    suspend fun setCrashReportingAsked(asked: Boolean)
 }

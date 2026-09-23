@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Open book: two pages meeting at the spine, inside the 72dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25,37.5 C34,33 45,32.5 52.5,36.5 L52.5,73 C45,69 34,69.5 25,74 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M83,37.5 C74,33 63,32.5 55.5,36.5 L55.5,73 C63,69 74,69.5 83,74 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.4"
+        android:strokeAlpha="0.55"
+        android:pathData="M36,43 L47,44.5 M36,49 L47,50.5 M36,55 L47,56.5" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.4"
+        android:strokeAlpha="0.55"
+        android:pathData="M61,44.5 L72,43 M61,50.5 L72,49 M61,56.5 L72,55" />
+</vector>

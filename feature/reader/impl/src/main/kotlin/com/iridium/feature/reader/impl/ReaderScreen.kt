@@ -1,6 +1,7 @@
 package com.iridium.feature.reader.impl
 
 import android.content.Intent
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -62,6 +63,7 @@ import com.iridium.core.designsystem.IridiumScrimPill
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
+import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
@@ -170,6 +172,53 @@ internal fun ReaderScreen(
                 androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         onDispose { }
+    }
+
+    // Keep the screen awake while reading, when the user asked for it.
+    DisposableEffect(state.prefs.keepScreenOn) {
+        val window = activity?.window
+        if (state.prefs.keepScreenOn) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    /**
+     * Volume-key paging. The handler is installed only while paging is on and
+     * no sheet is open, so volume always works normally everywhere else; it
+     * consumes both the down and up events so the system volume panel never
+     * appears during a page turn.
+     */
+    DisposableEffect(
+        state.prefs.volumeKeys,
+        state.settingsOpen,
+        state.tocOpen,
+        state.highlightsOpen,
+    ) {
+        val active = state.prefs.volumeKeys &&
+            !state.settingsOpen && !state.tocOpen && !state.highlightsOpen
+        ReaderKeyInterceptor.handler = if (active) {
+            { event ->
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_UP -> {
+                        if (event.action == KeyEvent.ACTION_UP) {
+                            if (event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                                onAction(ReaderAction.GoForward())
+                            } else {
+                                onAction(ReaderAction.GoBackward())
+                            }
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+        } else {
+            null
+        }
+        onDispose { ReaderKeyInterceptor.handler = null }
     }
 
     Scaffold(

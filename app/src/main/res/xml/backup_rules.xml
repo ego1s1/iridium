@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Full-backup rules (API < 31).
+
+  Backed up: the library database (progress, highlights, notes, bookmarks, the
+  search index) and DataStore preferences. Covers are regenerable, so they are
+  excluded to keep the archive small; the cache never leaves the device.
+
+  Note: book files themselves are never copied by the app, and linked SAF
+  folders cannot be resolved on a different device — a restore re-links them.
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+    <include domain="file" path="datastore" />
+    <exclude domain="file" path="covers" />
+    <exclude domain="cache" path="." />
+    <exclude domain="no_backup" path="." />
+</full-backup-content>

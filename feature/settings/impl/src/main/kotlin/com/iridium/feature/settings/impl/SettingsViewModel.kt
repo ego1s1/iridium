@@ -24,6 +24,7 @@ class SettingsViewModel @Inject constructor(
         preferences.motionStyle,
         preferences.readerPreferences,
         preferences.libraryDisplay,
+        preferences.crashReportingEnabled,
         ::SettingsUiState,
     ).stateIn(
         scope = viewModelScope,
@@ -48,6 +49,9 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetKeepScreenOn -> updateReader { it.copy(keepScreenOn = action.enabled) }
             is SettingsAction.SetShowPageCounter -> updateReader { it.copy(showPageCounter = action.enabled) }
             is SettingsAction.SetVolumeKeys -> updateReader { it.copy(volumeKeys = action.enabled) }
+            is SettingsAction.SetCrashReporting -> viewModelScope.launch {
+                preferences.setCrashReporting(action.enabled)
+            }
         }
     }
 

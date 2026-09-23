@@ -133,12 +133,31 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         }
     }
 
+    override val crashReportingEnabled: Flow<Boolean> =
+        dataStore.data.map { it[CRASH_REPORTING_ENABLED] ?: false }
+
+    override val crashReportingAsked: Flow<Boolean> =
+        dataStore.data.map { it[CRASH_REPORTING_ASKED] ?: false }
+
+    override suspend fun setCrashReporting(enabled: Boolean) {
+        dataStore.edit {
+            it[CRASH_REPORTING_ENABLED] = enabled
+            it[CRASH_REPORTING_ASKED] = true
+        }
+    }
+
+    override suspend fun setCrashReportingAsked(asked: Boolean) {
+        dataStore.edit { it[CRASH_REPORTING_ASKED] = asked }
+    }
+
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { it[ONBOARDING_COMPLETED] = completed }
     }
 
     private companion object {
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val CRASH_REPORTING_ENABLED = booleanPreferencesKey("crash_reporting_enabled")
+        val CRASH_REPORTING_ASKED = booleanPreferencesKey("crash_reporting_asked")
         val SOURCE_TREE_URI = stringPreferencesKey("source_tree_uri")
         val READING_FLOW = stringPreferencesKey("reading_flow")
         val FONT_SCALE = floatPreferencesKey("font_scale")

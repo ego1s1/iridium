@@ -18,6 +18,8 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     private val theme = MutableStateFlow(ThemePreferences())
     private val motion = MutableStateFlow(MotionStyle.EXPRESSIVE)
     private val display = MutableStateFlow(LibraryDisplay())
+    private val crashEnabled = MutableStateFlow(false)
+    private val crashAsked = MutableStateFlow(false)
 
     override val onboardingCompleted: Flow<Boolean> = onboarding
     override val sourceTreeUri: Flow<String?> = treeUri
@@ -25,6 +27,17 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     override val themePreferences: Flow<ThemePreferences> = theme
     override val motionStyle: Flow<MotionStyle> = motion
     override val libraryDisplay: Flow<LibraryDisplay> = display
+    override val crashReportingEnabled: Flow<Boolean> = crashEnabled
+    override val crashReportingAsked: Flow<Boolean> = crashAsked
+
+    override suspend fun setCrashReporting(enabled: Boolean) {
+        crashEnabled.value = enabled
+        crashAsked.value = true
+    }
+
+    override suspend fun setCrashReportingAsked(asked: Boolean) {
+        crashAsked.value = asked
+    }
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         onboarding.value = completed

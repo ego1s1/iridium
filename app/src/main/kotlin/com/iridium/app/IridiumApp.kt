@@ -100,6 +100,19 @@ fun IridiumApp(
                         }
                     }
                 }
+
+                // Consent-first crash reporting prompts, only once onboarding is
+                // behind us so they never compete with the wizard.
+                CrashPrompts(
+                    asked = state.crashConsentAsked,
+                    enabled = state.crashReportingEnabled,
+                    hasPendingReport = state.hasPendingCrashReport,
+                    onEnable = { viewModel.setCrashReporting(true) },
+                    onDecline = { viewModel.dismissCrashConsent() },
+                    onShared = { viewModel.markCrashReportShared() },
+                    onDiscard = { viewModel.discardCrashReports() },
+                    reportText = { viewModel.crashReportText() },
+                )
             }
         }
     }

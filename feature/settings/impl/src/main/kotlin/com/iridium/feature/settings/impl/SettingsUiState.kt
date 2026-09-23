@@ -14,6 +14,7 @@ data class SettingsUiState(
     val motionStyle: MotionStyle = MotionStyle.EXPRESSIVE,
     val reader: ReaderPreferences = ReaderPreferences(),
     val libraryDisplay: LibraryDisplay = LibraryDisplay(),
+    val crashReportingEnabled: Boolean = false,
 )
 
 sealed interface SettingsAction {
@@ -28,4 +29,5 @@ sealed interface SettingsAction {
     data class SetKeepScreenOn(val enabled: Boolean) : SettingsAction
     data class SetShowPageCounter(val enabled: Boolean) : SettingsAction
     data class SetVolumeKeys(val enabled: Boolean) : SettingsAction
+    data class SetCrashReporting(val enabled: Boolean) : SettingsAction
 }

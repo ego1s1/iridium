@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup/transfer rules. Same policy as backup_rules.xml: reading
+  state and preferences travel, regenerable covers and the cache do not.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+        <exclude domain="file" path="covers" />
+        <exclude domain="cache" path="." />
+        <exclude domain="no_backup" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+        <include domain="file" path="covers" />
+        <exclude domain="cache" path="." />
+    </device-transfer>
+</data-extraction-rules>
