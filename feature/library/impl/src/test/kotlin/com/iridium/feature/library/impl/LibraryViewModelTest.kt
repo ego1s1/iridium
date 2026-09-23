@@ -115,4 +115,44 @@ class LibraryViewModelTest {
         // The message channel is consumed by the UI; assert the scan ran.
         assertEquals(Uri.parse("content://tree"), repository.lastLinkedTree)
     }
+
+    @Test
+    fun `typing a query surfaces full-text hits`() = runTest {
+        repository.searchHits = listOf(
+            com.iridium.core.data.ContentHit(
+                bookId = "1",
+                bookTitle = "Treasure Island",
+                href = "OEBPS/ch1.xhtml",
+                chapterTitle = "Chapter 1",
+                snippet = "…the Hispaniola was rolling…",
+            ),
+        )
+        viewModel.onAction(LibraryAction.SearchTextChanged("hispaniola"))
+
+        val state = viewModel.uiState.first { it.contentHits.isNotEmpty() }
+        assertEquals("hispaniola", repository.lastSearchQuery)
+        assertEquals(1, state.contentHits.size)
+        assertEquals("OEBPS/ch1.xhtml", state.contentHits.first().href)
+    }
+
+    @Test
+    fun `a one-character query does not search content`() = runTest {
+        repository.searchHits = listOf(
+            com.iridium.core.data.ContentHit("1", "Book", "ch.xhtml", "Ch", "snippet"),
+        )
+        viewModel.onAction(LibraryAction.SearchTextChanged("a"))
+        // Give the debounce a chance to run; nothing should have been queried.
+        assertTrue(viewModel.uiState.value.contentHits.isEmpty())
+        assertEquals(null, repository.lastSearchQuery)
+    }
+
+    @Test
+    fun `index library indexes every book`() = runTest {
+        repository.setBooks(
+            listOf(TestData.book(id = "1"), TestData.book(id = "2")),
+        )
+        viewModel.onAction(LibraryAction.IndexLibrary)
+
+        assertEquals(listOf("1", "2"), repository.indexedBooks)
+    }
 }

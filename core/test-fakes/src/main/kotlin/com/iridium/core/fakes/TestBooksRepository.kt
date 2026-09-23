@@ -2,6 +2,7 @@ package com.iridium.core.fakes
 
 import android.net.Uri
 import com.iridium.core.data.BooksRepository
+import com.iridium.core.data.ContentHit
 import com.iridium.core.data.IndexReport
 import com.iridium.core.model.Book
 import com.iridium.core.model.Bookmark
@@ -102,5 +103,24 @@ class TestBooksRepository : BooksRepository {
 
     override suspend fun removeBook(id: String) {
         booksFlow.update { list -> list.filterNot { it.id == id } }
+    }
+
+    // Full-text search hooks.
+
+    var indexResultCount: Int = 0
+    var searchHits: List<ContentHit> = emptyList()
+    var lastSearchQuery: String? = null
+    val indexedBooks = mutableListOf<String>()
+
+    override suspend fun indexBookContent(bookId: String): Int {
+        indexedBooks += bookId
+        return indexResultCount
+    }
+
+    override suspend fun isContentIndexed(bookId: String): Boolean = bookId in indexedBooks
+
+    override suspend fun searchContent(query: String, limit: Int): List<ContentHit> {
+        lastSearchQuery = query
+        return searchHits.take(limit)
     }
 }

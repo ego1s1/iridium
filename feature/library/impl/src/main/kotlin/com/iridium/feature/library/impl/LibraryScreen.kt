@@ -59,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.data.ContentHit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryQuery
 
@@ -68,12 +69,14 @@ fun LibraryTabContent(
     onReadClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     onResumeAvailable: (Book?) -> Unit = {},
 ) {
     LibraryRoute(
         onBookClick = onReadClick,
         onBookLongClick = onBookLongClick,
         modifier = modifier,
+        onOpenChapter = onOpenChapter,
         onResumeAvailable = onResumeAvailable,
     )
 }
@@ -83,6 +86,7 @@ internal fun LibraryRoute(
     onBookClick: (String) -> Unit,
     onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     onResumeAvailable: (Book?) -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -109,6 +113,12 @@ internal fun LibraryRoute(
                 is LibraryMessage.IndexFailed ->
                     "${message.failed} book(s) couldn't be read"
                 LibraryMessage.ScanFailed -> "Couldn't scan that folder"
+                is LibraryMessage.IndexedForSearch ->
+                    if (message.chapters > 0) {
+                        "Indexed ${message.chapters} chapters for search"
+                    } else {
+                        "Nothing to index yet"
+                    }
             }
             snackbarHost.showSnackbar(text)
         }
@@ -124,6 +134,7 @@ internal fun LibraryRoute(
         },
         onDetailsClick = { onBookLongClick(it.id) },
         onLinkFolder = { folderLauncher.launch(null) },
+        onOpenChapter = onOpenChapter,
         snackbarHost = snackbarHost,
         modifier = modifier,
     )
@@ -138,6 +149,7 @@ internal fun LibraryScreen(
     onDetailsClick: (Book) -> Unit,
     modifier: Modifier = Modifier,
     onLinkFolder: () -> Unit = {},
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     snackbarHost: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -181,6 +193,14 @@ internal fun LibraryScreen(
                         icon = { Icon(IridiumIcons.Search, contentDescription = null) },
                         text = { Text(stringResource(R.string.library_rescan)) },
                     )
+                    FloatingActionButtonMenuItem(
+                        onClick = {
+                            expanded = false
+                            onAction(LibraryAction.IndexLibrary)
+                        },
+                        icon = { Icon(IridiumIcons.List, contentDescription = null) },
+                        text = { Text(stringResource(R.string.library_index_for_search)) },
+                    )
                 }
             }
         },
@@ -196,10 +216,13 @@ internal fun LibraryScreen(
                 searchOpen = uiState.searchOpen,
                 linked = uiState.linked,
                 shelf = uiState.continueReading,
+                contentHits = uiState.contentHits,
+                indexing = uiState.indexing,
                 onAction = onAction,
                 onReadClick = onReadClick,
                 onDetailsClick = onDetailsClick,
                 onLinkFolder = onLinkFolder,
+                onOpenChapter = onOpenChapter,
             )
             if (uiState.filterOpen) {
                 LibrarySortFilterSheet(
@@ -262,21 +285,30 @@ private fun LibraryContent(
     searchOpen: Boolean,
     linked: Boolean,
     shelf: List<Book>,
+    contentHits: List<ContentHit>,
+    indexing: Boolean,
     onAction: (LibraryAction) -> Unit,
     onReadClick: (Book) -> Unit,
     onDetailsClick: (Book) -> Unit,
     onLinkFolder: () -> Unit,
+    onOpenChapter: (bookId: String, href: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxSize()) {
         // Thin determinate bar: scanning never hides the books already on
         // screen, and large rescans never read as a stuck spinner.
         val progress = indexProgress
-        if (refreshing && progress != null && progress.total > 0) {
-            LinearProgressIndicator(
-                progress = { progress.done.coerceAtMost(progress.total).toFloat() / progress.total },
-                modifier = Modifier.fillMaxWidth(),
-            )
+        when {
+            refreshing && progress != null && progress.total > 0 ->
+                LinearProgressIndicator(
+                    progress = {
+                        progress.done.coerceAtMost(progress.total).toFloat() / progress.total
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            // Chapter indexing is indeterminate: the work is per-book, and a
+            // fake percentage would be less honest than a sweeping bar.
+            indexing -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         AnimatedVisibility(visible = searchOpen) {
             val searchFocus = remember { FocusRequester() }
@@ -332,6 +364,30 @@ private fun LibraryContent(
                                 books = shelf,
                                 onReadClick = onReadClick,
                                 onDetailsClick = onDetailsClick,
+                            )
+                        }
+                    }
+                    // Full-text matches sit above the shelf results: when the
+                    // user typed a word they are usually looking inside books.
+                    if (contentHits.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }, contentType = "hitsHeader") {
+                            Text(
+                                text = stringResource(
+                                    R.string.library_content_hits,
+                                    contentHits.size,
+                                ),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                            )
+                        }
+                        items(
+                            contentHits,
+                            key = { "${it.bookId}#${it.href}" },
+                            contentType = { "hit" },
+                        ) { hit ->
+                            ContentHitRow(
+                                hit = hit,
+                                onClick = { onOpenChapter(hit.bookId, hit.href) },
                             )
                         }
                     }
@@ -417,4 +473,43 @@ private fun LibraryEmptyState(
         modifier = modifier,
         bottomPadding = 112.dp,
     )
+}
+
+/** One full-text match: book, chapter, and the sentence around the hit. */
+@Composable
+private fun ContentHitRow(
+    hit: ContentHit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                text = hit.bookTitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = hit.chapterTitle,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = hit.snippet,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }

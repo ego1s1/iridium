@@ -194,20 +194,51 @@ class ReaderViewModel @Inject constructor(
 
     private suspend fun openPublication() {
         val book = repository.observeBook(bookId).first()
-        if (book == null) return // Gone state via uiState combine.
+        if (book == null) return // Gone state via UiState combine.
         val prefs = preferences.readerPreferences.first()
         val mapped = EpubPreferencesMapper.map(prefs)
-        val initialLocator = book.lastLocator?.let { raw ->
-            runCatching { Locator.fromJSON(JSONObject(raw)) }.getOrNull()
-        }
+
         when (val result = opener.open(book.sourcePath)) {
             is OpenResult.Opened -> {
+                // An explicit href (from a search hit) wins over saved progress.
+                val initialLocator = route.href
+                    ?.let { locatorForHref(result.publication, it) }
+                    ?: book.lastLocator?.let { raw ->
+                        runCatching { Locator.fromJSON(JSONObject(raw)) }.getOrNull()
+                    }
                 val factory = EpubNavigatorFactory(result.publication)
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
                 positionsCache = runCatching { result.publication.positions() }
                     .getOrDefault(emptyList())
+                indexContentIfNeeded()
             }
             OpenResult.FileMissing, OpenResult.ParseFailed -> openFailed.value = true
+        }
+    }
+
+    /**
+     * Resolves a search hit's archive path to a locator. Indexed hrefs are
+     * archive paths (`OEBPS/ch1.xhtml`) while Readium links are manifest
+     * relative, so matching falls back to the file name.
+     */
+    private fun locatorForHref(publication: Publication, href: String): Locator? {
+        val target = href.substringAfterLast('/').substringBefore('#')
+        if (target.isEmpty()) return null
+        val candidates = publication.readingOrder + publication.tableOfContents
+        val link = candidates.firstOrNull {
+            it.href.toString().substringAfterLast('/').substringBefore('#') == target
+        } ?: return null
+        return runCatching { publication.locatorFromLink(link) }.getOrNull()
+    }
+
+    /** Indexes chapter text once per book so content search has data. */
+    private fun indexContentIfNeeded() {
+        viewModelScope.launch {
+            runCatching {
+                if (!repository.isContentIndexed(bookId)) {
+                    repository.indexBookContent(bookId)
+                }
+            }
         }
     }
 

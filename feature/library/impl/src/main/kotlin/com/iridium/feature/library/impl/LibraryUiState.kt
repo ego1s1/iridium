@@ -1,6 +1,7 @@
 package com.iridium.feature.library.impl
 
 import android.net.Uri
+import com.iridium.core.data.ContentHit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibraryQuery
@@ -24,6 +25,10 @@ data class LibraryUiState(
     val continueReading: List<Book>,
     /** Determinate scan progress (done/total); null when idle. */
     val indexProgress: IndexProgress? = null,
+    /** Full-text matches for the current query, newest-first. */
+    val contentHits: List<ContentHit> = emptyList(),
+    /** True while chapter text is being indexed for search. */
+    val indexing: Boolean = false,
 ) {
     val isEmpty: Boolean get() = books.isEmpty()
 }
@@ -44,6 +49,9 @@ sealed interface LibraryAction {
     /** A SAF folder picked for linking; its EPUBs are indexed in place. */
     data class LinkFolder(val uri: Uri) : LibraryAction
 
+    /** Extracts chapter text for every book so content search has data. */
+    data object IndexLibrary : LibraryAction
+
     /** Unlinks a book (the user's original file is never touched). */
     data class RemoveBook(val bookId: String) : LibraryAction
 }
@@ -52,4 +60,5 @@ sealed interface LibraryAction {
 sealed interface LibraryMessage {
     data class IndexFailed(val failed: Int) : LibraryMessage
     data object ScanFailed : LibraryMessage
+    data class IndexedForSearch(val chapters: Int) : LibraryMessage
 }

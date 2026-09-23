@@ -6,6 +6,8 @@
     <string name="library_fab_actions">Library actions</string>
     <string name="library_link_folder">Link folder</string>
     <string name="library_rescan">Rescan folder</string>
+    <string name="library_index_for_search">Index for search</string>
+    <string name="library_content_hits">In books (%1$d)</string>
     <string name="library_continue_title">Continue reading</string>
     <string name="library_empty_title">No books yet</string>
     <string name="library_empty_body">Link a folder to read the EPUBs already on your device. Nothing is copied — files stay exactly where they are.</string>

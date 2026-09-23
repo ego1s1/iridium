@@ -82,6 +82,7 @@ fun NavController.navigateToMain() {
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun NavGraphBuilder.mainScreen(
     onReadClick: (String) -> Unit,
+    onOpenChapter: (bookId: String, href: String) -> Unit,
     onBookLongClick: (String) -> Unit,
     appVersion: String,
 ) {
@@ -89,6 +90,7 @@ fun NavGraphBuilder.mainScreen(
         CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
             MainScreen(
                 onReadClick = onReadClick,
+                onOpenChapter = onOpenChapter,
                 onBookLongClick = onBookLongClick,
                 appVersion = appVersion,
             )
@@ -104,6 +106,7 @@ fun NavGraphBuilder.mainScreen(
 @Composable
 internal fun MainScreen(
     onReadClick: (String) -> Unit,
+    onOpenChapter: (bookId: String, href: String) -> Unit,
     onBookLongClick: (String) -> Unit,
     appVersion: String,
     modifier: Modifier = Modifier,
@@ -175,6 +178,7 @@ internal fun MainScreen(
                         LIBRARY_TAB -> LibraryTabContent(
                             onReadClick = onReadClick,
                             onBookLongClick = onBookLongClick,
+                            onOpenChapter = onOpenChapter,
                             onResumeAvailable = { resume = it },
                         )
                         HISTORY_TAB -> HistoryTabContent(

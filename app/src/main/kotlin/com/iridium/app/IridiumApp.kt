@@ -84,6 +84,9 @@ fun IridiumApp(
                             )
                             mainScreen(
                                 onReadClick = { navController.navigateToDetail(it) },
+                                onOpenChapter = { bookId, href ->
+                                    navController.navigateToReader(bookId, href)
+                                },
                                 onBookLongClick = { navController.navigateToDetail(it) },
                                 appVersion = BuildConfig.VERSION_NAME,
                             )

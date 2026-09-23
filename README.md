@@ -17,6 +17,7 @@ Fast, native EPUB reading on your phone or tablet. No account, no ads, no tracki
 * **Truly native UI.** Jetpack Compose with Material 3 Expressive: dynamic wallpaper color, AMOLED black, spring physics motion, a floating navigation pill, and layouts that adapt from phones to tablets.
 * **A reader built for long sessions.** Paged and scrolled flow, tap zones, volume-key paging, a progress slider, per-book themes (light, sepia, grey, dark, pure black), text size and alignment, and an immersive chrome that hides itself.
 * **Highlight and take notes.** Select text to highlight it in one of six colors, attach a note, jump back to it later, and delete what you do not need.
+* **Search inside your books.** Iridium indexes chapter text on device and searches the prose, not just titles — results show the sentence around each match and open straight to that chapter.
 * **A library that runs itself.** Point Iridium at a folder and your shelf fills in with covers, search, sorts, filters, and a continue-reading shelf. Your files stay exactly where they are — nothing is ever moved or duplicated.
 * **Your reading stays yours.** Progress, highlights, bookmarks and preferences live on your device and work fully offline. No accounts, no sync, no telemetry.
 

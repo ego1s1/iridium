@@ -5,6 +5,7 @@ import android.net.Uri
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.BookEntity
 import com.iridium.core.database.BookmarkDao
+import com.iridium.core.database.ChapterTextDao
 import com.iridium.core.database.HighlightDao
 import com.iridium.core.model.Book
 import com.iridium.core.model.BookError
@@ -38,6 +39,15 @@ import kotlinx.coroutines.withContext
 /** Outcome of one linked-tree scan. */
 data class IndexReport(val total: Int, val failed: Int)
 
+/** A full-text match inside a chapter. */
+data class ContentHit(
+    val bookId: String,
+    val bookTitle: String,
+    val href: String,
+    val chapterTitle: String,
+    val snippet: String,
+)
+
 interface BooksRepository {
     fun observeLibrary(query: LibraryQuery): Flow<List<Book>>
     fun observeBook(id: String): Flow<Book?>
@@ -58,7 +68,19 @@ interface BooksRepository {
     suspend fun upsertBookmark(bookmark: Bookmark)
     suspend fun deleteBookmark(id: String)
 
-    /** Unlinks a book: removes the row + its thumbnail. The original is untouched. */
+    /**
+     * Extracts and indexes a book's chapter text for full-text search.
+     * Returns the number of chapters indexed (0 when unsupported/unreadable).
+     */
+    suspend fun indexBookContent(bookId: String): Int
+
+    /** True when a book already has chapter text in the search index. */
+    suspend fun isContentIndexed(bookId: String): Boolean
+
+    /** Full-text search across every indexed chapter. */
+    suspend fun searchContent(query: String, limit: Int = 40): List<ContentHit>
+
+    /** Unlinks a book: removes the row, thumbnail and search index. */
     suspend fun removeBook(id: String)
 }
 
@@ -73,10 +95,12 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     private val bookDao: BookDao,
     private val highlightDao: HighlightDao,
     private val bookmarkDao: BookmarkDao,
+    private val chapterTextDao: ChapterTextDao,
     private val backend: EpubBackend,
     private val covers: EpubCoverGenerator,
     private val treeLister: LinkedTreeLister,
-    @ApplicationContext private val context: Context,
+    private val sourceFactory: EpubSourceFactory,
+    private val chapterIndexer: ChapterIndexer,
 ) : BooksRepository {
 
     /**
@@ -178,12 +202,51 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         bookmarkDao.deleteById(id)
     }
 
+    override suspend fun indexBookContent(bookId: String): Int = withContext(Dispatchers.IO) {
+        val row = bookDao.getById(bookId) ?: return@withContext 0
+        val toc = row.tocEntries()
+        val chapters = runCatching {
+            chapterIndexer.extract(row.sourcePath, row.sourceDisplayName, toc)
+        }.getOrDefault(emptyList())
+
+        // Replace atomically enough: a failure mid-insert leaves the previous
+        // index in place rather than a half-built one.
+        chapterTextDao.deleteForBook(bookId)
+        if (chapters.isNotEmpty()) chapterTextDao.insertAll(chapters)
+        chapters.size
+    }
+
+    override suspend fun isContentIndexed(bookId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching { chapterTextDao.countForBook(bookId) > 0 }.getOrDefault(false)
+        }
+
+    override suspend fun searchContent(query: String, limit: Int): List<ContentHit> =
+        withContext(Dispatchers.IO) {
+            val expression = FtsQuery.build(query) ?: return@withContext emptyList()
+            val rows = runCatching { chapterTextDao.search(expression, limit) }
+                .getOrDefault(emptyList())
+            if (rows.isEmpty()) return@withContext emptyList()
+
+            val titles = bookDao.getAll().associate { it.id to it.title }
+            rows.mapNotNull { row ->
+                ContentHit(
+                    bookId = row.bookId,
+                    bookTitle = titles[row.bookId] ?: return@mapNotNull null,
+                    href = row.href,
+                    chapterTitle = row.title,
+                    snippet = FtsQuery.snippet(row.body, query),
+                )
+            }
+        }
+
     override suspend fun removeBook(id: String) = withContext(Dispatchers.IO) {
         // Unlink only: the user's original file must survive removal.
         val row = bookDao.getById(id)
         if (row != null) {
             highlightDao.deleteForBook(id)
             bookmarkDao.deleteForBook(id)
+            chapterTextDao.deleteForBook(id)
             bookDao.deleteById(id)
             deleteCover(row.coverPath)
         }
@@ -263,39 +326,12 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     private fun inspectDocument(doc: LinkedDocument): InspectedEpub {
         val fallback = doc.name.substringBeforeLast('.')
         if (NativeEpub.isAvailable) {
-            runCatching {
-                context.contentResolver.openFileDescriptor(doc.uri, "r")?.use { descriptor ->
-                    NativeEpub.inspectFd(descriptor.fd, fallback)?.let { return it }
-                }
-            }
+            sourceFactory.withFileDescriptor(doc.uri.toString()) { fd ->
+                NativeEpub.inspectFd(fd, fallback)
+            }?.let { return it }
         }
-        return openSource(doc).use { source -> backend.inspect(source, fallback) }
-    }
-
-    /**
-     * Opens a seekable source for a linked document. When the provider exposes
-     * a real file descriptor the engine random-accesses it and nothing is
-     * copied; only pipe-like providers fall back to spooling into the cache.
-     */
-    private fun openSource(doc: LinkedDocument): EpubSource {
-        runCatching {
-            val pfd = context.contentResolver.openFileDescriptor(doc.uri, "r")
-            if (pfd != null) {
-                val channel = java.io.FileInputStream(pfd.fileDescriptor).channel
-                if (channel.size() > 0L) {
-                    return EpubSource.ofChannel(channel) { runCatching { pfd.close() } }
-                }
-                runCatching { channel.close() }
-                runCatching { pfd.close() }
-            }
-        }
-        return EpubSource.ofStream(
-            openStream = {
-                context.contentResolver.openInputStream(doc.uri)
-                    ?: throw IOException("Unable to read ${doc.name}")
-            },
-            cacheDir = File(context.cacheDir, "epub-index"),
-        )
+        return sourceFactory.open(doc.uri.toString(), doc.name)
+            .use { source -> backend.inspect(source, fallback) }
     }
 
     private fun deleteCover(coverPath: String?) {
@@ -320,7 +356,14 @@ internal object EpubModule {
 
     @Provides
     @Singleton
-    fun provideEpubBackend(): EpubBackend = com.iridium.epub.engine.IridiumEpubEngine()
+    fun provideEpubEngine(): com.iridium.epub.engine.IridiumEpubEngine =
+        com.iridium.epub.engine.IridiumEpubEngine()
+
+    @Provides
+    @Singleton
+    fun provideEpubBackend(
+        engine: com.iridium.epub.engine.IridiumEpubEngine,
+    ): EpubBackend = engine
 
     @Provides
     @Singleton

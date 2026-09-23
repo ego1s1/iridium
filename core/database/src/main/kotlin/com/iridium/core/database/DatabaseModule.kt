@@ -33,4 +33,9 @@ internal object DatabaseModule {
     @Provides
     @Singleton
     fun provideBookmarkDao(database: IridiumDatabase): BookmarkDao = database.bookmarkDao()
+
+    @Provides
+    @Singleton
+    fun provideChapterTextDao(database: IridiumDatabase): ChapterTextDao =
+        database.chapterTextDao()
 }

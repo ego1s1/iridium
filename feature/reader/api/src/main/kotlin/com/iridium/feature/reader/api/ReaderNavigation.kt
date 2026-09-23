@@ -4,10 +4,10 @@ import androidx.navigation.NavController
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ReaderRoute(val bookId: String)
+data class ReaderRoute(val bookId: String, val href: String? = null)
 
-fun NavController.navigateToReader(bookId: String) {
-    navigate(ReaderRoute(bookId)) {
+fun NavController.navigateToReader(bookId: String, href: String? = null) {
+    navigate(ReaderRoute(bookId, href)) {
         launchSingleTop = true
     }
 }

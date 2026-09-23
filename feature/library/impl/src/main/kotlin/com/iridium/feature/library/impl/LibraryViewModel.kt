@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.data.BooksRepository
+import com.iridium.core.data.ContentHit
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryDisplay
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -70,6 +72,8 @@ class LibraryViewModel @Inject constructor(
     private val scanPending = AtomicInteger(0)
     private val scanQueued = AtomicBoolean(false)
     private val indexProgress = MutableStateFlow<IndexProgress?>(null)
+    private val contentHits = MutableStateFlow<List<ContentHit>>(emptyList())
+    private val indexing = MutableStateFlow(false)
 
     /**
      * Database subscription query: the text field echoes instantly through
@@ -102,7 +106,17 @@ class LibraryViewModel @Inject constructor(
         combine(refreshing, filterOpen, searchOpen, ::Chrome),
         preferences.sourceTreeUri,
         indexProgress,
-    ) { books, query, chrome, treeUri, progress ->
+        contentHits,
+        indexing,
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val books = args[0] as List<Book>
+        val query = args[1] as LibraryQuery
+        val chrome = args[2] as Chrome
+        val treeUri = args[3] as String?
+        val progress = args[4] as IndexProgress?
+        val hits = args[5] as List<ContentHit>
+        val isIndexing = args[6] as Boolean
         LibraryUiState(
             books = books,
             query = query,
@@ -112,6 +126,8 @@ class LibraryViewModel @Inject constructor(
             linked = treeUri != null,
             continueReading = books.continueShelf(),
             indexProgress = progress,
+            contentHits = hits,
+            indexing = isIndexing,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -146,6 +162,20 @@ class LibraryViewModel @Inject constructor(
             if (preferences.sourceTreeUri.first() == null) return@launch
             scan()
         }
+        // Content search rides the same typed text but its own debounce: FTS
+        // is cheap per query, yet we still avoid a query per keystroke.
+        viewModelScope.launch {
+            searchText
+                .debounce { text -> if (text.length < MIN_CONTENT_QUERY) 0L else CONTENT_DEBOUNCE_MS }
+                .distinctUntilChanged()
+                .collectLatest { text ->
+                    contentHits.value = if (text.length < MIN_CONTENT_QUERY) {
+                        emptyList()
+                    } else {
+                        runCatching { repository.searchContent(text) }.getOrDefault(emptyList())
+                    }
+                }
+        }
     }
 
     fun onAction(action: LibraryAction) {
@@ -162,6 +192,7 @@ class LibraryViewModel @Inject constructor(
             LibraryAction.ToggleSearch -> searchOpen.update { !it }
             LibraryAction.Rescan -> scan()
             is LibraryAction.LinkFolder -> scan(linkUri = action.uri.toString())
+            LibraryAction.IndexLibrary -> indexLibrary()
             is LibraryAction.RemoveBook -> remove(action.bookId)
         }
     }
@@ -224,8 +255,31 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    /** Extracts chapter text for every book; progress shows on the bar. */
+    private fun indexLibrary() {
+        viewModelScope.launch {
+            indexing.value = true
+            try {
+                // Read from the repository, not the UI-facing flow: `books` is
+                // WhileSubscribed, so its value is empty when nothing collects.
+                val all = repository.observeLibrary(LibraryQuery()).first()
+                var chapters = 0
+                all.forEach { book ->
+                    chapters += runCatching { repository.indexBookContent(book.id) }.getOrDefault(0)
+                }
+                messageChannel.send(LibraryMessage.IndexedForSearch(chapters))
+            } finally {
+                indexing.value = false
+            }
+        }
+    }
+
     private companion object {
         const val KEY_QUERY_TEXT = "iridium_query_text"
         const val SEARCH_DEBOUNCE_MS = 250L
+        const val CONTENT_DEBOUNCE_MS = 300L
+
+        /** Below this, content search would match almost everything. */
+        const val MIN_CONTENT_QUERY = 2
     }
 }
