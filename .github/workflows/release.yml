@@ -1,17 +1,18 @@
 name: Release
 
 # Cuts a GitHub Release with a signed APK + AAB whenever a version tag is
-# pushed:   git tag v0.1.0 && git push origin v0.1.0
+# pushed:   git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1
 # Tags containing alpha/beta/rc publish as prereleases.
 #
-# Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   KEYSTORE_BASE64  - base64 of the .jks/.keystore used for all releases.
-#                      Keep ONE keystore forever; rotating it breaks updates.
-#   KEY_ALIAS        - key alias inside the keystore (e.g. "iridium")
-#   KEY_PASSWORD     - password for the key
-#   STORE_PASSWORD   - password for the keystore
-#
-# The workflow fails fast with a clear message when secrets are missing.
+# Signing, in order of preference:
+#   1. Repository secrets (or variables) KEYSTORE_BASE64 / KEY_ALIAS /
+#      KEY_PASSWORD / STORE_PASSWORD. Keep ONE keystore forever; rotating it
+#      breaks updates. This is the intended long-term setup.
+#   2. If those are absent, a keystore is generated once and persisted with
+#      actions/cache, so repeat releases stay installable over the previous
+#      one. These builds are clearly flagged in the release notes and are
+#      meant for alpha testing only: if the cache is evicted a new key is
+#      generated and an update will need a reinstall.
 
 on:
   push:
@@ -20,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (must already exist, e.g. v0.1.0)"
+        description: "Tag to release (must already exist, e.g. v0.1.0-alpha.1)"
         required: true
         type: string
 
@@ -32,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
+      signing: ${{ steps.signing.outputs.mode }}
       apk: ${{ steps.sign.outputs.apk }}
     steps:
       - uses: actions/checkout@v4
@@ -54,20 +56,19 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Releasing $TAG"
 
-      - name: Check signing secrets
+      # Secrets first, then repository variables: the two are easy to confuse
+      # and either should work.
+      - name: Resolve signing material
+        id: signing
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 || vars.KEYSTORE_BASE64 }}
         run: |
-          missing=""
-          for var in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD STORE_PASSWORD; do
-            if [ -z "${!var}" ]; then missing="$missing $var"; fi
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Missing signing secrets:$missing. See release.yml header for setup."
-            exit 1
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "mode=secret" >> "$GITHUB_OUTPUT"
+            echo "Using the configured release keystore."
+          else
+            echo "mode=generated" >> "$GITHUB_OUTPUT"
+            echo "::warning::No signing secrets configured; falling back to an auto-generated CI keystore."
           fi
 
       - name: Set up JDK 17
@@ -75,6 +76,53 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      # Persist the generated keystore so successive releases are signed with
+      # the same key and stay installable over each other. Caches are
+      # immutable, so the first successful run wins.
+      - name: Restore CI keystore cache
+        if: steps.signing.outputs.mode == 'generated'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ci-keystore.jks
+            ci-keystore.pass
+          key: iridium-ci-keystore-v1
+
+      - name: Prepare keystore
+        id: keystore
+        env:
+          SECRET_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 || vars.KEYSTORE_BASE64 }}
+          SECRET_ALIAS: ${{ secrets.KEY_ALIAS || vars.KEY_ALIAS }}
+          SECRET_KEY_PASS: ${{ secrets.KEY_PASSWORD || vars.KEY_PASSWORD }}
+          SECRET_STORE_PASS: ${{ secrets.STORE_PASSWORD || vars.STORE_PASSWORD }}
+        run: |
+          set -eu
+          if [ "${{ steps.signing.outputs.mode }}" = "secret" ]; then
+            echo "::add-mask::$SECRET_KEY_PASS"
+            echo "::add-mask::$SECRET_STORE_PASS"
+            echo "$SECRET_KEYSTORE" | base64 -d > release.keystore
+            printf '%s' "$SECRET_STORE_PASS" > .store.pass
+            printf '%s' "$SECRET_KEY_PASS" > .key.pass
+            ALIAS="$SECRET_ALIAS"
+          else
+            if [ ! -f ci-keystore.jks ]; then
+              PASS="$(openssl rand -hex 20)"
+              "$JAVA_HOME/bin/keytool" -genkeypair -v \
+                -keystore ci-keystore.jks -alias iridium \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$PASS" -keypass "$PASS" \
+                -dname "CN=Iridium CI, OU=Iridium, O=Iridium, C=US"
+              printf '%s' "$PASS" > ci-keystore.pass
+            fi
+            PASS="$(cat ci-keystore.pass)"
+            cp ci-keystore.jks release.keystore
+            printf '%s' "$PASS" > .store.pass
+            printf '%s' "$PASS" > .key.pass
+            ALIAS="iridium"
+          fi
+          chmod 600 release.keystore .store.pass .key.pass
+          echo "alias=$ALIAS" >> "$GITHUB_OUTPUT"
 
       - name: Locate Android SDK tooling
         run: |
@@ -97,7 +145,6 @@ jobs:
           echo "sdkmanager=$SDKMANAGER"
           "$SDKMANAGER" --version || true
           df -h / | tail -1
-          ls "$SDK/ndk" 2>/dev/null || echo "no NDK preinstalled"
           {
             echo "ANDROID_SDK_ROOT=$SDK"
             echo "ANDROID_HOME=$SDK"
@@ -134,49 +181,29 @@ jobs:
 
       - name: Sign APK
         id: sign
-        env:
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
-          set -euo pipefail
-          # Mask secrets explicitly and keep passwords out of the process table:
-          # apksigner reads them from files instead of CLI arguments.
-          echo "::add-mask::$KEY_PASSWORD"
-          echo "::add-mask::$STORE_PASSWORD"
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
-          printf '%s' "$STORE_PASSWORD" > .store.pass
-          printf '%s' "$KEY_PASSWORD" > .key.pass
-          chmod 600 release.keystore .store.pass .key.pass
+          set -eu
           BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
           UNSIGNED=$(ls app/build/outputs/apk/release/app-release-unsigned.apk)
           ALIGNED=app-release-aligned.apk
           SIGNED="iridium-${{ steps.resolve.outputs.tag }}.apk"
           "$BUILD_TOOLS/zipalign" -f 4 "$UNSIGNED" "$ALIGNED"
+          # apksigner reads passwords from files, keeping them out of the
+          # process table.
           "$BUILD_TOOLS/apksigner" sign \
             --ks release.keystore \
-            --ks-key-alias "$KEY_ALIAS" \
+            --ks-key-alias "${{ steps.keystore.outputs.alias }}" \
             --ks-pass "file:.store.pass" \
             --key-pass "file:.key.pass" \
             --out "$SIGNED" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" verify --print-certs "$SIGNED" | head -5
-          rm -f release.keystore "$ALIGNED" .store.pass .key.pass
+          rm -f "$ALIGNED"
           echo "apk=$SIGNED" >> "$GITHUB_OUTPUT"
 
       - name: Sign App Bundle
         id: bundle
-        env:
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
-          set -euo pipefail
-          echo "::add-mask::$KEY_PASSWORD"
-          echo "::add-mask::$STORE_PASSWORD"
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
-          printf '%s' "$STORE_PASSWORD" > .store.pass
-          printf '%s' "$KEY_PASSWORD" > .key.pass
-          chmod 600 release.keystore .store.pass .key.pass
+          set -eu
           UNSIGNED_BUNDLE=$(ls app/build/outputs/bundle/release/app-release.aab)
           SIGNED_BUNDLE="iridium-${{ steps.resolve.outputs.tag }}.aab"
           # AABs take JAR signing (apksigner is APK-only).
@@ -185,10 +212,14 @@ jobs:
             -keystore release.keystore \
             -storepass:file .store.pass \
             -keypass:file .key.pass \
-            -signedjar "$SIGNED_BUNDLE" "$UNSIGNED_BUNDLE" "$KEY_ALIAS"
+            -signedjar "$SIGNED_BUNDLE" "$UNSIGNED_BUNDLE" \
+            "${{ steps.keystore.outputs.alias }}"
           jarsigner -verify "$SIGNED_BUNDLE"
-          rm -f release.keystore .store.pass .key.pass
           echo "aab=$SIGNED_BUNDLE" >> "$GITHUB_OUTPUT"
+
+      - name: Clean up signing material
+        if: always()
+        run: rm -f release.keystore .store.pass .key.pass
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -214,7 +245,8 @@ jobs:
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           name: Iridium ${{ needs.build.outputs.tag }}
-          generate_release_notes: true
+          generate_release_notes: ${{ needs.build.outputs.signing == 'secret' }}
+          body: ${{ needs.build.outputs.signing == 'generated' && '> **Alpha test build.** Signed with an auto-generated CI key because no release keystore is configured. Installing over a previous build may require uninstalling first.' || '' }}
           prerelease: ${{ contains(needs.build.outputs.tag, 'alpha') || contains(needs.build.outputs.tag, 'beta') || contains(needs.build.outputs.tag, 'rc') }}
           files: |
             ./dist/*.apk
