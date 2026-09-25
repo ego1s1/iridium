@@ -8,11 +8,12 @@ name: Release
 #   1. Repository secrets (or variables) KEYSTORE_BASE64 / KEY_ALIAS /
 #      KEY_PASSWORD / STORE_PASSWORD. Keep ONE keystore forever; rotating it
 #      breaks updates. This is the intended long-term setup.
-#   2. If those are absent, a keystore is generated once and persisted with
-#      actions/cache, so repeat releases stay installable over the previous
-#      one. These builds are clearly flagged in the release notes and are
-#      meant for alpha testing only: if the cache is evicted a new key is
-#      generated and an update will need a reinstall.
+#   2. If those are absent, a keystore is generated for that run so a release
+#      can still be cut. NOTE: actions/cache is scoped per ref, so a
+#      tag-triggered run cannot read a previous tag's cache. Each tag
+#      therefore gets a FRESH key, meaning alpha builds cannot be installed
+#      over one another -- users must uninstall first. Such builds say so in
+#      their release notes. Configure the secrets above for stable updates.
 
 on:
   push:
@@ -68,7 +69,7 @@ jobs:
             echo "Using the configured release keystore."
           else
             echo "mode=generated" >> "$GITHUB_OUTPUT"
-            echo "::warning::No signing secrets configured; falling back to an auto-generated CI keystore."
+            echo "::warning::No signing secrets configured. Generating a throwaway key for this tag: the APK will not install over a previous release."
           fi
 
       - name: Set up JDK 17
@@ -77,9 +78,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Persist the generated keystore so successive releases are signed with
-      # the same key and stay installable over each other. Caches are
-      # immutable, so the first successful run wins.
+      # Cache is scoped per ref, so this only helps re-runs of the *same*
+      # tag. It cannot carry a key between releases; that is what the
+      # KEYSTORE_BASE64 secret is for.
       - name: Restore CI keystore cache
         if: steps.signing.outputs.mode == 'generated'
         uses: actions/cache@v4
@@ -87,7 +88,7 @@ jobs:
           path: |
             ci-keystore.jks
             ci-keystore.pass
-          key: iridium-ci-keystore-v1
+          key: iridium-ci-keystore-${{ github.ref_name }}
 
       - name: Prepare keystore
         id: keystore
@@ -246,7 +247,7 @@ jobs:
           tag_name: ${{ needs.build.outputs.tag }}
           name: Iridium ${{ needs.build.outputs.tag }}
           generate_release_notes: ${{ needs.build.outputs.signing == 'secret' }}
-          body: ${{ needs.build.outputs.signing == 'generated' && '> **Alpha test build.** Signed with an auto-generated CI key because no release keystore is configured. Installing over a previous build may require uninstalling first.' || '' }}
+          body: ${{ needs.build.outputs.signing == 'generated' && '> **Alpha test build.** Signed with a throwaway key generated for this tag because no release keystore is configured, so this build will not install over a previous release — uninstall first. Set the KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD repository secrets to enable in-place updates.' || '' }}
           prerelease: ${{ contains(needs.build.outputs.tag, 'alpha') || contains(needs.build.outputs.tag, 'beta') || contains(needs.build.outputs.tag, 'rc') }}
           files: |
             ./dist/*.apk
