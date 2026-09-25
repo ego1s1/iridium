@@ -86,6 +86,7 @@ internal fun ReaderRoute(
     viewModel: ReaderViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sessionReady by viewModel.sessionReady.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -122,6 +123,7 @@ internal fun ReaderRoute(
         }
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
+            sessionReady = sessionReady,
             onAction = viewModel::onAction,
             onBackClick = onBackClick,
             snackbarHost = snackbarHost,
@@ -134,6 +136,7 @@ internal fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState.Ready,
+    sessionReady: Boolean,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
     snackbarHost: SnackbarHostState,
@@ -297,7 +300,7 @@ internal fun ReaderScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // Readium content fills the whole area; chrome overlays it.
-            NavigatorHost(bookId = state.book.id)
+            NavigatorHost(bookId = state.book.id, sessionReady = sessionReady)
             if (!state.chromeVisible && state.prefs.showPageCounter) {
                 state.positionText?.let {
                     IridiumScrimPill(
@@ -340,7 +343,7 @@ internal fun ReaderScreen(
 
 /** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
 @Composable
-private fun NavigatorHost(bookId: String, modifier: Modifier = Modifier) {
+private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     if (activity == null) {
@@ -353,24 +356,44 @@ private fun NavigatorHost(bookId: String, modifier: Modifier = Modifier) {
     // across configuration changes (a generated id would not be restorable).
     val containerId = R.id.reader_navigator_container
     val tag = "iridium_reader_$bookId"
+
+    // The container is always composed so FragmentManager has somewhere to
+    // restore into; the host fragment itself is only added once the session
+    // is published. Adding it earlier handed Readium a null navigator factory
+    // and collided with an in-flight composition on the first open.
     AndroidView(
         factory = { ctx -> FragmentContainerView(ctx).apply { id = containerId } },
         update = {},
         modifier = modifier.fillMaxSize(),
     )
-    LaunchedEffect(bookId, containerId) {
+
+    if (!sessionReady) {
+        IridiumLoading(modifier)
+        return
+    }
+
+    LaunchedEffect(bookId, containerId, sessionReady) {
         val fm = activity.supportFragmentManager
-        if (fm.findFragmentById(containerId) == null) {
-            fm.commitNow { add(containerId, ReaderHostFragment.newInstance(), tag) }
+        if (fm.findFragmentByTag(tag) != null || fm.findFragmentById(containerId) != null) {
+            return@LaunchedEffect
+        }
+        val fragment = ReaderHostFragment.newInstance()
+        if (fm.isStateSaved) {
+            // The activity already saved state (e.g. opening during a
+            // restore): commitNow would throw, so allow state loss.
+            fm.beginTransaction().add(containerId, fragment, tag).commitAllowingStateLoss()
+        } else {
+            fm.commitNow { add(containerId, fragment, tag) }
         }
     }
+
     DisposableEffect(bookId, containerId) {
         onDispose {
             // Leaving the reader: detach the navigator so a stale WebView never
             // lingers behind the library. commitAllowingStateLoss (not
             // commitNow) avoids throwing if the host already saved state.
             val fm = activity.supportFragmentManager
-            fm.findFragmentByTag(tag)?.let {
+            fm.findFragmentByTag(tag)?.takeIf { it.isAdded }?.let {
                 fm.beginTransaction().remove(it).commitAllowingStateLoss()
             }
         }

@@ -5,6 +5,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
@@ -38,6 +39,13 @@ sealed interface ReaderSessionEvent {
  * outlives Compose recompositions and owns the [Publication]) with the
  * [ReaderViewModel]. Single-book: opening another book replaces the session
  * and closes the previous publication.
+ *
+ * Opening a book is asynchronous (database read, preferences, then a Readium
+ * parse), so the UI must never attach the navigator host before the session is
+ * published — that race used to hand the fragment a null factory. [sessionReady]
+ * is the single source of truth for "safe to attach", and [openInFlight]
+ * distinguishes "still opening" from "genuinely lost" so a slow open is never
+ * mistaken for process death.
  */
 @Singleton
 class ReaderSessionStore @Inject constructor() {
@@ -59,8 +67,23 @@ class ReaderSessionStore @Inject constructor() {
     private val _latestLocator = MutableStateFlow<Locator?>(null)
     val latestLocator: StateFlow<Locator?> = _latestLocator
 
+    /** True once [publish] has run; the reader host may attach only then. */
+    private val _sessionReady = MutableStateFlow(false)
+    val sessionReady: StateFlow<Boolean> = _sessionReady.asStateFlow()
+
+    /** True while an open is running, so a missing factory is not "lost". */
+    private val _openInFlight = MutableStateFlow(false)
+    val openInFlight: StateFlow<Boolean> = _openInFlight.asStateFlow()
+
     private val eventChannel = Channel<ReaderSessionEvent>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
+
+    /** Marks the start of an open: nothing may attach until [publish]. */
+    fun beginOpen() {
+        closeCurrent()
+        _sessionReady.value = false
+        _openInFlight.value = true
+    }
 
     fun publish(
         bookId: String,
@@ -69,12 +92,21 @@ class ReaderSessionStore @Inject constructor() {
         initialLocator: Locator?,
         initialPreferences: EpubPreferences,
     ) {
-        clear()
+        closeCurrent()
         this.bookId = bookId
         this.publication = publication
         this.navigatorFactory = factory
         this.initialLocator = initialLocator
         this.initialPreferences = initialPreferences
+        _sessionReady.value = true
+        _openInFlight.value = false
+    }
+
+    /** The open finished without a publication (missing or unparseable file). */
+    fun failOpen() {
+        closeCurrent()
+        _sessionReady.value = false
+        _openInFlight.value = false
     }
 
     fun onLocator(locator: Locator) {
@@ -88,6 +120,13 @@ class ReaderSessionStore @Inject constructor() {
     fun tryEmit(event: ReaderSessionEvent): Boolean = eventChannel.trySend(event).isSuccess
 
     fun clear() {
+        closeCurrent()
+        _sessionReady.value = false
+        _openInFlight.value = false
+    }
+
+    /** Releases the publication and book fields, leaving flags untouched. */
+    private fun closeCurrent() {
         navigator = null
         _latestLocator.value = null
         runCatching { publication?.close() }

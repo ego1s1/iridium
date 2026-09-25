@@ -66,6 +66,13 @@ class ReaderViewModel @Inject constructor(
     private val messageChannel = Channel<ReaderMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
 
+    /**
+     * True once the publication is published and the navigator host may be
+     * attached. Opening is asynchronous, so the UI waits on this instead of
+     * composing the host during a window where there is no factory yet.
+     */
+    val sessionReady: StateFlow<Boolean> = store.sessionReady
+
     private val book: Flow<Book?> = repository.observeBook(bookId)
     private val toc: Flow<List<TocEntry>> = repository.observeToc(bookId)
     private val highlights: Flow<List<Highlight>> = repository.observeHighlights(bookId)
@@ -193,8 +200,15 @@ class ReaderViewModel @Inject constructor(
     // Session wiring
 
     private suspend fun openPublication() {
+        // Mark the open before any suspension: until publish() runs there is
+        // no navigator factory, and the UI must not attach the host fragment.
+        store.beginOpen()
+
         val book = repository.observeBook(bookId).first()
-        if (book == null) return // Gone state via UiState combine.
+        if (book == null) {
+            store.failOpen()
+            return // Gone state via UiState combine.
+        }
         val prefs = preferences.readerPreferences.first()
         val mapped = EpubPreferencesMapper.map(prefs)
 
@@ -212,7 +226,10 @@ class ReaderViewModel @Inject constructor(
                     .getOrDefault(emptyList())
                 indexContentIfNeeded()
             }
-            OpenResult.FileMissing, OpenResult.ParseFailed -> openFailed.value = true
+            OpenResult.FileMissing, OpenResult.ParseFailed -> {
+                store.failOpen()
+                openFailed.value = true
+            }
         }
     }
 

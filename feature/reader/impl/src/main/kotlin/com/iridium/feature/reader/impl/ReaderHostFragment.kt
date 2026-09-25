@@ -48,11 +48,15 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
         ).sessionStore()
         val factory = store.navigatorFactory
         if (factory == null) {
-            // Process death wiped the in-memory session: install the dummy
-            // factory so restoration doesn't crash, then leave via event.
+            // No factory. Usually process death wiped the in-memory session,
+            // but an open may simply still be running — the UI attaches the
+            // host only once ready, so a slow open must NOT be treated as a
+            // loss or we would pop a reader that is about to succeed.
             childFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
             super.onCreate(savedInstanceState)
-            lifecycleScope.launch { store.emit(ReaderSessionEvent.SessionLost) }
+            if (!store.openInFlight.value) {
+                lifecycleScope.launch { store.emit(ReaderSessionEvent.SessionLost) }
+            }
             return
         }
         childFragmentManager.fragmentFactory = factory.createFragmentFactory(
