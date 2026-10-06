@@ -57,6 +57,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
                 showPageCounter = prefs[SHOW_PAGE_COUNTER] ?: true,
                 volumeKeys = prefs[VOLUME_KEYS] ?: false,
+                pageMargins = prefs[PAGE_MARGINS] ?: 1f,
+                lineHeight = prefs[LINE_HEIGHT] ?: 1.4f,
             )
         }
 
@@ -71,6 +73,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             it[KEEP_SCREEN_ON] = updated.keepScreenOn
             it[SHOW_PAGE_COUNTER] = updated.showPageCounter
             it[VOLUME_KEYS] = updated.volumeKeys
+            it[PAGE_MARGINS] = updated.pageMargins
+            it[LINE_HEIGHT] = updated.lineHeight
         }
     }
 
@@ -167,6 +171,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val SHOW_PAGE_COUNTER = booleanPreferencesKey("show_page_counter")
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
+        val PAGE_MARGINS = floatPreferencesKey("page_margins")
+        val LINE_HEIGHT = floatPreferencesKey("line_height")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val APP_COLOR_SCHEME = stringPreferencesKey("app_color_scheme")

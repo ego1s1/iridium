@@ -49,6 +49,9 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetKeepScreenOn -> updateReader { it.copy(keepScreenOn = action.enabled) }
             is SettingsAction.SetShowPageCounter -> updateReader { it.copy(showPageCounter = action.enabled) }
             is SettingsAction.SetVolumeKeys -> updateReader { it.copy(volumeKeys = action.enabled) }
+            is SettingsAction.SetFontSize -> updateReader { it.copy(fontScale = action.scale) }
+            is SettingsAction.SetMargins -> updateReader { it.copy(pageMargins = action.margins) }
+            is SettingsAction.SetLineHeight -> updateReader { it.copy(lineHeight = action.lineHeight) }
             is SettingsAction.SetCrashReporting -> viewModelScope.launch {
                 preferences.setCrashReporting(action.enabled)
             }

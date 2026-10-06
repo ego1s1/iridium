@@ -37,7 +37,11 @@ fun IridiumSectionCard(
     ) {
         Column(Modifier.padding(16.dp)) {
             if (title != null) {
-                Text(text = title, style = IridiumEmphasized.titleMedium)
+                Text(
+                    text = title,
+                    style = IridiumEmphasized.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
                 Spacer(Modifier.height(12.dp))
             }
             content()

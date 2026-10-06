@@ -17,4 +17,7 @@ data class ReaderPreferences(
     val keepScreenOn: Boolean = true,
     val showPageCounter: Boolean = true,
     val volumeKeys: Boolean = false,
+    val pageMargins: Float = 1f,
+    val lineHeight: Float = 1.4f,
 )
+

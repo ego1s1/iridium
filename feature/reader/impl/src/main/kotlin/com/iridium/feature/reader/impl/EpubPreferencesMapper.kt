@@ -20,6 +20,8 @@ object EpubPreferencesMapper {
             ReadingFlow.AUTO, ReadingFlow.PAGED -> false
         },
         fontSize = prefs.fontScale.coerceIn(0.5f, 3f).toDouble(),
+        pageMargins = prefs.pageMargins.coerceIn(0.5f, 4f).toDouble(),
+        lineHeight = prefs.lineHeight.coerceIn(1f, 3f).toDouble(),
         textAlign = when (prefs.textAlign) {
             TextAlign.ORIGINAL -> null
             TextAlign.LEFT -> ReadiumTextAlign.LEFT
