@@ -12,8 +12,10 @@ junit = "4.13.2"
 orgJson = "20240303"
 robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
-composeBom = "2024.10.01"
-material3 = "1.4.0-alpha15"
+composeBom = "2025.06.00"
+# M3 Expressive: FloatingToolbar / ButtonGroup / LoadingIndicator ship in the
+# 1.4.0-alpha line; 1.4.0 stable drops them again.
+material3Expressive = "1.4.0-alpha15"
 navigationCompose = "2.8.4"
 lifecycle = "2.8.6"
 activityCompose = "1.9.3"
@@ -29,6 +31,8 @@ javapoet = "1.13.0"
 documentfile = "1.0.1"
 readium = "3.1.1"
 binaryCompatibilityValidator = "0.17.0"
+pulsar = "1.3.0"
+graphics-shapes = "1.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,7 +54,7 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3Expressive" }
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
@@ -88,8 +92,8 @@ readium-opds = { group = "org.readium.kotlin-toolkit", name = "readium-opds", ve
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
 # Expressive UI & Haptics
-androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes-android", version = "1.0.1" }
-pulsar = { group = "com.swmansion", name = "pulsar", version = "1.3.0" }
+androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes-android", version.ref = "graphics-shapes" }
+pulsar = { group = "com.swmansion", name = "pulsar", version.ref = "pulsar" }
 
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
