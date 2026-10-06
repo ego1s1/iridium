@@ -1,0 +1,25 @@
+10-07 00:43:00.872  4465  4465 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: FATAL EXCEPTION: main
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: Process: com.iridium.reader, PID: 4465
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: java.lang.IllegalArgumentException: Key "OEBPS/716005862216510784_64317-h-0.htm.xhtml" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException(InlineClassHelper.kt:36)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState.subcompose(SubcomposeLayout.kt:1055)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$Scope.subcompose(SubcomposeLayout.kt:926)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScopeImpl.measure-0kLqBqw(LazyLayoutMeasureScope.kt:124)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw(LazyListMeasuredItemProvider.kt:55)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default(LazyListMeasuredItemProvider.kt:49)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasureKt.measureLazyList-LCrQqZ4(LazyListMeasure.kt:222)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListKt$rememberLazyListMeasurePolicy$1$1.invoke-0kLqBqw(LazyList.kt:352)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListKt$rememberLazyListMeasurePolicy$1$1.invoke(LazyList.kt:200)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutKt$LazyLayout$1$2$1.invoke-0kLqBqw(LazyLayout.kt:78)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutKt$LazyLayout$1$2$1.invoke(LazyLayout.kt:76)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$createMeasurePolicy$1.measure-3p2s80s(SubcomposeLayout.kt:754)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.node.InnerNodeCoordinator.measure-BRTryo0(InnerNodeCoordinator.kt:128)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.graphics.SimpleGraphicsLayerModifier.measure-3p2s80s(GraphicsLayerModifier.kt:642)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutBeyondBoundsModifierNode.measure-3p2s80s(LazyLayoutBeyondBoundsModifierLocal.kt:118)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.layout.PaddingNode.measure-3p2s80s(Padding.kt:401)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+10-07 00:43:00.875  4465  4465 E AndroidRuntime: 	at androidx.compose.foundation.layout.FillNode.measure-3p2s80s(Size.kt:721)
