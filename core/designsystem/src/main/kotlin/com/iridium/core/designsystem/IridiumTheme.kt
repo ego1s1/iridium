@@ -47,6 +47,8 @@ fun IridiumTheme(
         typography = IridiumTypography,
     ) {
         CompositionLocalProvider(
+            LocalAppFonts provides appFonts(darkTheme),
+            LocalHapticsEnabled provides true,
             LocalExpressiveMotionEnabled provides expressiveMotion,
             content = content,
         )
