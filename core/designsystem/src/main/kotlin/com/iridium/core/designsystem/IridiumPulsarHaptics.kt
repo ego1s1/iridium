@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.swmansion.pulsar.Pulsar
@@ -14,15 +15,44 @@ import com.swmansion.pulsar.types.CompatibilityMode
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
 /**
- * Pulsar-backed haptics dispatcher for [IridiumHaptic] events with graceful fallback
- * to [LocalHapticFeedback].
+ * Pulsar-backed player for [IridiumHaptic] events.
  *
- * Uses Pulsar 1.3.0 (`com.swmansion:pulsar`) to drive OEM-tuned haptic patterns on
- * capable devices (Pixel, Samsung), falling back to framework [LocalHapticFeedback]
- * when:
- * 1. The context is not an [Activity].
- * 2. Device haptic capability is below [CompatibilityMode.LIMITED_SUPPORT].
- * 3. Pulsar instantiation or playback fails.
+ * Pulsar 1.3.0 (`com.swmansion:pulsar`, MIT — credited in the licenses
+ * screen) resolves each system preset through the OEM-tuned path with
+ * graceful fallbacks on older devices, which is what gives the crisp feeling
+ * on Pixel/Samsung flagships. Every semantic event gets its own weight
+ * instead of one shared tap:
+ *
+ * | Event | Preset | Feel |
+ * |---|---|---|
+ * | Tap / Select | systemSelection | light selection blip |
+ * | Tick | systemSegmentTick | discrete step |
+ * | FrequentTick | systemSegmentFrequentTick | light scrub ticks |
+ * | ToggleOn/Off | systemToggleOn/Off | distinct on/off |
+ * | Confirm | systemNotificationSuccess | success chime |
+ * | Warning | systemNotificationWarning | warning pulse |
+ * | PrimaryAction | systemImpactMedium | firm CTA thud |
+ * | Reject | systemNotificationError | error buzz |
+ * | LongPress | systemLongPress | deep press |
+ *
+ * `Tap` is a semantic alias of `Select` and `Warning` maps to the warning
+ * preset; both keep Iridium framework-mapping semantics
+ * (see `IridiumHaptic.type`).
+ *
+ * Boundaries, per the Pulsar skill:
+ * - Capability tiers: below [CompatibilityMode.LIMITED_SUPPORT] (budget
+ *   actuators, no amplitude control) everything routes to the framework
+ *   mapping, which degrades gracefully instead of buzzing blindly.
+ * - Pulsar's `getPresets()` requires an `Activity` context (it casts). If the
+ *   ambient context is not an Activity, or playback throws, we fall back to
+ *   the framework [HapticFeedback.perform] mapping — every flow stays usable
+ *   without Pulsar.
+ * - No `forceHapticsSupportLevel`, no `enableHaptics(true)`: the system
+ *   haptics toggle and capability tiers are respected as-is.
+ * - Bounded presets only. No `RealtimeComposer` here: none of our current
+ *   events (tabs, toggles, slider release, scrub ticks) need live modulation.
+ * - Must be called from the click handler, not composition or `LaunchedEffect`.
+ * - Silenced cleanly when [LocalHapticsEnabled] resolves to false.
  *
  * Usage:
  * ```kotlin
@@ -38,12 +68,13 @@ fun rememberIridiumHaptics(): (IridiumHaptic) -> Unit {
     }
     val context = LocalContext.current
     val framework = LocalHapticFeedback.current
-
+    // Pulsar holds the context; re-create only when it changes. Construction
+    // itself is cheap — preset cache fills on first play.
     val pulsar = remember(context) {
         val activity = context as? Activity ?: return@remember null
         runCatching { Pulsar(activity) }.getOrNull()
     }
-
+    // Tier once per instance: budget devices take the framework path below.
     val pulsarCapable = remember(pulsar) {
         runCatching {
             (pulsar?.hapticSupport() ?: CompatibilityMode.NO_SUPPORT) >=
@@ -67,7 +98,9 @@ fun rememberIridiumHaptics(): (IridiumHaptic) -> Unit {
 }
 
 /**
- * Dispatches one semantic event to its corresponding Pulsar system preset.
+ * Dispatches one semantic event to its Pulsar system preset. System presets
+ * (not the playful named ones like `hammer`/`dogBark`) so UI feedback keeps
+ * platform meaning and intensity on every OEM.
  */
 private fun IridiumHaptic.playWith(presets: PresetsWrapper) {
     when (this) {

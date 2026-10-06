@@ -7,10 +7,15 @@ import org.junit.Test
 class IridiumHapticsTest {
 
     @Test
-    fun tapAndSelectMapToSegmentTick() {
-        assertEquals(HapticFeedbackType.SegmentTick, IridiumHaptic.Tap.type())
+    fun selectionUsesLightTick() {
         assertEquals(HapticFeedbackType.SegmentTick, IridiumHaptic.Select.type())
         assertEquals(HapticFeedbackType.SegmentTick, IridiumHaptic.Tick.type())
+    }
+
+    @Test
+    fun tapIsAliasForSelect() {
+        assertEquals(HapticFeedbackType.SegmentTick, IridiumHaptic.Tap.type())
+        assertEquals(IridiumHaptic.Select.type(), IridiumHaptic.Tap.type())
     }
 
     @Test
@@ -25,14 +30,19 @@ class IridiumHapticsTest {
     }
 
     @Test
-    fun confirmAndWarningAreDistinct() {
+    fun completionAndFailureAreDistinct() {
         assertEquals(HapticFeedbackType.Confirm, IridiumHaptic.Confirm.type())
-        assertEquals(HapticFeedbackType.Reject, IridiumHaptic.Warning.type())
         assertEquals(HapticFeedbackType.Reject, IridiumHaptic.Reject.type())
     }
 
     @Test
-    fun primaryActionMapsToConfirm() {
+    fun warningSharesRejectPath() {
+        assertEquals(HapticFeedbackType.Reject, IridiumHaptic.Warning.type())
+        assertEquals(IridiumHaptic.Reject.type(), IridiumHaptic.Warning.type())
+    }
+
+    @Test
+    fun primaryActionIsAFirmConfirm() {
         assertEquals(HapticFeedbackType.Confirm, IridiumHaptic.PrimaryAction.type())
     }
 
