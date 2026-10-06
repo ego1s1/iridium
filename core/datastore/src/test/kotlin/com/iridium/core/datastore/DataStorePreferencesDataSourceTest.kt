@@ -83,6 +83,8 @@ class DataStorePreferencesDataSourceTest {
                 keepScreenOn = false,
                 showPageCounter = false,
                 volumeKeys = true,
+                pageMargins = 1.5f,
+                lineHeight = 1.8f,
             )
         }
         val reader = source.readerPreferences.first()
@@ -94,6 +96,8 @@ class DataStorePreferencesDataSourceTest {
         assertFalse(reader.keepScreenOn)
         assertFalse(reader.showPageCounter)
         assertTrue(reader.volumeKeys)
+        assertEquals(1.5f, reader.pageMargins)
+        assertEquals(1.8f, reader.lineHeight)
     }
 
     @Test

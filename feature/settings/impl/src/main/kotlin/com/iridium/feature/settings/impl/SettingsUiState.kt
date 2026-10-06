@@ -29,5 +29,9 @@ sealed interface SettingsAction {
     data class SetKeepScreenOn(val enabled: Boolean) : SettingsAction
     data class SetShowPageCounter(val enabled: Boolean) : SettingsAction
     data class SetVolumeKeys(val enabled: Boolean) : SettingsAction
+    data class SetFontSize(val scale: Float) : SettingsAction
+    data class SetMargins(val margins: Float) : SettingsAction
+    data class SetLineHeight(val lineHeight: Float) : SettingsAction
     data class SetCrashReporting(val enabled: Boolean) : SettingsAction
 }
+

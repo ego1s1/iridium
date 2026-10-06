@@ -34,6 +34,7 @@ import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
 import com.iridium.core.designsystem.IridiumSettingRow
 import com.iridium.core.designsystem.IridiumSettingSwitch
+import com.iridium.core.designsystem.IridiumSliderRow
 import com.iridium.core.designsystem.SchemePickerRow
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibrarySortOrder
@@ -181,6 +182,30 @@ internal fun SettingsScreen(
             }
 
             IridiumSectionCard(title = "Reading") {
+                IridiumSliderRow(
+                    label = "Font size",
+                    value = state.reader.fontScale,
+                    valueRange = 0.5f..2.5f,
+                    valueText = "${(state.reader.fontScale * 100).toInt()}%",
+                    onValueChange = { onAction(SettingsAction.SetFontSize(it)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                IridiumSliderRow(
+                    label = "Margins",
+                    value = state.reader.pageMargins,
+                    valueRange = 0.5f..3.0f,
+                    valueText = String.format(java.util.Locale.US, "%.1fx", state.reader.pageMargins),
+                    onValueChange = { onAction(SettingsAction.SetMargins(it)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                IridiumSliderRow(
+                    label = "Line height",
+                    value = state.reader.lineHeight,
+                    valueRange = 1.0f..2.5f,
+                    valueText = String.format(java.util.Locale.US, "%.2f", state.reader.lineHeight),
+                    onValueChange = { onAction(SettingsAction.SetLineHeight(it)) },
+                )
+                Spacer(Modifier.height(8.dp))
                 IridiumSettingSwitch(
                     title = "Keep screen on",
                     checked = state.reader.keepScreenOn,
@@ -198,6 +223,14 @@ internal fun SettingsScreen(
                 )
             }
 
+            IridiumSectionCard(title = "Storage") {
+                IridiumSettingRow(
+                    title = "Storage location",
+                    subtitle = "Books are read in place. Only covers and reading state are stored on device.",
+                    onClick = {},
+                )
+            }
+
             IridiumSectionCard(title = "About") {
                 IridiumSettingRow(
                     title = "Version",
@@ -210,12 +243,6 @@ internal fun SettingsScreen(
                     subtitle = "Off by default. Reports stay on device until you share them.",
                     checked = state.crashReportingEnabled,
                     onCheckedChange = { onAction(SettingsAction.SetCrashReporting(it)) },
-                )
-                HorizontalDivider()
-                IridiumSettingRow(
-                    title = "Storage",
-                    subtitle = "Books are read in place. Only covers and reading state are stored on device.",
-                    onClick = {},
                 )
             }
 

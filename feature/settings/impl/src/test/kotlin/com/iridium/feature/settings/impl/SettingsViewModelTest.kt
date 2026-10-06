@@ -75,6 +75,17 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `reading sliders write through and persist values`() = runTest {
+        viewModel.onAction(SettingsAction.SetFontSize(1.25f))
+        viewModel.onAction(SettingsAction.SetMargins(1.8f))
+        viewModel.onAction(SettingsAction.SetLineHeight(2.1f))
+        val reader = viewModel.uiState.first { it.reader.fontScale == 1.25f }.reader
+        assertEquals(1.25f, reader.fontScale)
+        assertEquals(1.8f, reader.pageMargins)
+        assertEquals(2.1f, reader.lineHeight)
+    }
+
+    @Test
     fun `crash reporting toggle persists and records consent`() = runTest {
         viewModel.onAction(SettingsAction.SetCrashReporting(true))
         assertTrue(viewModel.uiState.first { it.crashReportingEnabled }.crashReportingEnabled)

@@ -104,11 +104,18 @@ private fun PhoneMockup(
     amoled: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberIridiumHaptics()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .width(104.dp)
-            .clickable(onClick = onClick, role = Role.RadioButton)
+            .clickable(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onClick()
+                },
+                role = Role.RadioButton,
+            )
             .semantics { this.selected = selected },
     ) {
         IridiumTheme(
