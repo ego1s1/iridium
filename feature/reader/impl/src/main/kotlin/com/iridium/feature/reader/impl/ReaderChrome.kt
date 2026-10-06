@@ -193,44 +193,56 @@ fun chromeZoneForTap(
 
     val forwardRight = direction == ChromeReadingDirection.LEFT_TO_RIGHT
     val rawZone = when (navMode) {
-        ChromeNavMode.DEFAULT -> when {
-            x < 1f / 3f -> ChromeTapZone.PREV
-            x > 2f / 3f -> ChromeTapZone.NEXT
-            else -> ChromeTapZone.MENU
-        }
-        ChromeNavMode.L_SHAPE -> when {
-            y < 1f / 3f -> ChromeTapZone.PREV
-            y > 2f / 3f -> ChromeTapZone.NEXT
-            x < 1f / 3f -> ChromeTapZone.PREV
-            x > 2f / 3f -> ChromeTapZone.NEXT
-            else -> ChromeTapZone.MENU
-        }
-        ChromeNavMode.KINDLISH -> when {
-            y < 1f / 3f -> ChromeTapZone.MENU
-            x < 1f / 3f -> ChromeTapZone.PREV
-            else -> ChromeTapZone.NEXT
-        }
-        ChromeNavMode.EDGE -> when {
-            x in (1f / 3f)..(2f / 3f) && y in (1f / 3f)..(2f / 3f) -> ChromeTapZone.MENU
-            x in (1f / 3f)..(2f / 3f) && y > 2f / 3f -> ChromeTapZone.PREV
-            else -> ChromeTapZone.NEXT
-        }
-        ChromeNavMode.RIGHT_AND_LEFT -> when {
-            x < 1f / 3f -> if (forwardRight) ChromeTapZone.PREV else ChromeTapZone.NEXT
-            x > 2f / 3f -> if (forwardRight) ChromeTapZone.NEXT else ChromeTapZone.PREV
-            else -> ChromeTapZone.MENU
-        }
+        ChromeNavMode.DEFAULT -> zoneForThirds(x)
+        ChromeNavMode.L_SHAPE -> zoneForLShape(x, y)
+        ChromeNavMode.KINDLISH -> zoneForKindlish(x, y)
+        ChromeNavMode.EDGE -> zoneForEdge(x, y)
+        ChromeNavMode.RIGHT_AND_LEFT -> zoneForSides(x, forwardRight)
         ChromeNavMode.DISABLED -> ChromeTapZone.MENU
     }
     return if (navMode != ChromeNavMode.RIGHT_AND_LEFT && !forwardRight) {
-        when (rawZone) {
-            ChromeTapZone.PREV -> ChromeTapZone.NEXT
-            ChromeTapZone.NEXT -> ChromeTapZone.PREV
-            ChromeTapZone.MENU -> ChromeTapZone.MENU
-        }
+        mirrorTapZone(rawZone)
     } else {
         rawZone
     }
+}
+
+private fun zoneForThirds(x: Float): ChromeTapZone = when {
+    x < 1f / 3f -> ChromeTapZone.PREV
+    x > 2f / 3f -> ChromeTapZone.NEXT
+    else -> ChromeTapZone.MENU
+}
+
+private fun zoneForLShape(x: Float, y: Float): ChromeTapZone = when {
+    y < 1f / 3f -> ChromeTapZone.PREV
+    y > 2f / 3f -> ChromeTapZone.NEXT
+    x < 1f / 3f -> ChromeTapZone.PREV
+    x > 2f / 3f -> ChromeTapZone.NEXT
+    else -> ChromeTapZone.MENU
+}
+
+private fun zoneForKindlish(x: Float, y: Float): ChromeTapZone = when {
+    y < 1f / 3f -> ChromeTapZone.MENU
+    x < 1f / 3f -> ChromeTapZone.PREV
+    else -> ChromeTapZone.NEXT
+}
+
+private fun zoneForEdge(x: Float, y: Float): ChromeTapZone = when {
+    x in (1f / 3f)..(2f / 3f) && y in (1f / 3f)..(2f / 3f) -> ChromeTapZone.MENU
+    x in (1f / 3f)..(2f / 3f) && y > 2f / 3f -> ChromeTapZone.PREV
+    else -> ChromeTapZone.NEXT
+}
+
+private fun zoneForSides(x: Float, forwardRight: Boolean): ChromeTapZone = when {
+    x < 1f / 3f -> if (forwardRight) ChromeTapZone.PREV else ChromeTapZone.NEXT
+    x > 2f / 3f -> if (forwardRight) ChromeTapZone.NEXT else ChromeTapZone.PREV
+    else -> ChromeTapZone.MENU
+}
+
+private fun mirrorTapZone(zone: ChromeTapZone): ChromeTapZone = when (zone) {
+    ChromeTapZone.PREV -> ChromeTapZone.NEXT
+    ChromeTapZone.NEXT -> ChromeTapZone.PREV
+    ChromeTapZone.MENU -> ChromeTapZone.MENU
 }
 
 // Composables
