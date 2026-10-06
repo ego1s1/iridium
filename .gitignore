@@ -1,30 +1,89 @@
+# --- Gradle / Android build outputs ---
 .gradle/
 build/
-local.properties
-.idea/
-.vscode/
-*.iml
-*.hprof
-*.log
-.DS_Store
+out/
 captures/
 .externalNativeBuild/
 .cxx/
+
+# --- Kotlin / Java compilation ---
+.kotlin/
+*.class
+*.dex
+*.ap_
 *.apk
 *.aab
-*.ap_
-*.dex
-*.class
-.kotlin/
-out/
-# Release signing material must never be committed.
+
+# --- Profiling, logs, lint, test output ---
+*.hprof
+*.jfr
+*.trace
+*.log
+logs/
+**/lint-results.*
+*.exec
+*.ec
+
+# --- Local SDK / machine config ---
+local.properties
+
+# --- IDEs and editors ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.fleet/
+.attach_pid*
+*~
+*.swp
+*.swo
+*.orig
+*.rej
+
+# --- OS noise ---
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+
+# --- Signing / secrets (never commit) ---
 *.jks
 *.keystore
-/store.pass
-/key.pass
-# Design-reference drops at the repo root (screenshots, mockups).
+*.p12
+*.pem
+*.key
+store.pass
+key.pass
+keystore.properties
+signing.properties
+secrets.properties
+.env
+.env.local
+!.env.example
+
+# --- fastlane generated output ---
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# --- Python helpers in scripts/ ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Design-reference drops at the repo root (screenshots, mockups, sample books).
 # Real assets live in module res/ dirs; these must never be committed.
 /*.png
 /*.jpg
 /*.jpeg
 /*.avif
+/*.webp
+/*.gif
+/*.epub
+/*.pdf
