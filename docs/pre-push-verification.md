@@ -1,11 +1,18 @@
 # Pre-push verification gate — main
 
-Two independent report-only runs (t7 by Wren, t9 by Kit) audited the same
-commit and agree. This merged file keeps both runs' evidence.
+Three report-only runs audited the gate. Runs 1–2 (t7 by Wren, t9 by Kit)
+audited the same commit (`dab2ba3`) and agree; run 3 (t12 by Kit) re-ran the
+full gate stepwise on current main after the t11 detekt fix landed. This single
+file keeps all three runs' evidence with no duplicated or conflicting sections.
 
-- Commit under test: `dab2ba3` (Merge agentcraft/wren/t8-push-hygiene-secrets into main)
-- Mode: report-only. No source files modified, no fixes applied, nothing pushed.
-- Environment (both runs): `JAVA_HOME=/opt/homebrew/opt/openjdk@17` (JDK 17.0.20.1),
+- Commits under test:
+  - Runs 1–2: `dab2ba3` (Merge agentcraft/wren/t8-push-hygiene-secrets into main)
+  - Run 3: `df3a92a` (current main tip at re-run; adds t11 detekt refactor
+    `beae754`, t7-report merge `9761b11`, and t16 device report `7048e9a`.
+    Source delta vs `dab2ba3` is the t11 `ReaderChrome.kt` refactor plus docs.)
+- Mode: report-only. This task definition allows editing only this report file;
+  no source fixes were applied here (the detekt fix came via t11 on main).
+- Environment (all runs): `JAVA_HOME=/opt/homebrew/opt/openjdk@17` (JDK 17.0.20.1),
   `ANDROID_HOME=~/Library/Android/sdk`.
   Note: bare `java` is not on PATH on this machine; the gate needs the env above.
   No `local.properties` present; SDK resolved via `ANDROID_HOME`.
@@ -42,7 +49,25 @@ Nothing skipped: the full gate from the task ran as specified, no lightweight su
 Re-ran `:feature:reader:impl:detekt` after reverting the branch to base state to
 confirm the failure reproduces on the audited tree.
 
-## Failure detail (detekt, pre-existing on clean main — both runs agree)
+## Run 3 — t12 (Kit, 2026-10-07 UTC, branch `agentcraft/kit/t12-consolidate-pre-push`)
+
+Full gate, stepwise for per-step results, on current main `df3a92a`
+(fast-forward merged `main` at start; tree clean). Numbers below are from this
+run's own Gradle output and a post-run count over `**/build/test-results/**/*.xml`.
+
+| # | Command | Result |
+|---|---------|--------|
+| 0 | `./gradlew --version` (env sanity) | PASS — Gradle 8.9, JVM 17.0.20.1 |
+| 1 | `./gradlew :app:assembleDebug --console=plain -q` | PASS — exit 0, no output |
+| 2 | `./gradlew :app:lintDebug --console=plain` | PASS — BUILD SUCCESSFUL in 22s (623 tasks: 26 executed, 9 from cache, 588 up-to-date); `lint-results-debug.txt`: 0 errors, 94 warnings |
+| 3 | `./gradlew test --console=plain` | PASS — BUILD SUCCESSFUL in 31s (1101 tasks: 36 executed, 4 from cache, 1061 up-to-date); 31 suites, **178 tests, 0 failures, 0 errors, 0 skipped** |
+| 4 | `./gradlew detekt --console=plain` | PASS — BUILD SUCCESSFUL in 1s (26 tasks: 1 executed, 1 from cache, 24 up-to-date); plus `./gradlew :feature:reader:impl:detekt --rerun-tasks` → BUILD SUCCESSFUL in 12s (6 executed), confirming the former blocker module passes on fresh execution, not just cache |
+
+Nothing skipped: the full gate ran as specified, no lightweight substitution.
+
+## History: the detekt blocker seen by runs 1–2 (resolved by t11)
+
+Runs 1–2 both failed on the same single pre-existing finding on clean main:
 
 ```
 > Task :feature:reader:impl:detekt FAILED
@@ -57,21 +82,17 @@ Execution failed for task ':feature:reader:impl:detekt'.
 > Analysis failed with 1 weighted issues.
 ```
 
-One weighted issue; all other modules' `detekt` tasks passed.
+One weighted issue; all other modules' `detekt` tasks passed. This was left
+unfixed by the audit tasks and resolved separately by t11 (`beae754`: refactored
+`chromeZoneForTap` into per-nav-mode resolvers `zoneForThirds` / `zoneForLShape` /
+`zoneForKindlish` / `zoneForEdge` / `zoneForSides` plus a `mirrorTapZone` helper,
+behavior identical, `ReaderChromeTest` green). Run 3 above confirms the full gate
+— including a forced `--rerun-tasks` re-execution of the formerly failing module —
+is green on main with that fix.
 
-## Fix proposal (tracked separately, NOT in this branch)
+## Verdict: READY (gate green on current main)
 
-Decomposing `chromeZoneForTap` into per-nav-mode resolvers (`zoneForThirds`,
-`zoneForLShape`, `zoneForKindlish`, `zoneForEdge`, `zoneForSides`) plus a
-`mirrorTapZone` helper was verified to clear the gate on a scratch basis
-(full gate BUILD SUCCESSFUL), but is intentionally excluded here to keep this
-task audit-only. The proposal was sent to the lead for a separate follow-up
-task (only the lead can create tasks).
-
-## Verdict: NOT READY
-
-`assembleDebug`, `lintDebug`, and `test` pass, but `detekt` fails on
-`chromeZoneForTap` cyclomatic complexity (35 > 30), so the full gate is red
-and a push cannot be verified clean. Fixing the complexity finding (or an
-explicitly approved baseline/suppression) is required before the gate can go green —
-subject also to the t6 push-preview audit and t8 hygiene check, and Priyanshu's approval.
+`assembleDebug`, `lintDebug`, `test` (31 suites / 178 tests, 0 failures), and
+`detekt` all pass on `df3a92a`, so the full gate is green. Pushing still needs
+Priyanshu's approval (and remains subject to the t6 push-preview audit and t8
+hygiene check staying valid).
