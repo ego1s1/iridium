@@ -1,0 +1,23 @@
+10-07 00:12:29.052  1992  2014 D EGL_emulation: app_time_stats: avg=30.36ms min=17.08ms max=106.84ms count=23
+--------- beginning of crash
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: FATAL EXCEPTION: main
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: Process: com.iridium.reader, PID: 1992
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: java.lang.IllegalArgumentException: Key "OEBPS/716005862216510784_64317-h-0.htm.xhtml" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException(InlineClassHelper.kt:36)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState.subcompose(SubcomposeLayout.kt:1055)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$Scope.subcompose(SubcomposeLayout.kt:926)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScopeImpl.measure-0kLqBqw(LazyLayoutMeasureScope.kt:124)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw(LazyListMeasuredItemProvider.kt:55)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default(LazyListMeasuredItemProvider.kt:49)
+10-07 00:12:29.043  1992  1992 D AndroidRuntime: Shutting down VM
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: FATAL EXCEPTION: main
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: Process: com.iridium.reader, PID: 1992
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: java.lang.IllegalArgumentException: Key "OEBPS/716005862216510784_64317-h-0.htm.xhtml" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException(InlineClassHelper.kt:36)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState.subcompose(SubcomposeLayout.kt:1055)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$Scope.subcompose(SubcomposeLayout.kt:926)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScopeImpl.measure-0kLqBqw(LazyLayoutMeasureScope.kt:124)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw(LazyListMeasuredItemProvider.kt:55)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default(LazyListMeasuredItemProvider.kt:49)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasureKt.measureLazyList-LCrQqZ4(LazyListMeasure.kt:222)
+10-07 00:12:29.056  1992  1992 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListKt$rememberLazyListMeasurePolicy$1$1.invoke-0kLqBqw(LazyList.kt:352)
