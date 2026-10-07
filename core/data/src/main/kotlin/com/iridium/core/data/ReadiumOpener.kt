@@ -55,7 +55,9 @@ class ReadiumOpener @Inject constructor(
             val url = Uri.parse(sourcePath).toAbsoluteUrl() ?: return null
             assetRetriever.retrieve(url)
         } else {
-            val file = File(sourcePath)
+            // file:// URIs from the filesystem scan, or plain absolute
+            // paths: both resolve to the same File.
+            val file = File(Uri.parse(sourcePath).path ?: sourcePath)
             if (!file.exists()) return null
             assetRetriever.retrieve(file)
         }

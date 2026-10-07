@@ -2,22 +2,24 @@ package com.iridium.core.designsystem
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
+import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
@@ -25,10 +27,17 @@ import coil3.size.Scale
 import java.io.File
 
 /**
- * Book cover with a tonal bed + MenuBook placeholder until Coil reports
- * Success. [coverPath] is an app-private file path (or null for placeholders).
- * The request is remembered per path and bounded to an inexact fill so Coil
- * may serve a smaller cached bitmap for grid cells.
+ * Book cover art with an instant placeholder until the bitmap lands. Shared
+ * by the library grid and the detail hero so covers load — and fail —
+ * identically everywhere.
+ *
+ * Performance-optimized:
+ * - Uses Coil's [AsyncImage] with a custom [CenteredVectorPainter] to draw
+ *   the placeholder directly in the Canvas draw pass without subcomposition
+ *   or StateFlow lifecycle observations.
+ * - Memory caching is strongly enabled; redundant disk-cache writes are
+ *   avoided since cover files already reside on internal storage as files.
+ * - Zero recompositions occur upon image load completion.
  */
 @Composable
 fun BookCoverArt(
@@ -36,48 +45,73 @@ fun BookCoverArt(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        if (coverPath != null) {
-            val appContext = LocalContext.current.applicationContext
-            val request = remember(coverPath) {
-                ImageRequest.Builder(appContext)
-                    .data(File(coverPath))
-                    .crossfade(false)
-                    .precision(Precision.INEXACT)
-                    .scale(Scale.FILL)
-                    .build()
-            }
-            val painter = rememberAsyncImagePainter(
-                model = request,
-                contentScale = ContentScale.Crop,
-            )
-            val painterState by painter.state.collectAsStateWithLifecycle()
-            Image(
-                painter = painter,
-                contentDescription = contentDescription,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (painterState !is AsyncImagePainter.State.Success) {
-                CoverPlaceholder()
-            }
-        } else {
-            CoverPlaceholder()
+    val vectorPainter = rememberVectorPainter(image = IridiumIcons.MenuBook)
+    val placeholderTint = MaterialTheme.colorScheme.onSurfaceVariant
+    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val density = LocalDensity.current
+    val iconSizePx = remember(density) { with(density) { 40.dp.toPx() } }
+    val placeholder = remember(vectorPainter, placeholderTint, iconSizePx) {
+        CenteredVectorPainter(
+            painter = vectorPainter,
+            iconSizePx = iconSizePx,
+            tint = placeholderTint,
+        )
+    }
+
+    if (coverPath != null) {
+        val appContext = LocalContext.current.applicationContext
+        val request = remember(coverPath) {
+            ImageRequest.Builder(appContext)
+                .data(File(coverPath))
+                .memoryCacheKey(coverPath)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .crossfade(false)
+                .precision(Precision.INEXACT)
+                .scale(Scale.FILL)
+                .build()
         }
+        AsyncImage(
+            model = request,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            placeholder = placeholder,
+            error = placeholder,
+            fallback = placeholder,
+            modifier = modifier
+                .fillMaxSize()
+                .background(backgroundColor),
+        )
+    } else {
+        Image(
+            painter = placeholder,
+            contentDescription = contentDescription,
+            modifier = modifier
+                .fillMaxSize()
+                .background(backgroundColor),
+        )
     }
 }
 
-@Composable
-private fun CoverPlaceholder() {
-    Icon(
-        imageVector = IridiumIcons.MenuBook,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-        modifier = Modifier.size(40.dp),
-    )
+private class CenteredVectorPainter(
+    private val painter: Painter,
+    private val iconSizePx: Float,
+    private val tint: Color,
+) : Painter() {
+    override val intrinsicSize: Size = Size.Unspecified
+
+    override fun DrawScope.onDraw() {
+        val left = (size.width - iconSizePx) / 2f
+        val top = (size.height - iconSizePx) / 2f
+        if (left >= 0 && top >= 0) {
+            translate(left = left, top = top) {
+                with(painter) {
+                    draw(
+                        size = Size(iconSizePx, iconSizePx),
+                        colorFilter = ColorFilter.tint(tint),
+                    )
+                }
+            }
+        }
+    }
 }

@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.update
 class TestPreferencesDataSource : IridiumPreferencesDataSource {
 
     private val onboarding = MutableStateFlow(false)
-    private val treeUri = MutableStateFlow<String?>(null)
     private val reader = MutableStateFlow(ReaderPreferences())
     private val theme = MutableStateFlow(ThemePreferences())
     private val motion = MutableStateFlow(MotionStyle.EXPRESSIVE)
@@ -22,7 +21,6 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     private val crashAsked = MutableStateFlow(false)
 
     override val onboardingCompleted: Flow<Boolean> = onboarding
-    override val sourceTreeUri: Flow<String?> = treeUri
     override val readerPreferences: Flow<ReaderPreferences> = reader
     override val themePreferences: Flow<ThemePreferences> = theme
     override val motionStyle: Flow<MotionStyle> = motion
@@ -41,10 +39,6 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         onboarding.value = completed
-    }
-
-    override suspend fun setSourceTreeUri(uri: String?) {
-        treeUri.value = uri
     }
 
     override suspend fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences) {

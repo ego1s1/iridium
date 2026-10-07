@@ -1,7 +1,6 @@
 package com.iridium.core.data
 
 import android.content.Context
-import android.net.Uri
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.BookEntity
 import com.iridium.core.database.BookmarkDao
@@ -55,9 +54,11 @@ interface BooksRepository {
     fun observeHighlights(bookId: String): Flow<List<Highlight>>
     fun observeBookmarks(bookId: String): Flow<List<Bookmark>>
 
-    /** Links a user folder in place and indexes every EPUB under it. */
-    suspend fun indexLinkedTree(
-        treeUri: Uri,
+    /**
+     * Scans all of shared storage in place and indexes every EPUB found.
+     * Rows whose files are gone are pruned (never on a failed walk).
+     */
+    suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): IndexReport
 
@@ -129,11 +130,10 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     override fun observeBookmarks(bookId: String): Flow<List<Bookmark>> =
         bookmarkDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
 
-    override suspend fun indexLinkedTree(
-        treeUri: Uri,
+    override suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
     ): IndexReport = withContext(Dispatchers.IO) {
-        val (docs, walkFailed) = treeLister.listBooks(treeUri)
+        val (docs, walkFailed) = treeLister.listBooks()
         // Batch: one table fetch, one upsert, one emission.
         val knownById = bookDao.getAll().associateBy { it.id }
         val rows = mutableListOf<BookEntity>()
@@ -166,8 +166,11 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         // failed walk, which would read as an empty folder and wipe rows the
         // user still owns. Pruned covers go with their rows.
         if (!walkFailed) {
+            // Full-device scan: anything not found is gone, whatever scheme
+            // its row used (legacy SAF rows included) — except on a failed
+            // walk, which must never read as an empty device.
             val foundIds = rows.map { it.id }.toSet()
-            val pruned = knownById.values.filter { isLinkedSourcePath(it.sourcePath) && it.id !in foundIds }
+            val pruned = knownById.values.filter { it.id !in foundIds }
             if (rows.isEmpty() && pruned.isNotEmpty()) {
                 bookDao.deleteAllLinked()
             } else if (pruned.isNotEmpty()) {
@@ -367,7 +370,5 @@ internal object EpubModule {
 
     @Provides
     @Singleton
-    fun provideLinkedTreeLister(
-        @ApplicationContext context: Context,
-    ): LinkedTreeLister = DocumentLinkedTreeLister(context)
+    fun provideLinkedTreeLister(): LinkedTreeLister = FilesystemLinkedTreeLister()
 }

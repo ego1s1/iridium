@@ -59,6 +59,9 @@ class LibraryViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = LibraryQuery(),
     )
+    private val menuBookId = MutableStateFlow<String?>(null)
+    private val menuDeleteConfirm = MutableStateFlow(false)
+
     private val refreshing = MutableStateFlow(false)
     private val filterOpen = MutableStateFlow(false)
     private val searchOpen = MutableStateFlow(false)
@@ -104,30 +107,34 @@ class LibraryViewModel @Inject constructor(
         books,
         query,
         combine(refreshing, filterOpen, searchOpen, ::Chrome),
-        preferences.sourceTreeUri,
         indexProgress,
         contentHits,
         indexing,
+        preferences.libraryDisplay,
+        combine(menuBookId, menuDeleteConfirm, ::MenuChrome),
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val books = args[0] as List<Book>
         val query = args[1] as LibraryQuery
         val chrome = args[2] as Chrome
-        val treeUri = args[3] as String?
-        val progress = args[4] as IndexProgress?
-        val hits = args[5] as List<ContentHit>
-        val isIndexing = args[6] as Boolean
+        val progress = args[3] as IndexProgress?
+        val hits = args[4] as List<ContentHit>
+        val isIndexing = args[5] as Boolean
+        val display = args[6] as com.iridium.core.model.LibraryDisplay
+        val menu = args[7] as MenuChrome
         LibraryUiState(
             books = books,
             query = query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
             searchOpen = chrome.searchOpen,
-            linked = treeUri != null,
             continueReading = books.continueShelf(),
             indexProgress = progress,
             contentHits = hits,
             indexing = isIndexing,
+            display = display,
+            menuBookId = menu.bookId,
+            menuDeleteConfirm = menu.deleteConfirm,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -138,7 +145,6 @@ class LibraryViewModel @Inject constructor(
             refreshing = false,
             filterOpen = false,
             searchOpen = false,
-            linked = false,
             continueReading = emptyList(),
         ),
     )
@@ -156,12 +162,10 @@ class LibraryViewModel @Inject constructor(
         )
 
     init {
-        // Rescan on launch: the library reads user folders in place, so a
-        // launch pass picks up files added, moved or removed outside the app.
-        viewModelScope.launch {
-            if (preferences.sourceTreeUri.first() == null) return@launch
-            scan()
-        }
+        // Rescan on launch: the library reads every EPUB on shared storage
+        // in place, so a launch pass picks up files added, moved or removed
+        // outside the app.
+        viewModelScope.launch { scan() }
         // Content search rides the same typed text but its own debounce: FTS
         // is cheap per query, yet we still avoid a query per keystroke.
         viewModelScope.launch {
@@ -187,21 +191,51 @@ class LibraryViewModel @Inject constructor(
             is LibraryAction.SortSelected -> updateDisplay { it.copy(sortOrder = action.sort) }
             is LibraryAction.FilterSelected -> updateDisplay { it.copy(filter = action.filter) }
             is LibraryAction.ToggleHideErrors -> updateDisplay { it.copy(hideErrors = action.hide) }
+            is LibraryAction.DisplayModeSelected -> updateDisplay { it.copy(displayMode = action.mode) }
+            is LibraryAction.GridColumnsSelected -> updateDisplay {
+                it.copy(gridColumns = action.columns.coerceIn(0, 6))
+            }
             LibraryAction.OpenFilter -> filterOpen.value = true
             LibraryAction.CloseFilter -> filterOpen.value = false
             LibraryAction.ToggleSearch -> searchOpen.update { !it }
             LibraryAction.Rescan -> scan()
-            is LibraryAction.LinkFolder -> scan(linkUri = action.uri.toString())
             LibraryAction.IndexLibrary -> indexLibrary()
             is LibraryAction.RemoveBook -> remove(action.bookId)
+            is LibraryAction.OpenMenu -> {
+                menuBookId.value = action.bookId
+                menuDeleteConfirm.value = false
+            }
+            LibraryAction.CloseMenu -> {
+                menuBookId.value = null
+                menuDeleteConfirm.value = false
+            }
+            LibraryAction.ToggleMenuBookmark -> {
+                val id = menuBookId.value ?: return
+                val current = books.value.firstOrNull { it.id == id }?.bookmarked ?: return
+                viewModelScope.launch { repository.setBookmarked(id, !current) }
+            }
+            LibraryAction.OpenMenuDelete -> menuDeleteConfirm.value = true
+            LibraryAction.ConfirmMenuDelete -> {
+                val id = menuBookId.value ?: return
+                menuDeleteConfirm.value = false
+                menuBookId.value = null
+                remove(id)
+            }
         }
     }
+
 
     /** Ephemeral chrome state kept out of the query/data flows. */
     private data class Chrome(
         val refreshing: Boolean,
         val filterOpen: Boolean,
         val searchOpen: Boolean,
+    )
+
+    /** Ephemeral menu chrome kept out of the query/data flows. */
+    private data class MenuChrome(
+        val bookId: String?,
+        val deleteConfirm: Boolean,
     )
 
     private fun updateDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
@@ -213,16 +247,12 @@ class LibraryViewModel @Inject constructor(
     }
 
     /**
-     * Link-only scan: re-indexes a tree in place — nothing is ever copied.
-     * [linkUri] persists a freshly picked folder first, so a pick during a
-     * running scan folds into at most one follow-up run.
+     * Filesystem scan: re-indexes every EPUB on shared storage in place —
+     * nothing is ever copied. A scan during a running scan folds into at
+     * most one follow-up run.
      */
-    private fun scan(linkUri: String? = null) {
+    private fun scan() {
         viewModelScope.launch {
-            if (linkUri != null) {
-                preferences.setSourceTreeUri(linkUri)
-                preferences.setOnboardingCompleted(true)
-            }
             if (scanMutex.isLocked) {
                 scanQueued.set(true)
                 return@launch
@@ -234,8 +264,7 @@ class LibraryViewModel @Inject constructor(
                     scanQueued.set(false)
                     scanMutex.withLock {
                         try {
-                            val treeUri = preferences.sourceTreeUri.first() ?: return@withLock
-                            val report = repository.indexLinkedTree(android.net.Uri.parse(treeUri)) { done, total ->
+                            val report = repository.indexFilesystem { done, total ->
                                 indexProgress.value = IndexProgress(done, total)
                             }
                             if (report.failed > 0) {

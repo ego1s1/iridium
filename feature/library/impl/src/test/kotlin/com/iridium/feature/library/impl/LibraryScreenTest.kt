@@ -23,7 +23,6 @@ class LibraryScreenTest {
 
     private fun state(
         books: List<com.iridium.core.model.Book> = emptyList(),
-        linked: Boolean = false,
         text: String = "",
     ) = LibraryUiState(
         books = books,
@@ -31,57 +30,54 @@ class LibraryScreenTest {
         refreshing = false,
         filterOpen = false,
         searchOpen = false,
-        linked = linked,
         continueReading = emptyList(),
     )
 
-    @Test
-    fun `an unlinked library invites the user to link a folder`() {
+    private fun setScreen(
+        uiState: LibraryUiState = state(),
+        hasStorageAccess: Boolean = false,
+        onGrantAccess: () -> Unit = {},
+    ) {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 LibraryScreen(
-                    uiState = state(),
+                    uiState = uiState,
+                    hasStorageAccess = hasStorageAccess,
+                    onGrantAccess = onGrantAccess,
                     onAction = {},
                     onReadClick = {},
                     onDetailsClick = {},
                 )
             }
         }
+    }
+
+    @Test
+    fun `a library without storage access invites the grant`() {
+        setScreen()
         composeTestRule.onNodeWithText("No books yet").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Link folder").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Grant access").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a library with access but no books offers a rescan`() {
+        setScreen(hasStorageAccess = true)
+        composeTestRule.onNodeWithText("No books yet").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Rescan library").assertIsDisplayed()
     }
 
     @Test
     fun `an empty search result explains itself and offers a rescan`() {
-        composeTestRule.setContent {
-            IridiumTheme(expressiveMotion = false) {
-                LibraryScreen(
-                    uiState = state(linked = true, text = "zzz"),
-                    onAction = {},
-                    onReadClick = {},
-                    onDetailsClick = {},
-                )
-            }
-        }
+        setScreen(uiState = state(text = "zzz"), hasStorageAccess = true)
         composeTestRule.onNodeWithText("No matches").assertIsDisplayed()
     }
 
     @Test
     fun `the empty-state action is wired to the callback`() {
-        var linked = false
-        composeTestRule.setContent {
-            IridiumTheme(expressiveMotion = false) {
-                LibraryScreen(
-                    uiState = state(),
-                    onAction = {},
-                    onReadClick = {},
-                    onDetailsClick = {},
-                    onLinkFolder = { linked = true },
-                )
-            }
-        }
-        composeTestRule.onNodeWithText("Link folder").performClick()
-        assertTrue(linked)
+        var granted = false
+        setScreen(onGrantAccess = { granted = true })
+        composeTestRule.onNodeWithText("Grant access").performClick()
+        assertTrue(granted)
     }
 
     @Test
@@ -91,8 +87,9 @@ class LibraryScreenTest {
                 LibraryScreen(
                     uiState = state(
                         books = listOf(TestData.book(id = "1", title = "Treasure Island")),
-                        linked = true,
                     ),
+                    hasStorageAccess = true,
+                    onGrantAccess = {},
                     onAction = {},
                     onReadClick = {},
                     onDetailsClick = {},

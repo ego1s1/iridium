@@ -1,6 +1,5 @@
 package com.iridium.feature.onboarding.impl
 
-import android.net.Uri
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ThemeMode
@@ -38,34 +37,52 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `get started advances to the folder step`() = runTest {
+    fun `get started advances to the access step`() = runTest {
         viewModel.onAction(OnboardingAction.GetStarted)
-        assertTrue(viewModel.uiState.first() is OnboardingUiState.Folder)
+        assertTrue(viewModel.uiState.first() is OnboardingUiState.Access)
     }
 
     @Test
-    fun `a dismissed picker explains itself instead of stalling`() = runTest {
+    fun `advance walks access reading appearance`() = runTest {
         viewModel.onAction(OnboardingAction.GetStarted)
-        viewModel.onAction(OnboardingAction.FolderPickerDismissed)
-        val state = viewModel.uiState.first() as OnboardingUiState.Folder
-        assertTrue(state.pickerHintVisible)
-    }
-
-    @Test
-    fun `picking a folder persists the tree and advances to appearance`() = runTest {
-        viewModel.onAction(OnboardingAction.GetStarted)
-        viewModel.onAction(OnboardingAction.FolderSelected(Uri.parse("content://tree/books")))
-
-        assertEquals("content://tree/books", preferences.sourceTreeUri.first())
+        viewModel.onAction(OnboardingAction.Advance)
+        val reading = viewModel.uiState.first()
+        assertTrue(reading is OnboardingUiState.Reading)
+        assertEquals(1f, (reading as OnboardingUiState.Reading).prefs.fontScale)
+        viewModel.onAction(OnboardingAction.Advance)
         assertTrue(viewModel.uiState.first() is OnboardingUiState.Appearance)
+    }
+
+    @Test
+    fun `reading choices persist immediately`() = runTest {
+        viewModel.onAction(OnboardingAction.SetFontScale(1.5f))
+        viewModel.onAction(OnboardingAction.SetLineHeight(2f))
+        viewModel.onAction(OnboardingAction.SetReaderTheme(com.iridium.core.model.ColorSchemeChoice.DARK))
+
+        val reader = preferences.readerPreferences.first()
+        assertEquals(1.5f, reader.fontScale)
+        assertEquals(2f, reader.lineHeight)
+        assertEquals(com.iridium.core.model.ColorSchemeChoice.DARK, reader.theme)
+    }
+
+    @Test
+    fun `font scale clamps to the readable range`() = runTest {
+        viewModel.onAction(OnboardingAction.SetFontScale(99f))
+        assertEquals(3f, preferences.readerPreferences.first().fontScale)
+        viewModel.onAction(OnboardingAction.SetLineHeight(99f))
+        assertEquals(2.5f, preferences.readerPreferences.first().lineHeight)
     }
 
     @Test
     fun `back steps through the wizard`() = runTest {
         viewModel.onAction(OnboardingAction.GetStarted)
-        viewModel.onAction(OnboardingAction.FolderSelected(Uri.parse("content://tree")))
+        viewModel.onAction(OnboardingAction.Advance)
+        viewModel.onAction(OnboardingAction.Advance)
         viewModel.onAction(OnboardingAction.BackStep)
-        assertTrue(viewModel.uiState.first() is OnboardingUiState.Folder)
+        assertTrue(viewModel.uiState.first() is OnboardingUiState.Reading)
+
+        viewModel.onAction(OnboardingAction.BackStep)
+        assertTrue(viewModel.uiState.first() is OnboardingUiState.Access)
 
         viewModel.onAction(OnboardingAction.BackStep)
         assertEquals(OnboardingUiState.Welcome, viewModel.uiState.first())
@@ -85,11 +102,10 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `skip finishes without linking a folder`() = runTest {
+    fun `skip finishes from anywhere`() = runTest {
         viewModel.onAction(OnboardingAction.Skip)
 
         assertTrue(preferences.onboardingCompleted.first())
-        assertEquals(null, preferences.sourceTreeUri.first())
     }
 
     @Test

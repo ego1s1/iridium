@@ -1,0 +1,264 @@
+package com.iridium.app
+
+import android.content.Context
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.compose.composable
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
+import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumEmptyState
+import com.iridium.core.designsystem.IridiumErrorCard
+import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.IridiumLoading
+import com.iridium.core.designsystem.IridiumSheet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/** App-wide open-source licenses, generated at build time. */
+@Serializable
+object LicensesRoute
+
+fun NavController.navigateToLicenses() {
+    navigate(LicensesRoute) {
+        launchSingleTop = true
+    }
+}
+
+fun NavGraphBuilder.licensesScreen(onBackClick: () -> Unit) {
+    composable<LicensesRoute> {
+        LicensesRouteContent(onBackClick = onBackClick)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LicensesRouteContent(
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var data by remember { mutableStateOf<LicensesData?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<LibraryEntry?>(null) }
+    var attempt by remember { mutableIntStateOf(0) }
+    LaunchedEffect(attempt) {
+        failed = false
+        data = withContext(Dispatchers.IO) { loadLicenses(context) }
+        failed = data == null
+    }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        topBar = {
+            IridiumCollapsingTopBar(
+                title = stringResource(R.string.licenses_title),
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = IridiumIcons.Back,
+                            contentDescription = stringResource(R.string.licenses_back),
+                        )
+                    }
+                },
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    ) { padding ->
+        val libraries = data?.libraries.orEmpty()
+        when {
+            failed -> IridiumErrorCard(
+                body = stringResource(R.string.licenses_failed_body),
+                primaryLabel = stringResource(R.string.licenses_retry),
+                onPrimary = { attempt++ },
+                modifier = Modifier.padding(padding).padding(16.dp),
+            )
+            data == null -> IridiumLoading(modifier = Modifier.padding(padding))
+            libraries.isEmpty() -> IridiumEmptyState(
+                icon = IridiumIcons.MenuBook,
+                title = stringResource(R.string.licenses_empty_title),
+                body = stringResource(R.string.licenses_empty_body),
+                actionLabel = null,
+                onAction = null,
+                modifier = Modifier.padding(padding),
+            )
+            else -> LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                items(libraries, key = { it.uniqueId }) { library ->
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = library.name.ifBlank { library.uniqueId },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        supportingContent = {
+                            val sub = listOfNotNull(
+                                library.artifactVersion,
+                                library.organization?.name,
+                            ).joinToString(" • ").ifBlank { null }
+                            if (sub != null) {
+                                Text(
+                                    text = sub,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        },
+                        trailingContent = {
+                            Icon(
+                                imageVector = IridiumIcons.Forward,
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable(
+                            onClick = { selected = library },
+                            role = Role.Button,
+                        ),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
+    }
+    val current = selected
+    if (current != null && data != null) {
+        IridiumSheet(
+            onDismiss = { selected = null },
+            skipPartiallyExpanded = true,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+            ) {
+                Text(
+                    text = current.name.ifBlank { current.uniqueId },
+                    style = IridiumEmphasized.titleLarge,
+                )
+                val sub = listOfNotNull(
+                    current.artifactVersion,
+                    current.organization?.name,
+                    current.website,
+                ).joinToString("\n")
+                if (sub.isNotBlank()) {
+                    Text(
+                        text = sub,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                data?.licensesFor(current)?.forEach { license ->
+                    Text(
+                        text = license.name.ifBlank { license.spdxId.orEmpty() },
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                    Text(
+                        text = license.content?.takeIf { it.isNotBlank() }
+                            ?: license.url.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Generated `aboutlibraries.json` model (unknown fields ignored). */
+@Serializable
+internal data class LicensesData(
+    val libraries: List<LibraryEntry> = emptyList(),
+    val licenses: Map<String, LicenseEntry> = emptyMap(),
+)
+
+@Serializable
+internal data class LibraryEntry(
+    val uniqueId: String,
+    val name: String = "",
+    val artifactVersion: String? = null,
+    val description: String? = null,
+    val website: String? = null,
+    val organization: Organization? = null,
+    val licenses: List<String> = emptyList(),
+)
+
+@Serializable
+internal data class Organization(
+    val name: String = "",
+)
+
+@Serializable
+internal data class LicenseEntry(
+    val name: String = "",
+    val spdxId: String? = null,
+    val url: String? = null,
+    val content: String? = null,
+)
+
+internal fun LicensesData.licensesFor(library: LibraryEntry): List<LicenseEntry> =
+    library.licenses.mapNotNull { licenses[it] }
+
+private val licensesJson = Json { ignoreUnknownKeys = true }
+
+internal fun parseLicenses(raw: String): LicensesData? =
+    runCatching { licensesJson.decodeFromString<LicensesData>(raw) }.getOrNull()
+
+internal fun loadLicenses(context: Context): LicensesData? {
+    val raw = runCatching {
+        context.resources.openRawResource(R.raw.aboutlibraries).use {
+            it.readBytes().decodeToString()
+        }
+    }.getOrNull() ?: return null
+    val parsed = parseLicenses(raw) ?: return null
+    return parsed.copy(
+        libraries = parsed.libraries.sortedBy { it.name.ifBlank { it.uniqueId }.lowercase() },
+    )
+}

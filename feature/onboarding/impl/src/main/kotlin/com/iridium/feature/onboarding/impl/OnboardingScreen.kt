@@ -1,6 +1,10 @@
 package com.iridium.feature.onboarding.impl
 
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -9,6 +13,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Slider
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -49,11 +56,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -71,8 +80,11 @@ import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumSectionCard
 import com.iridium.core.designsystem.IridiumSettingSwitch
+import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
 import com.iridium.core.designsystem.SchemePickerRow
 import com.iridium.core.designsystem.topSheet
+import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
 import kotlinx.coroutines.delay
@@ -84,30 +96,8 @@ internal fun OnboardingRoute(
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    val folderLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri == null) {
-            viewModel.onAction(OnboardingAction.FolderPickerDismissed)
-        } else {
-            val granted = runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }.isSuccess
-            if (granted) {
-                viewModel.onAction(OnboardingAction.FolderSelected(uri))
-            } else {
-                viewModel.onAction(OnboardingAction.FolderPickerDismissed)
-            }
-        }
-    }
     OnboardingScreen(
         uiState = uiState,
-        onPickFolder = { folderLauncher.launch(null) },
         onAction = viewModel::onAction,
         onOnboardingComplete = onOnboardingComplete,
         modifier = modifier,
@@ -118,7 +108,6 @@ internal fun OnboardingRoute(
 @Suppress("UnusedContentLambdaTargetStateParameter")
 internal fun OnboardingScreen(
     uiState: OnboardingUiState,
-    onPickFolder: () -> Unit,
     onAction: (OnboardingAction) -> Unit,
     onOnboardingComplete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -128,8 +117,9 @@ internal fun OnboardingScreen(
         val stepExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
         val stepKey = when (uiState) {
             OnboardingUiState.Welcome -> 0
-            is OnboardingUiState.Folder -> 1
-            is OnboardingUiState.Appearance -> 2
+            is OnboardingUiState.Access -> 1
+            is OnboardingUiState.Reading -> 2
+            is OnboardingUiState.Appearance -> 3
         }
         AnimatedContent(
             targetState = stepKey,
@@ -144,31 +134,41 @@ internal fun OnboardingScreen(
                         onOnboardingComplete()
                     },
                 )
-                is OnboardingUiState.Folder -> WizardStep(
+                is OnboardingUiState.Access -> WizardStep(
                     stepIndex = 0,
-                    totalSteps = 2,
-                    title = stringResource(R.string.onboarding_folder_title),
-                    body = stringResource(R.string.onboarding_folder_body),
+                    totalSteps = 3,
+                    title = stringResource(R.string.onboarding_access_title),
+                    body = stringResource(R.string.onboarding_access_body),
                     onBack = { onAction(OnboardingAction.BackStep) },
                     onSkip = {
                         onAction(OnboardingAction.Skip)
                         onOnboardingComplete()
                     },
-                    onContinue = {
+                    onContinue = { onAction(OnboardingAction.Advance) },
+                    continueLabel = stringResource(R.string.onboarding_continue),
+                    continueCaption = "",
+                ) {
+                    AccessOptions()
+                }
+                is OnboardingUiState.Reading -> WizardStep(
+                    stepIndex = 1,
+                    totalSteps = 3,
+                    title = stringResource(R.string.onboarding_reading_title),
+                    body = stringResource(R.string.onboarding_reading_body),
+                    onBack = { onAction(OnboardingAction.BackStep) },
+                    onSkip = {
                         onAction(OnboardingAction.Skip)
                         onOnboardingComplete()
                     },
-                    continueLabel = stringResource(R.string.onboarding_continue_without_linking),
+                    onContinue = { onAction(OnboardingAction.Advance) },
+                    continueLabel = stringResource(R.string.onboarding_continue),
                     continueCaption = "",
                 ) {
-                    FolderOptions(
-                        onPickFolder = onPickFolder,
-                        pickerHintVisible = uiState.pickerHintVisible,
-                    )
+                    ReadingOptions(prefs = uiState.prefs, onAction = onAction)
                 }
                 is OnboardingUiState.Appearance -> WizardStep(
-                    stepIndex = 1,
-                    totalSteps = 2,
+                    stepIndex = 2,
+                    totalSteps = 3,
                     title = stringResource(R.string.onboarding_appearance_title),
                     body = stringResource(R.string.onboarding_appearance_body),
                     onBack = { onAction(OnboardingAction.BackStep) },
@@ -196,15 +196,22 @@ private fun WelcomeContent(
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var step by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    val staggerMotion = LocalExpressiveMotionEnabled.current
+    var step by remember(staggerMotion) {
+        mutableIntStateOf(if (!staggerMotion) WELCOME_STEPS else 0)
+    }
+    LaunchedEffect(staggerMotion) {
+        if (!staggerMotion) {
+            step = WELCOME_STEPS
+            return@LaunchedEffect
+        }
         repeat(WELCOME_STEPS) {
             delay(110)
             step++
         }
     }
     fun visibleAt(index: Int) = step > index
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().testTag(OnboardingTestTags.Welcome)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -237,7 +244,10 @@ private fun WelcomeContent(
                 enter = IridiumEnter.enter(IridiumEnterKind.FAB),
                 exit = IridiumEnter.exit(IridiumEnterKind.FAB),
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.testTag(OnboardingTestTags.Hero),
+                ) {
                     Surface(
                         shape = MaterialTheme.shapes.extraLarge,
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -300,7 +310,7 @@ private fun WelcomeContent(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Button(
                         onClick = onGetStarted,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.Cta),
                     ) {
                         Text(stringResource(R.string.onboarding_get_started))
                     }
@@ -320,41 +330,176 @@ private fun WelcomeContent(
 private const val WELCOME_STEPS = 3
 
 @Composable
-private fun FolderOptions(
-    onPickFolder: () -> Unit,
-    pickerHintVisible: Boolean,
+private fun AccessOptions(
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(hasAllFilesAccess()) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                granted = hasAllFilesAccess()
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Button(
-            onClick = onPickFolder,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            onClick = { openAllFilesAccessSettings(context) },
+            modifier = Modifier.fillMaxWidth().height(56.dp).testTag(OnboardingTestTags.AccessGrant),
         ) {
-            Text(stringResource(R.string.onboarding_pick_folder))
-        }
-        AnimatedVisibility(
-            visible = pickerHintVisible,
-            enter = IridiumEnter.enter(IridiumEnterKind.FADE),
-            exit = IridiumEnter.exit(IridiumEnterKind.FADE),
-        ) {
-            Text(
-                text = stringResource(R.string.onboarding_folder_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Text(stringResource(R.string.onboarding_access_grant))
         }
         Text(
-            text = stringResource(R.string.onboarding_folder_note),
+            text = stringResource(
+                if (granted) {
+                    R.string.onboarding_access_granted
+                } else {
+                    R.string.onboarding_access_hint
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (granted) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = stringResource(R.string.onboarding_access_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+private fun hasAllFilesAccess(): Boolean =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        // Robolectric shadows nothing here; treat unknown as denied.
+        runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
+    } else {
+        true
+    }
+
+private fun openAllFilesAccessSettings(context: android.content.Context) {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        runCatching {
+            Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:${context.packageName}"),
+            )
+        }.getOrDefault(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+    } else {
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}"),
+        )
+    }
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+}
+
+@Composable
+private fun ReadingOptions(
+    prefs: ReaderPreferences,
+    onAction: (OnboardingAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.onboarding_reading_text_size), style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${(prefs.fontScale * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = { onAction(OnboardingAction.SetFontScale(prefs.fontScale - 0.1f)) }) {
+                Icon(IridiumIcons.Remove, contentDescription = stringResource(R.string.onboarding_text_smaller))
+            }
+            IconButton(onClick = { onAction(OnboardingAction.SetFontScale(prefs.fontScale + 0.1f)) }) {
+                Icon(IridiumIcons.Add, contentDescription = stringResource(R.string.onboarding_text_larger))
+            }
+        }
+        Text(stringResource(R.string.onboarding_reading_line_spacing), style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${(prefs.lineHeight * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Slider(
+                value = prefs.lineHeight,
+                onValueChange = { onAction(OnboardingAction.SetLineHeight(it)) },
+                valueRange = 1f..2.5f,
+                modifier = Modifier.weight(2f),
+            )
+        }
+        Text(stringResource(R.string.onboarding_reading_colors), style = MaterialTheme.typography.titleMedium)
+        ReaderThemeSwatches(
+            selected = prefs.theme,
+            onSelect = { onAction(OnboardingAction.SetReaderTheme(it)) },
+        )
+    }
+}
+
+@Composable
+private fun ReaderThemeSwatches(
+    selected: ColorSchemeChoice,
+    onSelect: (ColorSchemeChoice) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        ColorSchemeChoice.entries.forEach { theme ->
+            val (bg, onSwatch) = when (theme) {
+                ColorSchemeChoice.LIGHT -> 0xFFFFFFFF.toInt() to Color.Black
+                ColorSchemeChoice.SEPIA -> 0xFFF5E6C8.toInt() to Color.Black
+                ColorSchemeChoice.GREY -> 0xFF444444.toInt() to Color.White
+                ColorSchemeChoice.DARK -> 0xFF121212.toInt() to Color.White
+                ColorSchemeChoice.BLACK -> 0xFF000000.toInt() to Color.White
+            }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(bg))
+                    .border(
+                        width = if (selected == theme) 2.dp else 1.dp,
+                        color = if (selected == theme) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        },
+                        shape = CircleShape,
+                    )
+                    .clickable(onClick = { onSelect(theme) }),
+            ) {
+                if (selected == theme) {
+                    Icon(
+                        imageVector = IridiumIcons.Check,
+                        contentDescription = null,
+                        tint = onSwatch,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -401,7 +546,8 @@ private fun WizardStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(20.dp)
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .testTag(OnboardingTestTags.StepIndicators),
         ) {
             repeat(totalSteps) { index ->
                 key(index) {
@@ -414,7 +560,8 @@ private fun WizardStep(
                     )
                     LinearProgressIndicator(
                         progress = { fill },
-                        modifier = Modifier.weight(1f).height(4.dp),
+                        modifier = Modifier.weight(1f).height(4.dp)
+                            .testTag(OnboardingTestTags.stepSegment(index)),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
@@ -453,7 +600,8 @@ private fun WizardStep(
                 ) {
                     Button(
                         onClick = onContinue,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                            .testTag(OnboardingTestTags.ContinueButton),
                     ) {
                         Text(continueLabel)
                     }
@@ -484,7 +632,9 @@ private fun AppearanceOptions(
         modifier = modifier.fillMaxWidth(),
     ) {
         Text(stringResource(R.string.onboarding_theme), style = MaterialTheme.typography.titleMedium)
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.AppearanceThemeOptions),
+        ) {
             SegmentedButton(
                 selected = theme.mode == ThemeMode.SYSTEM,
                 onClick = { onAction(OnboardingAction.SetThemeMode(ThemeMode.SYSTEM)) },
@@ -509,12 +659,14 @@ private fun AppearanceOptions(
             theme = theme,
             onDynamic = { onAction(OnboardingAction.SetDynamicColor(true)) },
             onScheme = { onAction(OnboardingAction.SetColorScheme(it)) },
+            modifier = Modifier.testTag(OnboardingTestTags.AppearanceSchemeOptions),
         )
         IridiumSettingSwitch(
             title = stringResource(R.string.onboarding_amoled_title),
             subtitle = stringResource(R.string.onboarding_amoled_subtitle),
             checked = theme.amoled,
             onCheckedChange = { onAction(OnboardingAction.SetAmoled(it)) },
+            modifier = Modifier.testTag(OnboardingTestTags.AppearanceAmoled),
         )
     }
 }
@@ -527,13 +679,22 @@ private fun MorphingHero(
     modifier: Modifier = Modifier,
 ) {
     var morphed by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+    val expressiveMotion = LocalExpressiveMotionEnabled.current
+    LaunchedEffect(expressiveMotion) {
+        if (!expressiveMotion) {
+            morphed = true
+            return@LaunchedEffect
+        }
         delay(HERO_MORPH_DELAY_MS)
         morphed = true
     }
     val corner by animateDpAsState(
         targetValue = if (morphed) 64.dp else 28.dp,
-        animationSpec = IridiumMotion.heroSpec(),
+        animationSpec = if (expressiveMotion) {
+            IridiumMotion.heroSpring()
+        } else {
+            IridiumMotion.calmFadeSpec()
+        },
         label = "heroMorph",
     )
     Surface(

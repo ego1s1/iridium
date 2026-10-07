@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.model.ThemePreferences
 import org.junit.Assert.assertTrue
@@ -27,7 +28,6 @@ class OnboardingScreenTest {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
                     uiState = OnboardingUiState.Welcome,
-                    onPickFolder = {},
                     onAction = {},
                     onOnboardingComplete = {},
                 )
@@ -48,7 +48,6 @@ class OnboardingScreenTest {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
                     uiState = OnboardingUiState.Welcome,
-                    onPickFolder = {},
                     onAction = { if (it == OnboardingAction.GetStarted) started = true },
                     onOnboardingComplete = {},
                 )
@@ -62,38 +61,39 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun `the folder step explains that nothing is copied and can be skipped`() {
+    fun `the access step explains the permission and offers the grant`() {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
-                    uiState = OnboardingUiState.Folder(pickerHintVisible = false),
-                    onPickFolder = {},
+                    uiState = OnboardingUiState.Access,
                     onAction = {},
                     onOnboardingComplete = {},
                 )
             }
         }
-        composeTestRule.onNodeWithText("Where are your books?").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Continue without linking").assertIsDisplayed()
+        composeTestRule.onNodeWithText("One permission first").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Grant access").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Continue").assertIsDisplayed()
     }
 
     @Test
-    fun `a dismissed picker shows the inline hint`() {
+    fun `the reading step shows text size spacing and colors`() {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
-                    uiState = OnboardingUiState.Folder(pickerHintVisible = true),
-                    onPickFolder = {},
+                    uiState = OnboardingUiState.Reading(
+                        com.iridium.core.model.ReaderPreferences(),
+                    ),
                     onAction = {},
                     onOnboardingComplete = {},
                 )
             }
         }
-        composeTestRule.onNodeWithText("Choose folder").assertIsDisplayed()
-        // The hint text is rendered when the picker was dismissed.
-        composeTestRule.onNodeWithText(
-            "Folder access is needed to read your books. Try again, or continue without linking.",
-        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Make reading yours").assertIsDisplayed()
+        // Lower rows may sit below the fold in the small test window.
+        composeTestRule.onNodeWithText("Text size").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Line spacing").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Book colors").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -102,7 +102,6 @@ class OnboardingScreenTest {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
                     uiState = OnboardingUiState.Appearance(ThemePreferences()),
-                    onPickFolder = {},
                     onAction = {},
                     onOnboardingComplete = {},
                 )

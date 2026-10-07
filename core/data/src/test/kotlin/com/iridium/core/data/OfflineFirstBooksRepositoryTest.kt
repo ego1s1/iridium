@@ -72,7 +72,7 @@ class OfflineFirstBooksRepositoryTest {
         val file = writeEpub("Treasure Island")
         lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
 
-        val report = repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        val report = repository.indexFilesystem() { _, _ -> }
 
         assertEquals(1, report.total)
         assertEquals(0, report.failed)
@@ -88,10 +88,10 @@ class OfflineFirstBooksRepositoryTest {
         val document = LinkedDocument(Uri.fromFile(file), file.name, modified = 5L)
         lister.documents = listOf(document)
 
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val firstRun = repository.observeLibrary(LibraryQuery()).first().first()
 
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val secondRun = repository.observeLibrary(LibraryQuery()).first().first()
 
         assertEquals(1, repository.observeLibrary(LibraryQuery()).first().size)
@@ -104,12 +104,12 @@ class OfflineFirstBooksRepositoryTest {
         // Pruning only ever targets linked rows (content:// documents); a
         // document the provider cannot open still yields a row to prune.
         lister.documents = listOf(linkedDocument("gone.epub"))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         assertEquals(1, repository.observeLibrary(LibraryQuery()).first().size)
 
         // The document vanishes from the folder; the rescan must drop it.
         lister.documents = emptyList()
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
 
         assertTrue(repository.observeLibrary(LibraryQuery()).first().isEmpty())
     }
@@ -117,12 +117,12 @@ class OfflineFirstBooksRepositoryTest {
     @Test
     fun `a failed walk never prunes`() = runTest {
         lister.documents = listOf(linkedDocument("kept.epub"))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
 
         // SAF listing failed: the result must not read as an empty folder.
         lister.walkFailed = true
         lister.documents = emptyList()
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
 
         assertEquals(1, repository.observeLibrary(LibraryQuery()).first().size)
     }
@@ -136,7 +136,7 @@ class OfflineFirstBooksRepositoryTest {
         val garbage = File(tempDir, "broken.epub").apply { writeBytes(ByteArray(1024) { 3 }) }
         lister.documents = listOf(LinkedDocument(Uri.fromFile(garbage), garbage.name, modified = 1L))
 
-        val report = repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        val report = repository.indexFilesystem() { _, _ -> }
 
         assertEquals(1, report.total)
         assertEquals(1, report.failed)
@@ -148,7 +148,7 @@ class OfflineFirstBooksRepositoryTest {
     fun `content indexing then search returns hits with book titles`() = runTest {
         val file = writeEpub("Treasure Island")
         lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val book = repository.observeLibrary(LibraryQuery()).first().single()
 
         val indexed = repository.indexBookContent(book.id)
@@ -165,7 +165,7 @@ class OfflineFirstBooksRepositoryTest {
     fun `re-indexing replaces previous rows rather than duplicating`() = runTest {
         val file = writeEpub("Treasure Island")
         lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val book = repository.observeLibrary(LibraryQuery()).first().single()
 
         repository.indexBookContent(book.id)
@@ -184,7 +184,7 @@ class OfflineFirstBooksRepositoryTest {
     fun `unlinking a book clears its annotations and index`() = runTest {
         val file = writeEpub("Treasure Island")
         lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val book = repository.observeLibrary(LibraryQuery()).first().single()
         repository.indexBookContent(book.id)
         repository.upsertHighlight(
@@ -207,23 +207,23 @@ class OfflineFirstBooksRepositoryTest {
     fun `progress survives a rescan`() = runTest {
         val file = writeEpub("Book")
         lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
         val book = repository.observeLibrary(LibraryQuery()).first().single()
 
         repository.updateProgress(book.id, 0.42f, "{\"href\":\"ch1.xhtml\"}")
-        repository.indexLinkedTree(Uri.parse("content://tree")) { _, _ -> }
+        repository.indexFilesystem() { _, _ -> }
 
         val after = repository.observeLibrary(LibraryQuery()).first().single()
         assertEquals(0.42f, after.progress)
         assertFalse(after.isFinished)
     }
 
-    /** SAF stand-in: the repository only ever asks for a document list. */
+    /** Filesystem stand-in: the repository only ever asks for a document list. */
     private class FakeLister : LinkedTreeLister {
         var documents: List<LinkedDocument> = emptyList()
         var walkFailed: Boolean = false
 
-        override suspend fun listBooks(treeUri: Uri): LinkedTreeListResult =
+        override suspend fun listBooks(): LinkedTreeListResult =
             LinkedTreeListResult(documents, walkFailed)
 
         override suspend fun resolve(documentUri: Uri): LinkedDocument? =

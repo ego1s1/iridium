@@ -9,11 +9,11 @@ class IridiumTypographyTest {
 
     @Test
     fun verifiesL1ToL4TypographyTokens() {
-        // L1: Top bar title (28sp / 34sp, wght 900)
+        // L1: Top bar title (28sp / 28sp, wght 900)
         assertEquals(28.sp, ScreenTitleSize)
-        assertEquals(34.sp, ScreenTitleLineHeight)
+        assertEquals(28.sp, ScreenTitleLineHeight)
         assertEquals(28.sp, TopBarTitleStyle.fontSize)
-        assertEquals(34.sp, TopBarTitleStyle.lineHeight)
+        assertEquals(28.sp, TopBarTitleStyle.lineHeight)
         assertEquals(FontWeight.Black, TopBarTitleStyle.fontWeight)
 
         // L2: titleLarge (22sp / 28sp, wght 700)

@@ -23,16 +23,32 @@ data class LibraryQuery(
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
     val filter: LibraryFilter = LibraryFilter.ALL,
     val hideErrors: Boolean = false,
-)
+) {
+    /** True when any sort/filter deviates from the defaults (drives the filter dot). */
+    fun hasActiveFilters(): Boolean =
+        sortOrder != LibrarySortOrder.RECENTLY_ADDED ||
+            filter != LibraryFilter.ALL ||
+            hideErrors
+}
 
 /**
- * Persisted library display options: sort, filter, and error visibility.
- * Unlike the ephemeral search text, these survive full app restarts.
+ * Persisted library display options: sort, filter, error visibility, card
+ * density, and grid width. Unlike the ephemeral search text, these survive
+ * full app restarts.
  */
+enum class LibraryDisplayMode {
+    COMPACT,
+    COMFORTABLE,
+    COVER_ONLY,
+    LIST,
+}
+
 data class LibraryDisplay(
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
     val filter: LibraryFilter = LibraryFilter.ALL,
     val hideErrors: Boolean = false,
+    val displayMode: LibraryDisplayMode = LibraryDisplayMode.COMPACT,
+    val gridColumns: Int = 0,
 ) {
     fun toQuery(text: String): LibraryQuery = LibraryQuery(
         text = text,

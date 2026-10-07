@@ -1,5 +1,7 @@
 package com.iridium.feature.history.impl
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,8 +45,12 @@ import androidx.lifecycle.viewModelScope
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.designsystem.BookCoverArt
 import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumEnter
+import com.iridium.core.designsystem.IridiumEnterKind
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.LibrarySortOrder
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -235,14 +241,22 @@ private fun ReadingTimeHeroCard(
                 .fillMaxWidth()
                 .padding(vertical = 24.dp, horizontal = 20.dp),
         ) {
-            Text(
-                text = formatHistoryDuration(durationMs),
-                style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            val numberEnter = IridiumEnter.enter(IridiumEnterKind.FADE_THROUGH)
+            val numberExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
+            AnimatedContent(
+                targetState = formatHistoryDuration(durationMs),
+                transitionSpec = { numberEnter togetherWith numberExit },
+                label = "heroReadingTime",
+            ) { duration ->
+                Text(
+                    text = duration,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Text(
                 text = "Time reading · estimated",
                 style = IridiumEmphasized.labelLarge,
@@ -292,14 +306,22 @@ private fun CompanionStatCard(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.displayMedium,
-                color = contentColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            val numberEnter = IridiumEnter.enter(IridiumEnterKind.FADE_THROUGH)
+            val numberExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
+            AnimatedContent(
+                targetState = value,
+                transitionSpec = { numberEnter togetherWith numberExit },
+                label = "companionValue",
+            ) { current ->
+                Text(
+                    text = current,
+                    style = MaterialTheme.typography.displayMedium,
+                    color = contentColor,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Text(
                 text = label,
                 style = IridiumEmphasized.labelLarge,
@@ -321,11 +343,15 @@ private fun HistoryRangeSelector(
     modifier: Modifier = Modifier,
 ) {
     val options = HistoryStatsRange.entries
+    val haptics = rememberIridiumHaptics()
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
         options.forEachIndexed { index, option ->
             SegmentedButton(
                 selected = range == option,
-                onClick = { onSelect(option) },
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onSelect(option)
+                },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 label = {
                     Text(

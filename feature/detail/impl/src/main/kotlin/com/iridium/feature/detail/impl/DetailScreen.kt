@@ -10,28 +10,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,8 +41,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.iridium.core.designsystem.BookCoverArt
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
+import com.iridium.core.designsystem.IridiumConfirmDialog
+import com.iridium.core.designsystem.IridiumContentWell
+import com.iridium.core.designsystem.IridiumFilledTonalIconButton
+import com.iridium.core.designsystem.IridiumHaptic
+import com.iridium.core.designsystem.IridiumIconButton
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumLoading
+import com.iridium.core.designsystem.IridiumPrimaryButton
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.screenEnter
 import com.iridium.core.designsystem.screenExit
@@ -107,18 +116,30 @@ internal fun DetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val book = state.book
+    val haptics = rememberIridiumHaptics()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {},
+            IridiumCollapsingTopBar(
+                title = book.title,
+                scrollBehavior = scrollBehavior,
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(IridiumIcons.Back, contentDescription = "Back")
+                    IridiumFilledTonalIconButton(onClick = onBackClick) {
+                        Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.detail_back))
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { onAction(DetailAction.ToggleBookmark(!book.bookmarked)) },
+                    IridiumIconButton(
+                        onClick = {
+                            haptics(
+                                if (book.bookmarked) {
+                                    IridiumHaptic.ToggleOff
+                                } else {
+                                    IridiumHaptic.ToggleOn
+                                },
+                            )
+                            onAction(DetailAction.ToggleBookmark(!book.bookmarked))
+                        },
                     ) {
                         Icon(
                             imageVector = if (book.bookmarked) {
@@ -129,21 +150,60 @@ internal fun DetailScreen(
                             contentDescription = stringResource(R.string.detail_bookmark),
                         )
                     }
-                    IconButton(onClick = { onAction(DetailAction.AskRemove) }) {
+                    IridiumIconButton(onClick = { onAction(DetailAction.AskRemove) }) {
                         Icon(IridiumIcons.Delete, contentDescription = stringResource(R.string.detail_remove))
                     }
                 },
             )
         },
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+        IridiumContentWell(Modifier.padding(padding)) {
+            // Completion affordance only: TOC rows stay non-interactive.
+            val completedToc = remember(state.book.lastLocator, state.book.progress, state.toc) {
+                completedTocIndices(state.toc, state.book.lastLocator, state.book.isFinished)
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
             item(contentType = "hero") {
-                DetailHero(book = book, onReadClick = onReadClick)
+                DetailHero(book = book)
+            }
+            item(contentType = "actions") {
+                IridiumPrimaryButton(
+                    onClick = onReadClick,
+                    haptic = IridiumHaptic.PrimaryAction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("detailRead"),
+                ) {
+                    Icon(IridiumIcons.Play, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (book.isInProgress) {
+                            stringResource(R.string.detail_resume)
+                        } else {
+                            stringResource(R.string.detail_start)
+                        },
+                    )
+                }
+            }
+            item(contentType = "metadata") {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    MetadataRow(
+                        label = stringResource(R.string.detail_meta_format),
+                        value = book.format.name,
+                    )
+                    MetadataRow(
+                        label = stringResource(R.string.detail_meta_file),
+                        value = book.sourceDisplayName,
+                    )
+                }
             }
             if (book.error != null) {
                 item(contentType = "error") {
@@ -178,14 +238,31 @@ internal fun DetailScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
-                items(state.toc, key = { it.href }) { entry ->
+                // Completion affordance is hoisted above (remember is
+                // not allowed inside the LazyColumn DSL scope).
+                // Keys include the index: several entries may share one file
+                // (fragment hrefs resolve to the same path), and href alone
+                // is not unique — it crashed LazyColumn on real books.
+                itemsIndexed(state.toc, key = { index, entry -> "$index:${entry.href}" }) { index, entry ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                        Text(
-                            text = entry.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = entry.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (index in completedToc) {
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = IridiumIcons.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.testTag("tocCompleted$index"),
+                                )
+                            }
+                        }
                         HorizontalDivider(Modifier.padding(top = 6.dp))
                     }
                 }
@@ -228,29 +305,26 @@ internal fun DetailScreen(
             }
         }
         if (state.confirmRemove) {
-            AlertDialog(
-                onDismissRequest = { onAction(DetailAction.DismissRemove) },
-                title = { Text(stringResource(R.string.detail_remove_title)) },
-                text = { Text(stringResource(R.string.detail_remove_body, book.title)) },
-                confirmButton = {
-                    TextButton(onClick = { onAction(DetailAction.ConfirmRemove) }) {
-                        Text(stringResource(R.string.detail_remove_confirm))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { onAction(DetailAction.DismissRemove) }) {
-                        Text(stringResource(R.string.detail_remove_cancel))
-                    }
-                },
+            IridiumConfirmDialog(
+                title = stringResource(R.string.detail_remove_title),
+                message = stringResource(R.string.detail_remove_body, book.title),
+                confirmLabel = stringResource(R.string.detail_remove_confirm),
+                onConfirm = { onAction(DetailAction.ConfirmRemove) },
+                onDismiss = { onAction(DetailAction.DismissRemove) },
+                dismissLabel = stringResource(R.string.detail_remove_cancel),
+                icon = IridiumIcons.Delete,
+                destructive = true,
+                confirmTestTag = "detailConfirmRemove",
+                dismissTestTag = "detailDismissRemove",
             )
         }
+    }
     }
 }
 
 @Composable
 private fun DetailHero(
     book: Book,
-    onReadClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -298,22 +372,36 @@ private fun DetailHero(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onReadClick) {
-                Icon(IridiumIcons.Play, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (book.isInProgress) {
-                        stringResource(R.string.detail_resume)
-                    } else {
-                        stringResource(R.string.detail_start)
-                    },
-                )
-            }
         }
     }
 }
 
+/** One metadata row: fixed label slot + two-line ellipsis value. */
+@Composable
+private fun MetadataRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .widthIn(min = 88.dp)
+                .padding(end = 8.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 /** One annotation (highlight or bookmark) with a delete action. */
 @Composable
 private fun AnnotationRow(
@@ -343,7 +431,7 @@ private fun AnnotationRow(
                 )
             }
         }
-        IconButton(onClick = onDelete) {
+        IridiumIconButton(onClick = onDelete) {
             Icon(IridiumIcons.Delete, contentDescription = stringResource(R.string.detail_delete))
         }
     }

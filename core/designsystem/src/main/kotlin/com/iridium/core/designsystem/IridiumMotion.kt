@@ -1,6 +1,14 @@
 package com.iridium.core.designsystem
 
 import android.provider.Settings
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -14,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import com.iridium.core.model.MotionStyle
 
@@ -39,6 +48,24 @@ object IridiumMotion {
     const val ChromeAutoHideMs = 3000L
     const val PageTurnMs = 180
     const val CoverMorphMs = 650
+    const val DoubleTapZoomMs = 500
+    const val FlingGlideMs = 500
+    const val ReaderFadeInMs = 180
+    const val ReaderFadeOutMs = 150
+    const val TabEnterMs = 450
+    const val TabExitMs = 300
+
+    /** Robert Penner ease-out quad: fast start, soft landing for pan flings. */
+    val EaseOutQuad: Easing = Easing { fraction -> 1f - (1f - fraction) * (1f - fraction) }
+
+    /** Robert Penner ease-in-out quad: gentle both ends for zoom glides. */
+    val EaseInOutQuad: Easing = Easing { fraction ->
+        if (fraction < 0.5f) {
+            2f * fraction * fraction
+        } else {
+            -1f + (4f - 2f * fraction) * fraction
+        }
+    }
 
     // Spatial: size, position, shape.
     fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> =
@@ -54,6 +81,63 @@ object IridiumMotion {
     /** Hero/shared-element morphs; a touch of bounce for delight. */
     fun <T> heroSpec(): FiniteAnimationSpec<T> =
         spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy)
+
+    /** Playful expressive spring for hero moments (alias kept for parity). */
+    fun <T> heroSpring(): FiniteAnimationSpec<T> = heroSpec()
+
+    /** Accordion expand: spring physics with gentle bounce for sub-controls. */
+    fun <T> accordionEnterSpec(): FiniteAnimationSpec<T> = spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+
+    /** Accordion collapse: snappy physics without bounce. */
+    fun <T> accordionExitSpec(): FiniteAnimationSpec<T> = spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium,
+    )
+
+    /** Accordion expand transition with expressive bounce and fade. */
+    fun accordionEnter(): EnterTransition =
+        expandVertically(accordionEnterSpec()) + fadeIn(defaultEffectsSpec())
+
+    /** Accordion collapse transition with clean physics and fade. */
+    fun accordionExit(): ExitTransition =
+        shrinkVertically(accordionExitSpec()) + fadeOut(defaultEffectsSpec())
+
+    /** In-out quad tween for combined zoom state driven as one Animatable. */
+    fun <T> zoomStateSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = DoubleTapZoomMs, easing = EaseInOutQuad)
+
+    /** Pan fling glide: fixed-time ease-out quad over the projected target. */
+    fun flingSpec(): FiniteAnimationSpec<Offset> =
+        tween(durationMillis = FlingGlideMs, easing = EaseOutQuad)
+
+    /** Reader route fades: the fullscreen bed makes slides read as lag. */
+    fun readerEnterSpec(): FiniteAnimationSpec<Float> =
+        tween(durationMillis = ReaderFadeInMs, easing = EmphasizedDecelerate)
+
+    /** Reader route fades: the fullscreen bed makes slides read as lag. */
+    fun readerExitSpec(): FiniteAnimationSpec<Float> =
+        tween(durationMillis = ReaderFadeOutMs, easing = EmphasizedAccelerate)
+
+    /**
+     * Cover launch morph: the shared element glides a beat slower than
+     * screen chrome, so the book visibly travels instead of snapping.
+     */
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    fun coverMorphTransform(): BoundsTransform =
+        BoundsTransform { _, _ ->
+            tween(durationMillis = CoverMorphMs, easing = EmphasizedDecelerate)
+        }
+
+    /** Tab travel glide: fixed-time tweens so rapid hops retarget cleanly. */
+    fun <T> tabEnterSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = TabEnterMs, easing = EmphasizedDecelerate)
+
+    /** Tab travel exit: quicker than enter so the arrival leads. */
+    fun <T> tabExitSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = TabExitMs, easing = EmphasizedAccelerate)
 
     /** Reader page turns stay crisp and quick. */
     fun <T> pageTurnSpec(): FiniteAnimationSpec<T> =

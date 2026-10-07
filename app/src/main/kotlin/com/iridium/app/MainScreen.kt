@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -23,7 +25,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,6 +89,7 @@ fun NavGraphBuilder.mainScreen(
     onOpenChapter: (bookId: String, href: String) -> Unit,
     onBookLongClick: (String) -> Unit,
     appVersion: String,
+    onLicensesClick: () -> Unit = {},
 ) {
     composable<MainRoute> {
         CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
@@ -93,6 +98,7 @@ fun NavGraphBuilder.mainScreen(
                 onOpenChapter = onOpenChapter,
                 onBookLongClick = onBookLongClick,
                 appVersion = appVersion,
+                onLicensesClick = onLicensesClick,
             )
         }
     }
@@ -109,6 +115,7 @@ internal fun MainScreen(
     onOpenChapter: (bookId: String, href: String) -> Unit,
     onBookLongClick: (String) -> Unit,
     appVersion: String,
+    onLicensesClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(LIBRARY_TAB) }
@@ -185,21 +192,38 @@ internal fun MainScreen(
                             onReadClick = onReadClick,
                             onBookLongClick = onBookLongClick,
                         )
-                        SETTINGS_TAB -> SettingsTabContent(appVersion = appVersion)
+                        SETTINGS_TAB -> SettingsTabContent(
+                            appVersion = appVersion,
+                            onLicensesClick = onLicensesClick,
+                        )
                         else -> Unit
                     }
                 }
             }
+            // Latch the running maximum of the navigation-bar inset (clamped)
+            // so the pill never sits low for a beat when returning from the
+            // reader while hidden system bars animate back in. navigationBars
+            // (never safeDrawing): safeDrawing includes the IME, which would
+            // park the pill mid-screen when search opens the keyboard.
+            val liveNavBottom = WindowInsets.navigationBars
+                .only(WindowInsetsSides.Bottom)
+                .asPaddingValues()
+                .calculateBottomPadding()
+            val latchedNavBottom = rememberSaveable { mutableFloatStateOf(liveNavBottom.value) }
+            SideEffect {
+                if (liveNavBottom.value > latchedNavBottom.floatValue) {
+                    latchedNavBottom.floatValue = liveNavBottom.value
+                }
+            }
+            val navBottom = maxOf(liveNavBottom.value, latchedNavBottom.floatValue).dp
+                .coerceAtMost(MaxChromeBottomInset)
             AnimatedVisibility(
                 visible = true,
                 enter = IridiumEnter.enter(IridiumEnterKind.TOOLBAR),
                 exit = IridiumEnter.exit(IridiumEnterKind.TOOLBAR),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                    )
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = navBottom + 16.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -230,3 +254,5 @@ internal fun MainScreen(
 private const val LIBRARY_TAB = 0
 private const val HISTORY_TAB = 1
 private const val SETTINGS_TAB = 2
+
+private val MaxChromeBottomInset = 120.dp

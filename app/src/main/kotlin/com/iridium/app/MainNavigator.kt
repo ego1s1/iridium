@@ -16,10 +16,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,13 +31,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
+import com.iridium.core.designsystem.rememberIridiumHaptics
 
 /**
  * The floating navigator: Library, History and Settings destinations with a
@@ -62,24 +69,24 @@ internal fun MainNavigator(
                 selected = selectedTab == 0,
                 onClick = { onSelectTab(0) },
                 icon = IridiumIcons.MenuBook,
-                label = "Library",
-                contentDescription = "Library tab",
+                label = stringResource(R.string.main_tab_library),
+                contentDescription = stringResource(R.string.main_tab_library),
                 testTag = MainTestTags.LibraryTab,
             )
             NavDestination(
                 selected = selectedTab == 1,
                 onClick = { onSelectTab(1) },
                 icon = IridiumIcons.History,
-                label = "History",
-                contentDescription = "History tab",
+                label = stringResource(R.string.main_tab_history),
+                contentDescription = stringResource(R.string.main_tab_history),
                 testTag = MainTestTags.HistoryTab,
             )
             NavDestination(
                 selected = selectedTab == 2,
                 onClick = { onSelectTab(2) },
                 icon = IridiumIcons.Settings,
-                label = "Settings",
-                contentDescription = "Settings tab",
+                label = stringResource(R.string.main_tab_settings),
+                contentDescription = stringResource(R.string.main_tab_settings),
                 testTag = MainTestTags.SettingsTab,
             )
         }
@@ -93,8 +100,12 @@ internal fun ResumeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberIridiumHaptics()
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptics(IridiumHaptic.PrimaryAction)
+            onClick()
+        },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.tertiaryContainer,
         tonalElevation = 0.dp,
@@ -104,7 +115,7 @@ internal fun ResumeButton(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = IridiumIcons.Play,
-                contentDescription = "Resume $title",
+                contentDescription = stringResource(R.string.main_resume_action, title),
                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.size(24.dp),
             )
@@ -112,6 +123,7 @@ internal fun ResumeButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NavDestination(
     selected: Boolean,
@@ -133,15 +145,27 @@ private fun NavDestination(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
     val expressiveMotion = LocalExpressiveMotionEnabled.current
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .clip(CircleShape)
-            .clickable(onClick = onClick, role = Role.Tab)
-            .semantics { this.selected = selected }
-            .testTag(testTag)
-            .sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+    val haptics = rememberIridiumHaptics()
+    TooltipBox(
+        positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
     ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .clip(CircleShape)
+                .clickable(
+                    onClick = {
+                        haptics(IridiumHaptic.Select)
+                        onClick()
+                    },
+                    role = Role.Tab,
+                )
+                .semantics { this.selected = selected }
+                .testTag(testTag)
+                .sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+        ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -180,3 +204,6 @@ private fun NavDestination(
         }
     }
 }
+}
+
+

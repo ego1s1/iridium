@@ -17,11 +17,18 @@ enum class ColorSchemeChoice {
 }
 
 /** App-wide Material color presets (used when dynamic color is off). */
-enum class AppColorScheme {
-    IRIDIUM,
-    OCEAN,
-    FOREST,
-    SUNSET,
+enum class AppColorScheme(val displayName: String) {
+    IRIDIUM("Iridium"),
+    OCEAN("Ocean"),
+    FOREST("Forest"),
+    SUNSET("Sunset"),
+    CATPPUCCIN("Catppuccin"),
+    NORD("Nord"),
+    GRUVBOX("Gruvbox"),
+    DRACULA("Dracula"),
+    TOKYO_NIGHT("Tokyo Night"),
+    EVERFOREST("Everforest"),
+    MONOCHROME("Monochrome"),
 }
 
 /** App-wide theme preferences persisted in DataStore. */
@@ -30,4 +37,5 @@ data class ThemePreferences(
     val dynamicColor: Boolean = true,
     val colorScheme: AppColorScheme = AppColorScheme.IRIDIUM,
     val amoled: Boolean = false,
+    val hapticsEnabled: Boolean = true,
 )

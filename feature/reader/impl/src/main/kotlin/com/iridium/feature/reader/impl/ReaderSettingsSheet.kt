@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.model.ColorSchemeChoice
@@ -51,28 +52,28 @@ internal fun ReaderSettingsSheet(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("Flow", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.reader_settings_flow), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.AUTO,
                     onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.AUTO)) },
                     modifier = Modifier.weight(1f),
-                ) { Text("Auto") }
+                ) { Text(stringResource(R.string.reader_settings_flow_auto)) }
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.PAGED,
                     onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.PAGED)) },
                     modifier = Modifier.weight(1f),
-                ) { Text("Paged") }
+                ) { Text(stringResource(R.string.reader_settings_flow_paged)) }
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.SCROLLED,
                     onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.SCROLLED)) },
                     modifier = Modifier.weight(1f),
-                ) { Text("Scrolled") }
+                ) { Text(stringResource(R.string.reader_settings_flow_scrolled)) }
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Brightness", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.reader_settings_brightness), style = MaterialTheme.typography.titleSmall)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("A", style = MaterialTheme.typography.bodySmall)
                 Slider(
@@ -85,7 +86,7 @@ internal fun ReaderSettingsSheet(
             }
 
             Spacer(Modifier.height(8.dp))
-            Text("Theme", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.reader_settings_theme), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -103,7 +104,7 @@ internal fun ReaderSettingsSheet(
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Text size", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.reader_settings_text_size), style = MaterialTheme.typography.bodyLarge)
                     Text(
                         "${(prefs.fontScale * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
@@ -111,22 +112,40 @@ internal fun ReaderSettingsSheet(
                     )
                 }
                 IconButton(onClick = { onAction(ReaderAction.SetFontScale(prefs.fontScale - 0.1f)) }) {
-                    Icon(IridiumIcons.Remove, contentDescription = "Smaller text")
+                    Icon(IridiumIcons.Remove, contentDescription = stringResource(R.string.reader_settings_text_smaller))
                 }
                 IconButton(onClick = { onAction(ReaderAction.SetFontScale(prefs.fontScale + 0.1f)) }) {
-                    Icon(IridiumIcons.Add, contentDescription = "Larger text")
+                    Icon(IridiumIcons.Add, contentDescription = stringResource(R.string.reader_settings_text_larger))
                 }
             }
 
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Text align", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.reader_settings_line_height), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "${(prefs.lineHeight * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = prefs.lineHeight,
+                    onValueChange = { onAction(ReaderAction.SetLineHeight(it)) },
+                    valueRange = 1f..2.5f,
+                    modifier = Modifier.weight(1.4f),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.reader_settings_text_align), style = MaterialTheme.typography.bodyLarge)
                     Text(
                         when (prefs.textAlign) {
-                            TextAlign.ORIGINAL -> "Original"
-                            TextAlign.LEFT -> "Left"
-                            TextAlign.JUSTIFY -> "Justified"
+                            TextAlign.ORIGINAL -> stringResource(R.string.reader_settings_align_auto)
+                            TextAlign.LEFT -> stringResource(R.string.reader_settings_align_left)
+                            TextAlign.JUSTIFY -> stringResource(R.string.reader_settings_align_justified)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -137,17 +156,17 @@ internal fun ReaderSettingsSheet(
                         checked = prefs.textAlign == TextAlign.LEFT,
                         onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.LEFT)) },
                         modifier = Modifier.weight(1f),
-                    ) { Text("Left", style = MaterialTheme.typography.labelSmall) }
+                    ) { Text(stringResource(R.string.reader_settings_align_left), style = MaterialTheme.typography.labelSmall) }
                     ToggleButton(
                         checked = prefs.textAlign == TextAlign.JUSTIFY,
                         onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.JUSTIFY)) },
                         modifier = Modifier.weight(1f),
-                    ) { Text("Full", style = MaterialTheme.typography.labelSmall) }
+                    ) { Text(stringResource(R.string.reader_settings_align_full), style = MaterialTheme.typography.labelSmall) }
                     ToggleButton(
                         checked = prefs.textAlign == TextAlign.ORIGINAL,
                         onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.ORIGINAL)) },
                         modifier = Modifier.weight(1f),
-                    ) { Text("Auto", style = MaterialTheme.typography.labelSmall) }
+                    ) { Text(stringResource(R.string.reader_settings_align_auto), style = MaterialTheme.typography.labelSmall) }
                 }
             }
         }
@@ -188,7 +207,7 @@ private fun ThemeSwatch(
         if (selected) {
             Icon(
                 imageVector = IridiumIcons.Check,
-                contentDescription = "Selected",
+                contentDescription = stringResource(R.string.reader_settings_swatch_selected),
                 tint = onSwatch,
                 modifier = Modifier.size(20.dp),
             )

@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
@@ -42,7 +43,16 @@ import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumSettingSwitch
 import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.designsystem.rememberIridiumHaptics
+import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
+
+/** Test tags for the prefs rows in [ReaderChromeSettingsContent]. */
+internal object ReaderChromeSettingsSwitchTags {
+    const val KeepScreenOn = "chromeKeepScreenOnSwitch"
+    const val VolumeKeys = "chromeVolumeKeysSwitch"
+    const val InvertVolumeKeys = "chromeInvertVolumeKeysSwitch"
+    const val PageCounter = "chromePageCounterSwitch"
+}
 
 /**
  * Mori reader-settings parity sheet for Iridium (UI hierarchy.md §3.3).
@@ -62,6 +72,8 @@ fun ReaderChromeSettingsSheet(
     onFlowChange: (ReadingFlow) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    prefs: ReaderPreferences = ReaderPreferences(),
+    onAction: (ReaderAction) -> Unit = {},
 ) {
     IridiumSheet(
         onDismiss = onDismiss,
@@ -74,6 +86,8 @@ fun ReaderChromeSettingsSheet(
             onCropChange = onCropChange,
             onNavModeChange = onNavModeChange,
             onFlowChange = onFlowChange,
+            prefs = prefs,
+            onAction = onAction,
         )
     }
 }
@@ -89,6 +103,8 @@ fun ReaderChromeSettingsContent(
     onNavModeChange: (ChromeNavMode) -> Unit,
     onFlowChange: (ReadingFlow) -> Unit,
     modifier: Modifier = Modifier,
+    prefs: ReaderPreferences = ReaderPreferences(),
+    onAction: (ReaderAction) -> Unit = {},
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -121,12 +137,12 @@ fun ReaderChromeSettingsContent(
                 checked = config.flow == ReadingFlow.PAGED,
                 onCheckedChange = { if (it) onFlowChange(ReadingFlow.PAGED) },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.FlowPaged),
-            ) { Text("Paged") }
+            ) { Text(stringResource(R.string.reader_settings_flow_paged)) }
             ToggleButton(
                 checked = config.flow == ReadingFlow.SCROLLED,
                 onCheckedChange = { if (it) onFlowChange(ReadingFlow.SCROLLED) },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.FlowScrolled),
-            ) { Text("Scrolled") }
+            ) { Text(stringResource(R.string.reader_settings_flow_scrolled)) }
         }
 
         Text(
@@ -142,14 +158,14 @@ fun ReaderChromeSettingsContent(
                     if (it) onDirectionChange(ChromeReadingDirection.LEFT_TO_RIGHT)
                 },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.DirectionLtr),
-            ) { Text("Left to right") }
+            ) { Text(stringResource(R.string.reader_settings_direction_ltr)) }
             ToggleButton(
                 checked = config.direction == ChromeReadingDirection.RIGHT_TO_LEFT,
                 onCheckedChange = {
                     if (it) onDirectionChange(ChromeReadingDirection.RIGHT_TO_LEFT)
                 },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.DirectionRtl),
-            ) { Text("Right to left") }
+            ) { Text(stringResource(R.string.reader_settings_direction_rtl)) }
         }
 
         Text(
@@ -168,22 +184,22 @@ fun ReaderChromeSettingsContent(
                 checked = config.pageFit == ChromePageFit.WIDTH,
                 onCheckedChange = { if (it) onFitChange(ChromePageFit.WIDTH) },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.FitWidth),
-            ) { Text("Width") }
+            ) { Text(stringResource(R.string.reader_settings_fit_width)) }
             ToggleButton(
                 checked = config.pageFit == ChromePageFit.HEIGHT,
                 onCheckedChange = { if (it) onFitChange(ChromePageFit.HEIGHT) },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.FitHeight),
-            ) { Text("Height") }
+            ) { Text(stringResource(R.string.reader_settings_fit_height)) }
             ToggleButton(
                 checked = config.pageFit == ChromePageFit.ORIGINAL,
                 onCheckedChange = { if (it) onFitChange(ChromePageFit.ORIGINAL) },
                 modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.FitOriginal),
-            ) { Text("Original") }
+            ) { Text(stringResource(R.string.reader_settings_fit_original)) }
         }
 
         IridiumSettingSwitch(
             title = "Crop page margins",
-            subtitle = "Trim empty margins around the content",
+            subtitle = stringResource(R.string.reader_settings_crop_subtitle),
             checked = config.cropMargins,
             onCheckedChange = onCropChange,
             modifier = Modifier.testTag(ReaderChromeTestTags.CropSwitch),
@@ -204,6 +220,34 @@ fun ReaderChromeSettingsContent(
             selectedMode = config.navMode,
             direction = config.direction,
             onSelectMode = onNavModeChange,
+        )
+
+        IridiumSettingSwitch(
+            title = stringResource(R.string.reader_settings_keep_screen_on),
+            checked = prefs.keepScreenOn,
+            onCheckedChange = { onAction(ReaderAction.SetKeepScreenOn(it)) },
+            modifier = Modifier.testTag(ReaderChromeSettingsSwitchTags.KeepScreenOn),
+        )
+        IridiumSettingSwitch(
+            title = stringResource(R.string.reader_settings_volume_keys),
+            checked = prefs.volumeKeys,
+            onCheckedChange = { onAction(ReaderAction.SetVolumeKeys(it)) },
+            modifier = Modifier.testTag(ReaderChromeSettingsSwitchTags.VolumeKeys),
+        )
+        if (prefs.volumeKeys) {
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_volume_invert),
+                subtitle = stringResource(R.string.reader_settings_volume_invert_subtitle),
+                checked = prefs.volumeKeysInverted,
+                onCheckedChange = { onAction(ReaderAction.SetVolumeKeysInverted(it)) },
+                modifier = Modifier.testTag(ReaderChromeSettingsSwitchTags.InvertVolumeKeys),
+            )
+        }
+        IridiumSettingSwitch(
+            title = stringResource(R.string.reader_settings_page_counter),
+            checked = prefs.showPageCounter,
+            onCheckedChange = { onAction(ReaderAction.SetShowPageCounter(it)) },
+            modifier = Modifier.testTag(ReaderChromeSettingsSwitchTags.PageCounter),
         )
 
         Spacer(modifier = Modifier.height(8.dp))

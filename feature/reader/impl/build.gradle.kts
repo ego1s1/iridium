@@ -20,4 +20,6 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.haze)
+    implementation(libs.haze.materials)
 }

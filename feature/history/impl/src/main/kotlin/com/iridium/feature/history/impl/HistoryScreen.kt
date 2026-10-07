@@ -21,12 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,7 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.designsystem.BookCoverArt
-import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.LibrarySortOrder
@@ -120,30 +121,42 @@ internal fun HistoryRoute(
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("History", style = IridiumEmphasized.headlineSmall) })
+            IridiumCollapsingTopBar(
+                title = "History",
+                scrollBehavior = scrollBehavior,
+            )
         },
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { padding ->
         Surface(Modifier.fillMaxSize().padding(padding)) {
-            if (state.groups.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Books you read will show up here.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(32.dp),
-                    )
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    start = 16.dp, top = 8.dp, end = 16.dp, bottom = 112.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                item(key = "stats", contentType = "stats") {
+                    HistoryStatsBentoRoute(modifier = Modifier.fillMaxWidth())
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = 16.dp, top = 8.dp, end = 16.dp, bottom = 112.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
+                if (state.groups.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = "Books you read will show up here.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(32.dp),
+                            )
+                        }
+                    }
+                } else {
                     state.groups.forEach { group ->
                         item(key = "header-${group.label}", contentType = "header") {
                             Text(

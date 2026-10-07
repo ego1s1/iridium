@@ -1,0 +1,171 @@
+package com.iridium.core.designsystem
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+
+/** One option in a [IridiumChoiceGroup]: label plus an optional leading icon. */
+data class IridiumChoiceOption(
+    val label: String,
+    val icon: ImageVector? = null,
+)
+
+private val OuterCorner = 20.dp
+private val InnerCorner = 8.dp
+
+/**
+ * Expressive single-choice group: connected morphing [ToggleButton] pills —
+ * 56dp targets, icon + label content, Flex-emphasized selected label.
+ *
+ * Weighted full-width layout fits short labels ("System/Light/Dark").
+ * Long labels ("Recently added", "Unfinished first") squeeze to stubs, so
+ * those call sites pass `fillWidth = false` for a scrollable row where
+ * every pill keeps its full text.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun IridiumChoiceGroup(
+    options: List<IridiumChoiceOption>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    testTagFor: (String) -> String = { it },
+    fillWidth: Boolean = true,
+) {
+    val haptics = rememberIridiumHaptics()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .then(if (!fillWidth) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+    ) {
+        options.forEachIndexed { index, option ->
+            val selected = index == selectedIndex
+            // Connected-pill morphing: bold outer corners, tight inner joins.
+            val pill = when {
+                options.size == 1 -> CircleShape
+                index == 0 -> RoundedCornerShape(
+                    topStart = OuterCorner,
+                    bottomStart = OuterCorner,
+                    topEnd = InnerCorner,
+                    bottomEnd = InnerCorner,
+                )
+                index == options.size - 1 -> RoundedCornerShape(
+                    topStart = InnerCorner,
+                    bottomStart = InnerCorner,
+                    topEnd = OuterCorner,
+                    bottomEnd = OuterCorner,
+                )
+                else -> RoundedCornerShape(InnerCorner)
+            }
+            ToggleButton(
+                checked = selected,
+                onCheckedChange = {
+                    haptics(IridiumHaptic.Select)
+                    onSelect(index)
+                },
+                shapes = ToggleButtonDefaults.shapes(pill, pill, pill),
+                modifier = Modifier
+                    .then(if (fillWidth) Modifier.weight(1f) else Modifier)
+                    .testTag(testTagFor(option.label))
+                    .semantics { this.selected = selected },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                ) {
+                    if (option.icon != null) {
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = null,
+                        )
+                    }
+                    Text(
+                        text = option.label,
+                        style = if (selected) {
+                            IridiumEmphasized.labelLarge
+                        } else {
+                            MaterialTheme.typography.labelLarge
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Expressive single-choice pills for open-ended option counts: same
+ * [ToggleButton] language as [IridiumChoiceGroup], but wrapping in a
+ * [FlowRow] instead of squeezing into one weighted row.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
+@Composable
+fun IridiumFilterPills(
+    options: List<IridiumChoiceOption>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    testTagFor: (Int) -> String = { "filter:$it" },
+) {
+    val haptics = rememberIridiumHaptics()
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        options.forEachIndexed { index, option ->
+            val selected = index == selectedIndex
+            ToggleButton(
+                checked = selected,
+                onCheckedChange = {
+                    haptics(IridiumHaptic.Select)
+                    onSelect(index)
+                },
+                shapes = ToggleButtonDefaults.shapes(CircleShape, CircleShape, CircleShape),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag(testTagFor(index))
+                    .semantics { this.selected = selected },
+            ) {
+                Text(
+                    text = option.label,
+                    style = if (selected) {
+                        IridiumEmphasized.labelLarge
+                    } else {
+                        MaterialTheme.typography.labelLarge
+                    },
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}

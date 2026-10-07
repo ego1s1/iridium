@@ -40,11 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
@@ -127,7 +129,7 @@ fun LibraryCollapsingTopBar(
                 ) {
                     Icon(
                         imageVector = IridiumIcons.Tune,
-                        contentDescription = "Sort and filter",
+                        contentDescription = stringResource(R.string.library_action_sort_filter),
                     )
                 }
                 if (filterActive) {
@@ -165,12 +167,15 @@ fun LibrarySearchIsland(
     onTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Search title or author",
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    shadowElevation: Dp = 0.dp,
 ) {
     val haptics = rememberIridiumHaptics()
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = containerColor,
+        shadowElevation = shadowElevation,
         shape = MaterialTheme.shapes.extraLarge,
         modifier = modifier.testTag(LibraryChromeTestTags.SearchIsland),
     ) {
@@ -196,7 +201,7 @@ fun LibrarySearchIsland(
                     ) {
                         Icon(
                             imageVector = IridiumIcons.Close,
-                            contentDescription = "Clear search",
+                            contentDescription = stringResource(R.string.library_action_clear_search),
                         )
                     }
                 }
@@ -234,12 +239,13 @@ private val QuickFilterOptions = listOf(
     LibraryFilter.FINISHED,
 )
 
+@Composable
 private fun quickFilterLabel(filter: LibraryFilter): String = when (filter) {
-    LibraryFilter.ALL -> "All"
-    LibraryFilter.IN_PROGRESS -> "In progress"
-    LibraryFilter.UNREAD -> "Unread"
-    LibraryFilter.FINISHED -> "Finished"
-    LibraryFilter.FAVORITES -> "Favorites"
+    LibraryFilter.ALL -> stringResource(R.string.library_filter_all)
+    LibraryFilter.IN_PROGRESS -> stringResource(R.string.library_filter_in_progress)
+    LibraryFilter.UNREAD -> stringResource(R.string.library_filter_unread)
+    LibraryFilter.FINISHED -> stringResource(R.string.library_filter_finished)
+    LibraryFilter.FAVORITES -> stringResource(R.string.library_filter_favorites)
 }
 
 /**
@@ -434,8 +440,6 @@ fun LibraryShelvesCarousel(
  */
 @Composable
 fun LibraryActionIsland(
-    linked: Boolean,
-    onLinkFolder: () -> Unit,
     onRescan: () -> Unit,
     onIndex: () -> Unit,
     modifier: Modifier = Modifier,
@@ -455,49 +459,32 @@ fun LibraryActionIsland(
             TextButton(
                 onClick = {
                     haptics(IridiumHaptic.PrimaryAction)
-                    onLinkFolder()
+                    onRescan()
                 },
-                modifier = Modifier.testTag(LibraryChromeTestTags.ActionLink),
+                modifier = Modifier.testTag(LibraryChromeTestTags.ActionRescan),
             ) {
                 Icon(
-                    imageVector = IridiumIcons.ImportFolder,
+                    imageVector = IridiumIcons.Search,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Link folder")
+                Text(stringResource(R.string.library_rescan))
             }
-            if (linked) {
-                TextButton(
-                    onClick = {
-                        haptics(IridiumHaptic.PrimaryAction)
-                        onRescan()
-                    },
-                    modifier = Modifier.testTag(LibraryChromeTestTags.ActionRescan),
-                ) {
-                    Icon(
-                        imageVector = IridiumIcons.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Rescan")
-                }
-                TextButton(
-                    onClick = {
-                        haptics(IridiumHaptic.PrimaryAction)
-                        onIndex()
-                    },
-                    modifier = Modifier.testTag(LibraryChromeTestTags.ActionIndex),
-                ) {
-                    Icon(
-                        imageVector = IridiumIcons.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Index")
-                }
+            TextButton(
+                onClick = {
+                    haptics(IridiumHaptic.PrimaryAction)
+                    onIndex()
+                },
+                modifier = Modifier.testTag(LibraryChromeTestTags.ActionIndex),
+            ) {
+                Icon(
+                    imageVector = IridiumIcons.List,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.library_index_for_search))
             }
         }
     }

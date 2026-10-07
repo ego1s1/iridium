@@ -27,7 +27,7 @@ class TestBooksRepository : BooksRepository {
     private val bookmarksFlow = MutableStateFlow<List<Bookmark>>(emptyList())
 
     var indexResult: IndexReport = IndexReport(total = 0, failed = 0)
-    var lastLinkedTree: Uri? = null
+    var filesystemScans: Int = 0
     private val progressWrites = mutableListOf<Pair<String, Float>>()
 
     // Test hooks.
@@ -64,11 +64,10 @@ class TestBooksRepository : BooksRepository {
     override fun observeBookmarks(bookId: String): Flow<List<Bookmark>> =
         bookmarksFlow.map { list -> list.filter { it.bookId == bookId } }
 
-    override suspend fun indexLinkedTree(
-        treeUri: Uri,
+    override suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
     ): IndexReport {
-        lastLinkedTree = treeUri
+        filesystemScans += 1
         return indexResult
     }
 

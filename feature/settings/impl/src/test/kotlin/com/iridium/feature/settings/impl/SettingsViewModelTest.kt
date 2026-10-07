@@ -56,6 +56,12 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `haptics toggle writes through`() = runTest {
+        viewModel.onAction(SettingsAction.SetHapticsEnabled(false))
+        assertFalse(viewModel.uiState.first { !it.theme.hapticsEnabled }.theme.hapticsEnabled)
+    }
+
+    @Test
     fun `library sort writes through`() = runTest {
         viewModel.onAction(SettingsAction.SetSortOrder(LibrarySortOrder.TITLE))
         assertEquals(

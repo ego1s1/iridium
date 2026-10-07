@@ -3,6 +3,7 @@ package com.iridium.feature.onboarding.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
+import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -14,25 +15,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Link-only step wizard: Welcome → Folder → Appearance. Theme choices persist
- * immediately so quitting mid-wizard never loses them; Skip finishes without
- * linking. Nothing is copied or indexed here — the library picks up the
- * persisted tree on arrival.
+ * Permission-first step wizard: Welcome → Access → Reading → Appearance.
+ * Theme and reading choices persist immediately so quitting mid-wizard never
+ * loses them; Skip finishes from anywhere. Nothing is copied or indexed
+ * here — the library scans all of shared storage on arrival.
  */
 @HiltViewModel
 internal class OnboardingViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
 ) : ViewModel() {
 
-    private enum class Step { WELCOME, FOLDER, APPEARANCE }
+    private enum class Step { WELCOME, ACCESS, READING, APPEARANCE }
 
     private val step = MutableStateFlow(Step.WELCOME)
-    private val folderHintVisible = MutableStateFlow(false)
 
     val uiState: StateFlow<OnboardingUiState> = combine(
         step,
         preferences.themePreferences,
-        folderHintVisible,
+        preferences.readerPreferences,
         ::toUiState,
     ).stateIn(
         scope = viewModelScope,
@@ -43,30 +43,36 @@ internal class OnboardingViewModel @Inject constructor(
     private fun toUiState(
         step: Step,
         theme: ThemePreferences,
-        folderHintVisible: Boolean,
+        reader: ReaderPreferences,
     ): OnboardingUiState = when (step) {
         Step.WELCOME -> OnboardingUiState.Welcome
-        Step.FOLDER -> OnboardingUiState.Folder(pickerHintVisible = folderHintVisible)
+        Step.ACCESS -> OnboardingUiState.Access
+        Step.READING -> OnboardingUiState.Reading(reader)
         Step.APPEARANCE -> OnboardingUiState.Appearance(theme)
     }
 
     fun onAction(action: OnboardingAction) {
         when (action) {
-            OnboardingAction.GetStarted -> step.value = Step.FOLDER
+            OnboardingAction.GetStarted -> step.value = Step.ACCESS
             OnboardingAction.Skip -> finish()
             OnboardingAction.BackStep -> step.value = when (step.value) {
                 Step.WELCOME -> Step.WELCOME
-                Step.FOLDER -> Step.WELCOME
-                Step.APPEARANCE -> Step.FOLDER
+                Step.ACCESS -> Step.WELCOME
+                Step.READING -> Step.ACCESS
+                Step.APPEARANCE -> Step.READING
             }
-            is OnboardingAction.FolderSelected -> {
-                viewModelScope.launch {
-                    preferences.setSourceTreeUri(action.uri.toString())
-                }
-                folderHintVisible.value = false
-                step.value = Step.APPEARANCE
+            OnboardingAction.Advance -> step.value = when (step.value) {
+                Step.WELCOME -> Step.ACCESS
+                Step.ACCESS -> Step.READING
+                Step.READING -> Step.APPEARANCE
+                Step.APPEARANCE -> Step.APPEARANCE
             }
-            OnboardingAction.FolderPickerDismissed -> folderHintVisible.value = true
+            is OnboardingAction.SetFontScale ->
+                updateReader { it.copy(fontScale = action.scale.coerceIn(0.5f, 3f)) }
+            is OnboardingAction.SetLineHeight ->
+                updateReader { it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f)) }
+            is OnboardingAction.SetReaderTheme ->
+                updateReader { it.copy(theme = action.theme) }
             is OnboardingAction.SetThemeMode -> updateTheme { it.copy(mode = action.mode) }
             is OnboardingAction.SetDynamicColor -> updateTheme { it.copy(dynamicColor = action.enabled) }
             is OnboardingAction.SetColorScheme -> updateTheme {
@@ -79,6 +85,10 @@ internal class OnboardingViewModel @Inject constructor(
 
     private fun updateTheme(transform: (ThemePreferences) -> ThemePreferences) {
         viewModelScope.launch { preferences.updateThemePreferences(transform) }
+    }
+
+    private fun updateReader(transform: (ReaderPreferences) -> ReaderPreferences) {
+        viewModelScope.launch { preferences.updateReaderPreferences(transform) }
     }
 
     private fun finish() {

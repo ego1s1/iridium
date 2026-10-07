@@ -7,10 +7,14 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
@@ -26,6 +30,8 @@ import com.iridium.core.designsystem.screenEnter
 import com.iridium.core.designsystem.screenExit
 import com.iridium.core.designsystem.screenPopEnter
 import com.iridium.core.designsystem.screenPopExit
+import com.iridium.core.designsystem.wizardEnter
+import com.iridium.core.designsystem.wizardExit
 import com.iridium.core.model.ThemeMode
 import com.iridium.feature.detail.api.navigateToDetail
 import com.iridium.feature.detail.impl.detailScreen
@@ -60,8 +66,10 @@ fun IridiumApp(
         colorScheme = state.theme.colorScheme,
         amoled = state.theme.amoled,
         expressiveMotion = expressiveMotion,
+        hapticsEnabled = state.theme.hapticsEnabled,
     ) {
         CompositionLocalProvider(LocalExpressiveMotionEnabled provides expressiveMotion) {
+            SystemBarGlyphs(darkTheme)
             Surface(modifier = modifier.fillMaxSize()) {
                 // Null until DataStore's first emission: never flash the wizard.
                 if (completed == null) {
@@ -74,10 +82,22 @@ fun IridiumApp(
                         NavHost(
                             navController = navController,
                             startDestination = if (completed == true) MainRoute else OnboardingRoute,
-                            enterTransition = { screenEnter() },
-                            exitTransition = { screenExit() },
-                            popEnterTransition = { screenPopEnter() },
-                            popExitTransition = { screenPopExit() },
+                            enterTransition = {
+                                if (initialState.destination.isOnboarding()) {
+                                    wizardEnter(expressiveMotion)
+                                } else {
+                                    screenEnter(expressiveMotion)
+                                }
+                            },
+                            exitTransition = {
+                                if (targetState.destination.isMain()) {
+                                    wizardExit(expressiveMotion)
+                                } else {
+                                    screenExit(expressiveMotion)
+                                }
+                            },
+                            popEnterTransition = { screenPopEnter(expressiveMotion) },
+                            popExitTransition = { screenPopExit(expressiveMotion) },
                         ) {
                             onboardingScreen(
                                 onOnboardingComplete = { navController.navigateToMain() },
@@ -89,12 +109,16 @@ fun IridiumApp(
                                 },
                                 onBookLongClick = { navController.navigateToDetail(it) },
                                 appVersion = BuildConfig.VERSION_NAME,
+                                onLicensesClick = { navController.navigateToLicenses() },
                             )
                             detailScreen(
                                 onBackClick = { navController.popBackStack() },
                                 onReadClick = { navController.navigateToReader(it) },
                             )
                             readerScreen(
+                                onBackClick = { navController.popBackStack() },
+                            )
+                            licensesScreen(
                                 onBackClick = { navController.popBackStack() },
                             )
                         }
@@ -121,3 +145,23 @@ fun IridiumApp(
 @Suppress("unused")
 private fun NavDestination.isOnboarding(): Boolean =
     route?.substringAfterLast('.') == "OnboardingRoute"
+
+private fun NavDestination.isMain(): Boolean =
+    route?.substringAfterLast('.') == "MainRoute"
+
+/**
+ * System-bar glyphs follow the Compose theme: light glyphs on dark theme and
+ * vice versa, regardless of the system night mode (which can disagree when
+ * the user forces a theme).
+ */
+@Composable
+private fun SystemBarGlyphs(darkTheme: Boolean) {
+    val context = LocalContext.current
+    SideEffect {
+        val window = (context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !darkTheme
+            isAppearanceLightNavigationBars = !darkTheme
+        }
+    }
+}

@@ -39,6 +39,8 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetColorScheme ->
                 updateTheme { it.copy(colorScheme = action.scheme, dynamicColor = false) }
             is SettingsAction.SetAmoled -> updateTheme { it.copy(amoled = action.enabled) }
+            is SettingsAction.SetHapticsEnabled ->
+                updateTheme { it.copy(hapticsEnabled = action.enabled) }
             is SettingsAction.SetMotionStyle -> viewModelScope.launch {
                 preferences.updateMotionStyle(action.style)
             }

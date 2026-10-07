@@ -37,7 +37,6 @@ class LibraryChromeParityTest2 {
 
     private fun state(
         books: List<com.iridium.core.model.Book> = emptyList(),
-        linked: Boolean = false,
         text: String = "",
         continueReading: List<com.iridium.core.model.Book> = emptyList(),
         contentHits: List<ContentHit> = emptyList(),
@@ -50,18 +49,23 @@ class LibraryChromeParityTest2 {
         refreshing = refreshing,
         filterOpen = false,
         searchOpen = false,
-        linked = linked,
         continueReading = continueReading,
         indexProgress = indexProgress,
         contentHits = contentHits,
         indexing = indexing,
     )
 
-    private fun setScreen(uiState: LibraryUiState, onAction: (LibraryAction) -> Unit = {}) {
+    private fun setScreen(
+        uiState: LibraryUiState,
+        onAction: (LibraryAction) -> Unit = {},
+        hasStorageAccess: Boolean = true,
+    ) {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 LibraryScreen(
                     uiState = uiState,
+                    hasStorageAccess = hasStorageAccess,
+                    onGrantAccess = {},
                     onAction = onAction,
                     onReadClick = {},
                     onDetailsClick = {},
@@ -129,25 +133,32 @@ class LibraryChromeParityTest2 {
     // --- Empty states ---
 
     @Test
-    fun `linked empty library offers rescan instead of link`() {
-        setScreen(state(linked = true))
+    fun `granted empty library offers rescan`() {
+        setScreen(state(), hasStorageAccess = true)
         composeTestRule.onNodeWithText("No books yet").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Rescan folder").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Link folder").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Rescan library").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Grant access").assertDoesNotExist()
     }
 
     @Test
-    fun `searching an unlinked library offers rescan not link`() {
-        setScreen(state(linked = false, text = "zzz"))
+    fun `denied empty library invites the grant`() {
+        setScreen(state(), hasStorageAccess = false)
+        composeTestRule.onNodeWithText("No books yet").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Grant access").assertIsDisplayed()
+    }
+
+    @Test
+    fun `searching offers rescan not grant`() {
+        setScreen(state(text = "zzz"), hasStorageAccess = true)
         composeTestRule.onNodeWithText("No matches").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Link folder").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Grant access").assertDoesNotExist()
     }
 
     @Test
     fun `empty-state rescan action dispatches rescan`() {
         val actions = mutableListOf<LibraryAction>()
-        setScreen(state(linked = true), onAction = actions::add)
-        composeTestRule.onNodeWithText("Rescan folder").performClick()
+        setScreen(state(), onAction = actions::add)
+        composeTestRule.onNodeWithText("Rescan library").performClick()
         assertTrue(actions.any { it is LibraryAction.Rescan })
     }
 
@@ -156,16 +167,18 @@ class LibraryChromeParityTest2 {
     @Test
     fun `continue shelf hides while searching`() {
         val book = TestData.book(id = "1", title = "Treasure Island", progress = 0.4f)
-        setScreen(state(books = listOf(book), linked = true, text = "treasure", continueReading = listOf(book)))
+        setScreen(state(books = listOf(book), text = "treasure", continueReading = listOf(book)))
         composeTestRule.onNodeWithText("Continue reading").assertDoesNotExist()
         composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()
     }
 
     @Test
-    fun `continue shelf shows without a query`() {
+    fun `now-reading hero shows without a query`() {
         val book = TestData.book(id = "1", title = "Treasure Island", progress = 0.4f)
-        setScreen(state(books = listOf(book), linked = true, continueReading = listOf(book)))
-        composeTestRule.onNodeWithText("Continue reading").assertIsDisplayed()
+        setScreen(state(books = listOf(book), continueReading = listOf(book)))
+        composeTestRule.onNodeWithTag(LibraryTestTags.NowReadingHero).assertIsDisplayed()
+        composeTestRule.onNodeWithText("NOW READING").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Resume").assertIsDisplayed()
     }
 
     // --- Loading never hides content ---
@@ -176,7 +189,6 @@ class LibraryChromeParityTest2 {
         setScreen(
             state(
                 books = listOf(book),
-                linked = true,
                 refreshing = true,
                 indexProgress = IndexProgress(done = 1, total = 4),
             ),
@@ -187,7 +199,7 @@ class LibraryChromeParityTest2 {
     @Test
     fun `chapter indexing never hides the grid`() {
         val book = TestData.book(id = "1", title = "Treasure Island")
-        setScreen(state(books = listOf(book), linked = true, indexing = true))
+        setScreen(state(books = listOf(book), indexing = true))
         composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()
     }
 
@@ -229,7 +241,7 @@ class LibraryChromeParityTest2 {
                 snippet = "the Hispaniola was rolling",
             ),
         )
-        setScreen(state(books = listOf(book), linked = true, contentHits = hits))
+        setScreen(state(books = listOf(book), contentHits = hits))
         composeTestRule.onNodeWithText("In books (1)").assertIsDisplayed()
     }
 }

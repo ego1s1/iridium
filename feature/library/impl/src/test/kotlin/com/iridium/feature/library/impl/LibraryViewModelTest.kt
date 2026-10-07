@@ -1,6 +1,5 @@
 package com.iridium.feature.library.impl
 
-import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import com.iridium.core.data.IndexReport
 import com.iridium.core.fakes.TestBooksRepository
@@ -40,10 +39,9 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `ui state starts empty and unlinked without a loading gate`() = runTest {
+    fun `ui state starts empty without a loading gate`() = runTest {
         val state = viewModel.uiState.value
         assertTrue(state.books.isEmpty())
-        assertFalse(state.linked)
         assertFalse(state.refreshing)
     }
 
@@ -68,13 +66,17 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `link folder persists the tree and scans it`() = runTest {
-        val uri = Uri.parse("content://tree/books")
-        viewModel.onAction(LibraryAction.LinkFolder(uri))
+    fun `launch scans the filesystem`() = runTest {
+        viewModel.uiState.first { repository.filesystemScans > 0 }
+        assertTrue(repository.filesystemScans >= 1)
+    }
 
-        assertEquals("content://tree/books", preferences.sourceTreeUri.first())
-        assertEquals(uri, repository.lastLinkedTree)
-        assertTrue(preferences.onboardingCompleted.first())
+    @Test
+    fun `manual rescan scans the filesystem again`() = runTest {
+        viewModel.uiState.first { repository.filesystemScans > 0 }
+        val before = repository.filesystemScans
+        viewModel.onAction(LibraryAction.Rescan)
+        viewModel.uiState.first { repository.filesystemScans > before }
     }
 
     @Test
@@ -111,9 +113,9 @@ class LibraryViewModelTest {
     @Test
     fun `scan failure emits a one-shot message`() = runTest {
         repository.indexResult = IndexReport(total = 3, failed = 2)
-        viewModel.onAction(LibraryAction.LinkFolder(Uri.parse("content://tree")))
+        viewModel.onAction(LibraryAction.Rescan)
         // The message channel is consumed by the UI; assert the scan ran.
-        assertEquals(Uri.parse("content://tree"), repository.lastLinkedTree)
+        viewModel.uiState.first { repository.filesystemScans > 1 }
     }
 
     @Test

@@ -23,6 +23,10 @@ sealed interface ReaderUiState {
         val positionText: String?,
         /** Highlight id tapped in content (shown in the highlights sheet). */
         val focusedHighlightId: String? = null,
+        /** 0-based position index for the scrubber; 0 when positions unknown. */
+        val positionIndex: Int = 0,
+        /** Total positions for the scrubber; 0 when positions unknown. */
+        val positionCount: Int = 0,
         /** True once the navigator fragment attached (content visible). */
         val navigatorAttached: Boolean = false,
     ) : ReaderUiState
@@ -43,6 +47,7 @@ sealed interface ReaderAction {
     data object CloseToc : ReaderAction
     data object OpenHighlights : ReaderAction
     data object CloseHighlights : ReaderAction
+    data object DismissDictionary : ReaderAction
     data class SeekTo(val progression: Float) : ReaderAction
     data class GoTocEntry(val entry: TocEntry) : ReaderAction
     data class GoForward(val animated: Boolean = true) : ReaderAction
@@ -55,9 +60,14 @@ sealed interface ReaderAction {
     // Reader preference edits (persisted + submitted to the navigator).
     data class SetFlow(val flow: com.iridium.core.model.ReadingFlow) : ReaderAction
     data class SetFontScale(val scale: Float) : ReaderAction
+    data class SetLineHeight(val lineHeight: Float) : ReaderAction
     data class SetTextAlign(val align: com.iridium.core.model.TextAlign) : ReaderAction
     data class SetTheme(val theme: com.iridium.core.model.ColorSchemeChoice) : ReaderAction
     data class SetBrightness(val brightness: Float) : ReaderAction
+    data class SetKeepScreenOn(val enabled: Boolean) : ReaderAction
+    data class SetShowPageCounter(val enabled: Boolean) : ReaderAction
+    data class SetVolumeKeys(val enabled: Boolean) : ReaderAction
+    data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction
 }
 
 /** One-shot UI messages. */

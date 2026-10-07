@@ -58,26 +58,26 @@ private fun TextStyle.heading() = copy(fontFamily = HeadingFlex)
 
 /**
  * Screen title size and leading shared by collapsing top bars.
- * L1: topBarTitle (28sp/34sp, wght 900).
+ * L1: topBarTitle (28sp/28sp, wght 900).
  */
 val ScreenTitleSize = 28.sp
-val ScreenTitleLineHeight = 34.sp
+val ScreenTitleLineHeight = 28.sp
 
 /**
  * Top bar title style conforming to L1 typography hierarchy:
- * 28sp / 34sp with font weight 900 (Black).
+ * 28sp / 28sp with font weight 900 (Black).
  */
 val TopBarTitleStyle = TextStyle(
     fontFamily = HeadingFlex,
     fontWeight = FontWeight.Black,
     fontSize = 28.sp,
-    lineHeight = 34.sp,
+    lineHeight = 28.sp,
 )
 
 /**
  * Iridium type scale built on variable Google Sans Flex.
  * L1-L4 hierarchy:
- * - L1: topBarTitle 28sp / 34sp, wght 900
+ * - L1: topBarTitle 28sp / 28sp, wght 900
  * - L2: titleLarge 22sp / 28sp, wght 700
  * - L3: titleMedium 16sp / 24sp
  * - L4: bodyLarge 16sp / 24sp

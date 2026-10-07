@@ -9,6 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
@@ -78,7 +81,19 @@ fun ReaderChromeFloatingToolbar(
                     haptics(IridiumHaptic.Select)
                     onExpandedChange(!effectiveExpanded)
                 },
-                modifier = Modifier.testTag(ReaderFloatingToolbarTestTags.ExpandFab),
+                modifier = Modifier
+                    .testTag(ReaderFloatingToolbarTestTags.ExpandFab)
+                    .semantics {
+                        onClick(
+                            label = if (effectiveExpanded) {
+                                "Collapse reader toolbar"
+                            } else {
+                                "Expand reader toolbar"
+                            },
+                            action = null,
+                        )
+                        stateDescription = if (effectiveExpanded) "Expanded" else "Collapsed"
+                    },
             ) {
                 Icon(
                     imageVector = if (effectiveExpanded) IridiumIcons.Close else IridiumIcons.Add,
@@ -92,6 +107,10 @@ fun ReaderChromeFloatingToolbar(
         },
         modifier = modifier.testTag(ReaderFloatingToolbarTestTags.Toolbar),
     ) {
+        val directionState = when (config.direction) {
+            ChromeReadingDirection.LEFT_TO_RIGHT -> "Left to right"
+            ChromeReadingDirection.RIGHT_TO_LEFT -> "Right to left"
+        }
         ToolbarAction(
             onClick = {
                 haptics(IridiumHaptic.Select)
@@ -99,7 +118,14 @@ fun ReaderChromeFloatingToolbar(
             },
             icon = { Icon(IridiumIcons.Motion, contentDescription = "Reading direction") },
             testTag = ReaderChromeTestTags.DirectionButton,
+            onClickLabel = "Reading direction",
+            stateText = directionState,
         )
+        val fitState = when (config.pageFit) {
+            ChromePageFit.WIDTH -> "Fit width"
+            ChromePageFit.HEIGHT -> "Fit height"
+            ChromePageFit.ORIGINAL -> "Original size"
+        }
         ToolbarAction(
             onClick = {
                 haptics(IridiumHaptic.Select)
@@ -107,6 +133,8 @@ fun ReaderChromeFloatingToolbar(
             },
             icon = { Icon(IridiumIcons.Tune, contentDescription = "Page fit") },
             testTag = ReaderChromeTestTags.FitButton,
+            onClickLabel = "Page fit",
+            stateText = fitState,
         )
         ToolbarAction(
             onClick = {
@@ -125,6 +153,8 @@ fun ReaderChromeFloatingToolbar(
                 )
             },
             testTag = ReaderChromeTestTags.CropButton,
+            onClickLabel = "Crop margins",
+            stateText = if (config.cropMargins) "On" else "Off",
         )
         ToolbarAction(
             onClick = {
@@ -133,6 +163,8 @@ fun ReaderChromeFloatingToolbar(
             },
             icon = { Icon(IridiumIcons.List, contentDescription = "Contents overview") },
             testTag = ReaderChromeTestTags.OverviewButton,
+            onClickLabel = "Contents overview",
+            stateText = null,
         )
         ToolbarAction(
             onClick = {
@@ -141,6 +173,8 @@ fun ReaderChromeFloatingToolbar(
             },
             icon = { Icon(IridiumIcons.Settings, contentDescription = "Reader settings") },
             testTag = ReaderChromeTestTags.SettingsButton,
+            onClickLabel = "Reader settings",
+            stateText = null,
         )
     }
 }
@@ -150,11 +184,20 @@ private fun ToolbarAction(
     onClick: () -> Unit,
     icon: @Composable () -> Unit,
     testTag: String,
+    onClickLabel: String,
+    stateText: String?,
     modifier: Modifier = Modifier,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier.testTag(testTag),
+        modifier = modifier
+            .testTag(testTag)
+            .semantics {
+                onClick(label = onClickLabel, action = null)
+                if (stateText != null) {
+                    stateDescription = stateText
+                }
+            },
         content = { icon() },
     )
 }

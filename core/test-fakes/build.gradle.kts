@@ -11,5 +11,4 @@ dependencies {
     api(project(":core:datastore"))
     api(project(":core:model"))
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.androidx.documentfile)
 }

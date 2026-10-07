@@ -22,6 +22,7 @@ sealed interface SettingsAction {
     data class SetDynamicColor(val enabled: Boolean) : SettingsAction
     data class SetColorScheme(val scheme: AppColorScheme) : SettingsAction
     data class SetAmoled(val enabled: Boolean) : SettingsAction
+    data class SetHapticsEnabled(val enabled: Boolean) : SettingsAction
     data class SetMotionStyle(val style: MotionStyle) : SettingsAction
     data class SetSortOrder(val order: LibrarySortOrder) : SettingsAction
     data class SetFilter(val filter: LibraryFilter) : SettingsAction

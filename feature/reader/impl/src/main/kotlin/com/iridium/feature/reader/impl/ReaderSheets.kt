@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumIcons
@@ -51,7 +53,7 @@ internal fun ReaderTocSheet(
 ) {
     IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
-            "Contents",
+            stringResource(R.string.reader_toc_title),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 20.dp),
         )
@@ -59,7 +61,9 @@ internal fun ReaderTocSheet(
         LazyColumn(
             modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
         ) {
-            items(toc, key = { it.href }) { entry ->
+            // Index-qualified keys: nav entries often share one file
+            // (fragment hrefs resolve to the same path).
+            itemsIndexed(toc, key = { index, entry -> "$index:${entry.href}" }) { _, entry ->
                 Column(
                     Modifier.fillMaxWidth()
                         .clickable { onEntryClick(entry) }
@@ -89,14 +93,14 @@ internal fun ReaderHighlightsSheet(
 ) {
     IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
-            "Highlights (${highlights.size})",
+            stringResource(R.string.reader_highlights_title, highlights.size),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 20.dp),
         )
         Spacer(Modifier.height(8.dp))
         if (highlights.isEmpty()) {
             Text(
-                "Long-press text, then use “Highlight selection” in the menu to save one here.",
+                stringResource(R.string.reader_highlights_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -167,7 +171,7 @@ private fun HighlightRow(
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(IridiumIcons.Delete, contentDescription = "Delete highlight")
+            Icon(IridiumIcons.Delete, contentDescription = stringResource(R.string.reader_highlight_delete))
         }
     }
 }
@@ -186,7 +190,7 @@ internal fun AddHighlightDialog(
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Highlight") },
+        title = { Text(stringResource(R.string.reader_add_highlight_title)) },
         text = {
             Column {
                 Row(
@@ -205,18 +209,18 @@ internal fun AddHighlightDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Tap to add a note") },
+                    label = { Text(stringResource(R.string.reader_add_highlight_note_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             Button(onClick = { onSave(color, note.ifBlank { null }) }) {
-                Text("Save")
+                Text(stringResource(R.string.reader_add_highlight_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.reader_dialog_cancel)) }
         },
         modifier = modifier,
     )

@@ -1,24 +1,26 @@
 package com.iridium.feature.onboarding.impl
 
-import android.net.Uri
 import com.iridium.core.model.AppColorScheme
+import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
 
 /**
- * Link-only wizard: Welcome → Folder → Appearance. It asks exactly one
- * question (where the books live) and copies nothing; picking a folder
- * persists its tree URI and advances, and the library indexes it lazily.
+ * Permission-first wizard: Welcome → Access → Reading → Appearance. Theme
+ * and reading choices persist immediately so quitting mid-wizard never loses
+ * them; Skip finishes from anywhere. Nothing is copied or indexed here — the
+ * library scans all of shared storage on arrival.
  */
 sealed interface OnboardingUiState {
     data object Welcome : OnboardingUiState
 
-    /**
-     * Folder step: [pickerHintVisible] turns on after a dismissed picker or
-     * denied grant, so the step explains itself instead of sitting silent.
-     */
-    data class Folder(
-        val pickerHintVisible: Boolean = false,
+    /** All-files access step: the library reads every EPUB on the device. */
+    data object Access : OnboardingUiState
+
+    /** Reader defaults step: text size, line spacing, book colors. */
+    data class Reading(
+        val prefs: ReaderPreferences,
     ) : OnboardingUiState
 
     data class Appearance(
@@ -30,17 +32,23 @@ sealed interface OnboardingAction {
     /** Welcome CTA. */
     data object GetStarted : OnboardingAction
 
-    /** Leave the wizard (an empty library is a valid start). */
+    /** Leave the wizard (defaults everywhere is a valid start). */
     data object Skip : OnboardingAction
 
     /** Back one step. */
     data object BackStep : OnboardingAction
 
-    /** The user picked the folder to read from. */
-    data class FolderSelected(val uri: Uri) : OnboardingAction
+    /** Forward one step (Access -> Reading -> Appearance). */
+    data object Advance : OnboardingAction
 
-    /** The picker was dismissed or its grant denied: explain, don't stall. */
-    data object FolderPickerDismissed : OnboardingAction
+    /** Reader text size multiplier. */
+    data class SetFontScale(val scale: Float) : OnboardingAction
+
+    /** Reader line-height multiplier. */
+    data class SetLineHeight(val lineHeight: Float) : OnboardingAction
+
+    /** Reader book-color theme. */
+    data class SetReaderTheme(val theme: ColorSchemeChoice) : OnboardingAction
 
     data class SetThemeMode(val mode: ThemeMode) : OnboardingAction
 

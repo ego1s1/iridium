@@ -2,100 +2,131 @@ package com.iridium.feature.library.impl
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.iridium.core.designsystem.IridiumChoiceGroup
+import com.iridium.core.designsystem.IridiumChoiceOption
+import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumSettingSwitch
+import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.model.LibraryDisplay
-import com.iridium.core.model.LibraryFilter
+import com.iridium.core.model.LibraryDisplayMode
 import com.iridium.core.model.LibrarySortOrder
 
-/** Sort/filter sheet: FilterChip FlowRows + hide-errors switch. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Sort/display sheet: choice groups + hide-errors switch. Reading-state
+ * filters live in the quick chips, so the sheet intentionally has no
+ * duplicate filter row. */
 @Composable
 internal fun LibrarySortFilterSheet(
     display: LibraryDisplay,
     onAction: (LibraryAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = { onAction(LibraryAction.CloseFilter) },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = modifier,
+    IridiumSheet(
+        onDismiss = { onAction(LibraryAction.CloseFilter) },
+        skipPartiallyExpanded = true,
+        modifier = modifier.testTag(LibraryTestTags.SortFilterSheet),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            Text("Sort by", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                LibrarySortOrder.entries.forEach { sort ->
-                    FilterChip(
-                        selected = display.sortOrder == sort,
-                        onClick = { onAction(LibraryAction.SortSelected(sort)) },
-                        label = { Text(sortLabel(sort)) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Show", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                LibraryFilter.entries.forEach { filter ->
-                    FilterChip(
-                        selected = display.filter == filter,
-                        onClick = { onAction(LibraryAction.FilterSelected(filter)) },
-                        label = { Text(filterLabel(filter)) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.library_sheet_sort_by),
+                style = IridiumEmphasized.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            IridiumChoiceGroup(
+                options = LibrarySortOrder.entries.map {
+                    IridiumChoiceOption(sortLabel(it))
+                },
+                selectedIndex = LibrarySortOrder.entries.indexOf(display.sortOrder),
+                onSelect = { onAction(LibraryAction.SortSelected(LibrarySortOrder.entries[it])) },
+                fillWidth = false,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.library_sheet_display),
+                style = IridiumEmphasized.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            IridiumChoiceGroup(
+                options = LibraryDisplayMode.entries.map {
+                    IridiumChoiceOption(displayModeLabel(it))
+                },
+                selectedIndex = LibraryDisplayMode.entries.indexOf(display.displayMode),
+                onSelect = {
+                    onAction(LibraryAction.DisplayModeSelected(LibraryDisplayMode.entries[it]))
+                },
+                fillWidth = false,
+            )
+            if (display.displayMode != LibraryDisplayMode.LIST) {
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "Hide unreadable books",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
+                    text = stringResource(R.string.library_sheet_columns),
+                    style = IridiumEmphasized.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() },
                 )
-                Switch(
-                    checked = display.hideErrors,
-                    onCheckedChange = { onAction(LibraryAction.ToggleHideErrors(it)) },
+                IridiumChoiceGroup(
+                    options = listOf(
+                        IridiumChoiceOption(stringResource(R.string.library_columns_auto)),
+                        IridiumChoiceOption("2"),
+                        IridiumChoiceOption("3"),
+                        IridiumChoiceOption("4"),
+                        IridiumChoiceOption("5"),
+                        IridiumChoiceOption("6"),
+                    ),
+                    selectedIndex = display.gridColumns.coerceIn(0, 6),
+                    onSelect = { onAction(LibraryAction.GridColumnsSelected(it)) },
                 )
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(4.dp))
+            IridiumSettingSwitch(
+                title = stringResource(R.string.library_sheet_hide_errors),
+                checked = display.hideErrors,
+                onCheckedChange = { onAction(LibraryAction.ToggleHideErrors(it)) },
+            )
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
+@Composable
 private fun sortLabel(sort: LibrarySortOrder): String = when (sort) {
-    LibrarySortOrder.RECENTLY_ADDED -> "Recently added"
-    LibrarySortOrder.RECENTLY_READ -> "Recently read"
-    LibrarySortOrder.TITLE -> "Title"
-    LibrarySortOrder.UNFINISHED_FIRST -> "Unfinished first"
+    LibrarySortOrder.RECENTLY_ADDED -> stringResource(R.string.library_sort_recently_added)
+    LibrarySortOrder.RECENTLY_READ -> stringResource(R.string.library_sort_recently_read)
+    LibrarySortOrder.TITLE -> stringResource(R.string.library_sort_title)
+    LibrarySortOrder.UNFINISHED_FIRST -> stringResource(R.string.library_sort_unfinished_first)
 }
 
-private fun filterLabel(filter: LibraryFilter): String = when (filter) {
-    LibraryFilter.ALL -> "All"
-    LibraryFilter.IN_PROGRESS -> "In progress"
-    LibraryFilter.UNREAD -> "Unread"
-    LibraryFilter.FINISHED -> "Finished"
-    LibraryFilter.FAVORITES -> "Favorites"
+@Composable
+private fun displayModeLabel(mode: LibraryDisplayMode): String = when (mode) {
+    LibraryDisplayMode.COMPACT -> stringResource(R.string.library_display_compact)
+    LibraryDisplayMode.COMFORTABLE -> stringResource(R.string.library_display_comfortable)
+    LibraryDisplayMode.COVER_ONLY -> stringResource(R.string.library_display_cover_only)
+    LibraryDisplayMode.LIST -> stringResource(R.string.library_display_list)
 }

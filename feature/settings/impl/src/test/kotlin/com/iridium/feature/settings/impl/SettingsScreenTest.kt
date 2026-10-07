@@ -2,6 +2,7 @@ package com.iridium.feature.settings.impl
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -61,11 +62,11 @@ class SettingsScreenTest {
 
         // Modular Storage section
         composeTestRule.onNodeWithText("Storage").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Storage location").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Your library").performScrollTo().assertIsDisplayed()
 
         // About section
         composeTestRule.onNodeWithText("About").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("1.0.0-test").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Version 1.0.0-test").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -86,8 +87,14 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithText("Dark").assertIsDisplayed()
         composeTestRule.onNodeWithText("Wallpaper color").assertIsDisplayed()
         composeTestRule.onNodeWithText("Pure black").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Dynamic").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Iridium").assertIsDisplayed()
+        // Anchor the outer scroll below the picker first: a node inside the
+        // nested horizontal picker row cannot drive the outer scroll itself,
+        // so scroll to Motion (next card down) to bring the row into view.
+        composeTestRule.onNodeWithText("Motion").performScrollTo()
+        composeTestRule.onNodeWithText("Dynamic").performScrollTo().assertIsDisplayed()
+        // Two "Iridium" texts exist (scheme preset + About hero); [0] is the
+        // preset, first in composition order.
+        composeTestRule.onAllNodesWithText("Iridium")[0].performScrollTo().assertIsDisplayed()
     }
 
     @Test

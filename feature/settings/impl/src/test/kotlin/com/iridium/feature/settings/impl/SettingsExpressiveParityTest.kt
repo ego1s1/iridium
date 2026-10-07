@@ -98,7 +98,7 @@ class SettingsExpressiveParityTest {
         composeTestRule.onNodeWithText("Reading").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Storage").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("About").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("9.9.9-t10").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Version 9.9.9-t10").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -180,6 +180,9 @@ class SettingsExpressiveParityTest {
     fun `scheme picker dispatches dynamic color`() {
         val actions = mutableListOf<SettingsAction>()
         setScreen(SettingsUiState(), onAction = actions::add)
+        // Same nested-scroll anchor as the appearance test: bring the picker
+        // row into view via Motion before driving its horizontal scroll.
+        composeTestRule.onNodeWithText("Motion").performScrollTo()
         composeTestRule.onNodeWithText("Dynamic").performScrollTo().performClick()
         assertTrue(actions.any { it is SettingsAction.SetDynamicColor && it.enabled })
     }
@@ -188,6 +191,7 @@ class SettingsExpressiveParityTest {
     fun `scheme picker dispatches forest preset`() {
         val actions = mutableListOf<SettingsAction>()
         setScreen(SettingsUiState(), onAction = actions::add)
+        composeTestRule.onNodeWithText("Motion").performScrollTo()
         composeTestRule.onNodeWithText("Forest").performScrollTo().performClick()
         assertTrue(
             actions.any {

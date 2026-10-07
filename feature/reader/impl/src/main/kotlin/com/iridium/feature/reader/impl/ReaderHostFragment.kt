@@ -1,7 +1,10 @@
 package com.iridium.feature.reader.impl
 
 import android.os.Bundle
+import android.view.ActionMode
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -63,6 +66,9 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
             initialLocator = store.initialLocator,
             initialPreferences = store.initialPreferences ?: EpubPreferences(),
             listener = this,
+            configuration = EpubNavigatorFragment.Configuration(
+                selectionActionModeCallback = selectionActionModeCallback,
+            ),
         )
         super.onCreate(savedInstanceState)
     }
@@ -132,6 +138,8 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
     /** Center-tap toggles chrome; never consumed so links keep working. */
     private val chromeTapListener = object : InputListener {
         override fun onTap(event: TapEvent): Boolean {
+            // A content tap dismisses any active selection (and its popup).
+            store.clearSelection()
             store.tryEmit(ReaderSessionEvent.ContentTapped)
             return false
         }
@@ -144,6 +152,62 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
         override fun onDecorationActivated(event: DecorableNavigator.OnActivatedEvent): Boolean {
             store.tryEmit(ReaderSessionEvent.DecorationTapped(event.decoration.id))
             return true
+        }
+    }
+
+    /**
+     * Intercepts the WebView long-press selection menu. Returning false from
+     * [ActionMode.Callback.onCreateActionMode] suppresses the system
+     * Copy/Share menu — Iridium shows its own dictionary popup (driven by
+     * [ReaderSessionStore.selectedText]) instead. The WebView selection
+     * highlight itself is unaffected.
+     */
+    private var selectionMode: ActionMode? = null
+
+    private val selectionActionModeCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            // Returning false aborts the nascent selection, so the mode must
+            // live: fetch on a delay (selection lands just after the mode
+            // starts), publish to the store for the dictionary popup, then
+            // finish the system bar — the popup is the UI, not the toolbar.
+            selectionMode = mode
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(250)
+                fetchSelection()
+            }
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean = false
+
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean = false
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+            // Intentionally not clearing: selection lifetime is owned by the
+            // popup/tap/page-turn paths in the session store. Clearing here
+            // would dismiss our own popup right after we finish the mode.
+            if (selectionMode === mode) selectionMode = null
+        }
+    }
+
+    /** Reads the navigator's current selection into the session store. */
+    private fun fetchSelection(retry: Boolean = true) {
+        val nav = navigator ?: return
+        lifecycleScope.launch {
+            val highlight = runCatching { nav.currentSelection() }
+                .getOrNull()
+                ?.locator?.text?.highlight
+            if (highlight.isNullOrBlank()) {
+                // Selection may trail the mode start; one retry before giving up.
+                if (retry) {
+                    kotlinx.coroutines.delay(300)
+                    fetchSelection(retry = false)
+                }
+            } else {
+                store.onSelection(highlight)
+                selectionMode?.finish()
+                selectionMode = null
+            }
         }
     }
 

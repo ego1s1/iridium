@@ -42,7 +42,6 @@ class DataStorePreferencesDataSourceTest {
     @Test
     fun `defaults reflect a fresh install`() = runTest {
         assertFalse(source.onboardingCompleted.first())
-        assertNull(source.sourceTreeUri.first())
         assertEquals(ThemeMode.SYSTEM, source.themePreferences.first().mode)
         assertTrue(source.themePreferences.first().dynamicColor)
         assertEquals(AppColorScheme.IRIDIUM, source.themePreferences.first().colorScheme)
@@ -83,6 +82,7 @@ class DataStorePreferencesDataSourceTest {
                 keepScreenOn = false,
                 showPageCounter = false,
                 volumeKeys = true,
+                volumeKeysInverted = true,
                 pageMargins = 1.5f,
                 lineHeight = 1.8f,
             )
@@ -96,6 +96,7 @@ class DataStorePreferencesDataSourceTest {
         assertFalse(reader.keepScreenOn)
         assertFalse(reader.showPageCounter)
         assertTrue(reader.volumeKeys)
+        assertTrue(reader.volumeKeysInverted)
         assertEquals(1.5f, reader.pageMargins)
         assertEquals(1.8f, reader.lineHeight)
     }
@@ -109,15 +110,6 @@ class DataStorePreferencesDataSourceTest {
         assertEquals(LibrarySortOrder.TITLE, display.sortOrder)
         assertEquals(LibraryFilter.FAVORITES, display.filter)
         assertTrue(display.hideErrors)
-    }
-
-    @Test
-    fun `source tree uri can be set and cleared`() = runTest {
-        source.setSourceTreeUri("content://tree/books")
-        assertEquals("content://tree/books", source.sourceTreeUri.first())
-
-        source.setSourceTreeUri(null)
-        assertNull(source.sourceTreeUri.first())
     }
 
     @Test

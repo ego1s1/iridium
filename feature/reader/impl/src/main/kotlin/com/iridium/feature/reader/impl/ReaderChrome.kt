@@ -1,6 +1,7 @@
 package com.iridium.feature.reader.impl
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -41,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -55,6 +58,7 @@ import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ReadingFlow
+import com.iridium.core.model.TapInvertMode
 import kotlin.math.roundToInt
 
 /**
@@ -91,6 +95,7 @@ enum class ChromeTapZone {
     MENU,
     NEXT,
 }
+
 
 /**
  * Tap-zone layout modes (Mori `ReaderNavMode` parity).
@@ -136,6 +141,13 @@ object ReaderChromeTestTags {
     const val FitHeight = "chromeFitHeight"
     const val FitOriginal = "chromeFitOriginal"
     const val CropSwitch = "chromeCropSwitch"
+    const val EpubDock = "chromeEpubDock"
+    const val EpubFlowButton = "chromeEpubFlow"
+    const val EpubThemeButton = "chromeEpubTheme"
+    const val EpubTocButton = "chromeEpubToc"
+    const val EpubHighlightsButton = "chromeEpubHighlights"
+    const val EpubSettingsButton = "chromeEpubSettings"
+    const val TapZoneOverlay = "chromeTapZoneOverlay"
 
     fun navCardFor(mode: ChromeNavMode): String = "chromeNavCard:${mode.name}"
 }
@@ -185,10 +197,17 @@ fun chromeZoneForTap(
     fractionY: Float,
     direction: ChromeReadingDirection,
     navMode: ChromeNavMode = ChromeNavMode.DEFAULT,
+    invertMode: TapInvertMode = TapInvertMode.NONE,
 ): ChromeTapZone {
     if (navMode == ChromeNavMode.DISABLED) return ChromeTapZone.MENU
-    val x = fractionX.coerceIn(0f, 1f)
-    val y = fractionY.coerceIn(0f, 1f)
+    val x = when (invertMode) {
+        TapInvertMode.HORIZONTAL, TapInvertMode.BOTH -> 1f - fractionX.coerceIn(0f, 1f)
+        TapInvertMode.NONE, TapInvertMode.VERTICAL -> fractionX.coerceIn(0f, 1f)
+    }
+    val y = when (invertMode) {
+        TapInvertMode.VERTICAL, TapInvertMode.BOTH -> 1f - fractionY.coerceIn(0f, 1f)
+        TapInvertMode.NONE, TapInvertMode.HORIZONTAL -> fractionY.coerceIn(0f, 1f)
+    }
     if (y < 0.05f) return ChromeTapZone.MENU
 
     val forwardRight = direction == ChromeReadingDirection.LEFT_TO_RIGHT
@@ -271,6 +290,19 @@ fun ReaderScrubberIsland(
     val safeIndex = positionIndex.coerceIn(0, (positionCount - 1).coerceAtLeast(0))
     var scrub by remember(positionCount) { mutableStateOf<Int?>(null) }
     val shownIndex = scrub ?: safeIndex
+    val isRtl = direction == ChromeReadingDirection.RIGHT_TO_LEFT
+    val prevIcon = if (isRtl) IridiumIcons.SkipNext else IridiumIcons.SkipPrevious
+    val nextIcon = if (isRtl) IridiumIcons.SkipPrevious else IridiumIcons.SkipNext
+    val prevEnabled = canChromeGoBackward(safeIndex)
+    val nextEnabled = canChromeGoForward(safeIndex, positionCount)
+    val prevContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+        .copy(alpha = if (prevEnabled) 1f else 0.4f)
+    val prevContent = MaterialTheme.colorScheme.onSurface
+        .copy(alpha = if (prevEnabled) 1f else 0.38f)
+    val nextContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+        .copy(alpha = if (nextEnabled) 1f else 0.4f)
+    val nextContent = MaterialTheme.colorScheme.onSurface
+        .copy(alpha = if (nextEnabled) 1f else 0.38f)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -314,18 +346,18 @@ fun ReaderScrubberIsland(
                             haptics(IridiumHaptic.Select)
                             onPrevious()
                         },
-                        enabled = canChromeGoBackward(safeIndex),
+                        enabled = prevEnabled,
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = prevContainer,
+                            contentColor = prevContent,
                         ),
                         modifier = Modifier
                             .size(48.dp)
                             .testTag(ReaderChromeTestTags.ScrubPrev),
                     ) {
                         Icon(
-                            imageVector = IridiumIcons.Previous,
+                            imageVector = prevIcon,
                             contentDescription = "Previous position",
                         )
                     }
@@ -346,11 +378,19 @@ fun ReaderScrubberIsland(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
                         ) {
-                            Text(
-                                text = (shownIndex + 1).toString(),
-                                style = IridiumEmphasized.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = positionCount.coerceAtLeast(1).toString(),
+                                    style = IridiumEmphasized.titleMedium,
+                                    modifier = Modifier.alpha(0f)
+                                        .clearAndSetSemantics { },
+                                )
+                                Text(
+                                    text = (shownIndex + 1).toString(),
+                                    style = IridiumEmphasized.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                             // Force the LTR slider geometry even in RTL rows:
                             // the value domain (first -> last position) must
                             // not flip with layout direction.
@@ -386,18 +426,18 @@ fun ReaderScrubberIsland(
                             haptics(IridiumHaptic.Select)
                             onNext()
                         },
-                        enabled = canChromeGoForward(safeIndex, positionCount),
+                        enabled = nextEnabled,
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = nextContainer,
+                            contentColor = nextContent,
                         ),
                         modifier = Modifier
                             .size(48.dp)
                             .testTag(ReaderChromeTestTags.ScrubNext),
                     ) {
                         Icon(
-                            imageVector = IridiumIcons.Next,
+                            imageVector = nextIcon,
                             contentDescription = "Next position",
                         )
                     }
@@ -423,6 +463,24 @@ fun ReaderActionDock(
 ) {
     val haptics = rememberIridiumHaptics()
     val segmentShape = RoundedCornerShape(14.dp)
+    val cropContainer by animateColorAsState(
+        targetValue = if (config.cropMargins) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            Color.Transparent
+        },
+        animationSpec = IridiumMotion.defaultEffectsSpec(),
+        label = "cropContainer",
+    )
+    val cropContent by animateColorAsState(
+        targetValue = if (config.cropMargins) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = IridiumMotion.defaultEffectsSpec(),
+        label = "cropContent",
+    )
 
     Surface(
         shape = CircleShape,
@@ -508,16 +566,8 @@ fun ReaderActionDock(
                 },
                 shape = segmentShape,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = if (config.cropMargins) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color.Transparent
-                    },
-                    contentColor = if (config.cropMargins) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    containerColor = cropContainer,
+                    contentColor = cropContent,
                 ),
                 modifier = Modifier
                     .size(44.dp)
@@ -579,4 +629,159 @@ private fun DockDivider() {
             .height(20.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
     )
+}
+
+/**
+ * EPUB bottom dock: flow / theme / TOC / highlights / settings in one
+ * elevated segmented pill. Stateless; the host owns wiring into
+ * [ReaderScreen] (a parallel worker owns that call site).
+ */
+@Composable
+fun ReaderEpubDock(
+    onFlowCycle: () -> Unit,
+    onThemeCycle: () -> Unit,
+    onTocClick: () -> Unit,
+    onHighlightsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberIridiumHaptics()
+    val segmentShape = RoundedCornerShape(14.dp)
+
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+        ),
+        modifier = modifier
+            .widthIn(max = 480.dp)
+            .fillMaxWidth()
+            .testTag(ReaderChromeTestTags.EpubDock),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            FilledTonalIconButton(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onFlowCycle()
+                },
+                shape = segmentShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(ReaderChromeTestTags.EpubFlowButton)
+                    .semantics {
+                        onClick(label = "Reading flow", action = null)
+                        stateDescription = "Reading flow"
+                    },
+            ) {
+                Icon(IridiumIcons.ViewAgenda, contentDescription = "Cycle reading flow")
+            }
+
+            DockDivider()
+
+            FilledTonalIconButton(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onThemeCycle()
+                },
+                shape = segmentShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(ReaderChromeTestTags.EpubThemeButton)
+                    .semantics {
+                        onClick(label = "Reading theme", action = null)
+                        stateDescription = "Reading theme"
+                    },
+            ) {
+                Icon(IridiumIcons.Contrast, contentDescription = "Cycle reading theme")
+            }
+
+            DockDivider()
+
+            FilledTonalIconButton(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onTocClick()
+                },
+                shape = segmentShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(ReaderChromeTestTags.EpubTocButton)
+                    .semantics {
+                        onClick(label = "Table of contents", action = null)
+                        stateDescription = "Table of contents"
+                    },
+            ) {
+                Icon(IridiumIcons.MenuBook, contentDescription = "Table of contents")
+            }
+
+            DockDivider()
+
+            FilledTonalIconButton(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onHighlightsClick()
+                },
+                shape = segmentShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(ReaderChromeTestTags.EpubHighlightsButton)
+                    .semantics {
+                        onClick(label = "Highlights", action = null)
+                        stateDescription = "Highlights"
+                    },
+            ) {
+                Icon(IridiumIcons.Highlight, contentDescription = "Highlights")
+            }
+
+            DockDivider()
+
+            FilledTonalIconButton(
+                onClick = {
+                    haptics(IridiumHaptic.Select)
+                    onSettingsClick()
+                },
+                shape = segmentShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(ReaderChromeTestTags.EpubSettingsButton)
+                    .semantics {
+                        onClick(label = "Reader settings", action = null)
+                        stateDescription = "Reader settings"
+                    },
+            ) {
+                Icon(IridiumIcons.Settings, contentDescription = "Reader settings")
+            }
+        }
+    }
 }

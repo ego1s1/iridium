@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.iridium.hilt)
+    alias(libs.plugins.aboutlibraries)
 }
 
 android {

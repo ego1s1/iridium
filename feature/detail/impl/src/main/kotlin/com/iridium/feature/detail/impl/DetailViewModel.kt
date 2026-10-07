@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.iridium.core.data.BooksRepository
+import com.iridium.core.model.TocEntry
 import com.iridium.feature.detail.api.DetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import javax.inject.Inject
 
 @HiltViewModel
@@ -84,3 +86,43 @@ class DetailViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * TOC indices whose chapter resource sits fully before the reader's current
+ * position. Anchored on [Book.lastLocator]'s href (the only per-chapter signal
+ * persisted to the detail layer) against TOC order, which follows the nav
+ * document's reading order.
+ *
+ * Granularity is one spine resource: TOC rows sharing the current file stay
+ * unmarked because intra-file progress is invisible without the reader's
+ * positions table. Linear reading is assumed — a slider jump over unread
+ * chapters overstates completion. A finished book marks every row.
+ */
+internal fun completedTocIndices(
+    toc: List<TocEntry>,
+    lastLocator: String?,
+    isFinished: Boolean,
+): Set<Int> {
+    if (toc.isEmpty()) return emptySet()
+    if (isFinished) return toc.indices.toSet()
+    val current = locatorResourceKey(lastLocator) ?: return emptySet()
+    val firstCurrent = toc.indexOfFirst { resourceKey(it.href) == current }
+    if (firstCurrent < 0) return emptySet()
+    return (0 until firstCurrent).toSet()
+}
+
+/** Resource href out of a persisted Readium locator JSON, or null when absent/unparseable. */
+internal fun locatorResourceKey(rawLocator: String?): String? {
+    if (rawLocator.isNullOrBlank()) return null
+    val href = runCatching { JSONObject(rawLocator).optString("href").ifBlank { null } }
+        .getOrNull() ?: return null
+    return resourceKey(href)
+}
+
+/**
+ * Filename-level href key. Stored TOC hrefs are archive paths
+ * (`OEBPS/ch1.xhtml`) while Readium emits manifest-relative hrefs, so the
+ * comparison mirrors the reader's filename fallback.
+ */
+internal fun resourceKey(href: String): String =
+    href.substringAfterLast('/').substringBefore('#')

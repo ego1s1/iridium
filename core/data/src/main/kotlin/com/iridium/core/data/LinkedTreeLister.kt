@@ -1,13 +1,13 @@
 package com.iridium.core.data
 
-import android.content.Context
 import android.net.Uri
-import androidx.documentfile.provider.DocumentFile
-import dagger.hilt.android.qualifiers.ApplicationContext
+import android.os.Environment
+import java.io.File
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * A user document addressable for indexing: identity, display name, and a
+ * A book file addressable for indexing: identity, display name, and a
  * change marker for the fast path.
  */
 internal data class LinkedDocument(
@@ -17,12 +17,11 @@ internal data class LinkedDocument(
 )
 
 /**
- * Lists linked-tree documents. Separated from the repository for testability:
- * SAF document queries need a content provider, which unit tests fake here
- * instead of in Robolectric shadows.
+ * Lists book files for indexing. Separated from the repository for
+ * testability: filesystem walks are faked here instead of touching disk.
  */
 internal interface LinkedTreeLister {
-    suspend fun listBooks(treeUri: Uri): LinkedTreeListResult
+    suspend fun listBooks(): LinkedTreeListResult
 
     /** Resolves one document, or null when it is gone/unreadable. */
     suspend fun resolve(documentUri: Uri): LinkedDocument?
@@ -32,47 +31,65 @@ internal data class LinkedTreeListResult(
     val documents: List<LinkedDocument>,
     /**
      * True when any listing failed: the result must never read as an empty
-     * folder, or pruning would wipe rows the user still owns.
+     * device, or pruning would wipe rows the user still owns.
      */
     val walkFailed: Boolean,
 )
 
-internal class DocumentLinkedTreeLister @Inject constructor(
-    @ApplicationContext private val context: Context,
-) : LinkedTreeLister {
+/**
+ * Walks shared storage for EPUBs (all-files access). Skips the private
+ * `Android/` tree, hidden directories, and unreadable subtrees; any skipped
+ * subtree sets [LinkedTreeListResult.walkFailed] so the repository never
+ * prunes on a partial walk.
+ */
+@Singleton
+internal class FilesystemLinkedTreeLister @Inject constructor() : LinkedTreeLister {
 
-    override suspend fun listBooks(treeUri: Uri): LinkedTreeListResult {
-        val root = DocumentFile.fromTreeUri(context, treeUri)
-            ?: return LinkedTreeListResult(emptyList(), walkFailed = true)
+    override suspend fun listBooks(): LinkedTreeListResult {
+        val root = Environment.getExternalStorageDirectory() ?: return LinkedTreeListResult(
+            emptyList(),
+            walkFailed = true,
+        )
+        return listBooks(root)
+    }
+
+    internal fun listBooks(root: File): LinkedTreeListResult {
         val out = mutableListOf<LinkedDocument>()
         var walkFailed = false
-        val stack = ArrayDeque<DocumentFile>()
-        stack.add(root)
-        while (stack.isNotEmpty()) {
-            val current = stack.removeFirst()
-            val children = runCatching { current.listFiles().toList() }
-                .getOrElse {
-                    walkFailed = true
-                    emptyList()
-                }
-            children.forEach { child ->
-                if (child.isDirectory) {
-                    stack.add(child)
-                } else {
-                    val name = child.name ?: return@forEach
-                    if (isSupportedBook(name)) {
-                        out += LinkedDocument(child.uri, name, child.lastModified())
+        try {
+            root.walkTopDown()
+                .onEnter { dir ->
+                    val name = dir.name
+                    // Private app data, thumbnails caches and dot-dirs never
+                    // hold books; skipping them also bounds walk time.
+                    if (dir != root && (name == "Android" || name.startsWith("."))) {
+                        false
+                    } else if (!dir.canRead()) {
+                        walkFailed = true
+                        false
+                    } else {
+                        true
                     }
                 }
-            }
+                .onFail { _, _ -> walkFailed = true }
+                .filter { it.isFile && isSupportedBook(it.name) }
+                .forEach { file ->
+                    out += LinkedDocument(
+                        Uri.fromFile(file),
+                        file.name,
+                        file.lastModified(),
+                    )
+                }
+        } catch (_: SecurityException) {
+            return LinkedTreeListResult(emptyList(), walkFailed = true)
         }
         return LinkedTreeListResult(out, walkFailed)
     }
 
     override suspend fun resolve(documentUri: Uri): LinkedDocument? {
-        val doc = runCatching { DocumentFile.fromSingleUri(context, documentUri) }.getOrNull()
-            ?: return null
-        val name = doc.name ?: return null
-        return LinkedDocument(doc.uri, name, doc.lastModified())
+        val path = documentUri.path ?: return null
+        val file = File(path)
+        if (!file.isFile || !file.canRead()) return null
+        return LinkedDocument(documentUri, file.name, file.lastModified())
     }
 }

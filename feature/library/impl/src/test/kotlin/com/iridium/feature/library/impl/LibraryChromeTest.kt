@@ -187,42 +187,18 @@ class LibraryChromeTest {
     // --- Action island ---
 
     @Test
-    fun `action island always links and gates rescan plus index on linked`() {
-        var link = 0
+    fun `action island fires rescan and index`() {
         var rescan = 0
         var index = 0
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 LibraryActionIsland(
-                    linked = false,
-                    onLinkFolder = { link++ },
                     onRescan = { rescan++ },
                     onIndex = { index++ },
                 )
             }
         }
         composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionIsland).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionLink).performClick()
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionRescan).assertDoesNotExist()
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionIndex).assertDoesNotExist()
-        assertEquals(1, link)
-        assertEquals(0, rescan)
-    }
-
-    @Test
-    fun `action island fires rescan and index when linked`() {
-        var rescan = 0
-        var index = 0
-        composeTestRule.setContent {
-            IridiumTheme(expressiveMotion = false) {
-                LibraryActionIsland(
-                    linked = true,
-                    onLinkFolder = {},
-                    onRescan = { rescan++ },
-                    onIndex = { index++ },
-                )
-            }
-        }
         composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionRescan).performClick()
         composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionIndex).performClick()
         assertEquals(1, rescan)

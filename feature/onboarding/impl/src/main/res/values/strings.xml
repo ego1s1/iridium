@@ -11,12 +11,19 @@
     <string name="onboarding_get_started">Get started</string>
     <string name="onboarding_get_started_caption">No account, no ads, no tracking.</string>
 
-    <string name="onboarding_folder_title">Where are your books?</string>
-    <string name="onboarding_folder_body">Link a folder and Iridium reads the EPUBs already on your device. Files stay exactly where they are — nothing is copied or uploaded.</string>
-    <string name="onboarding_pick_folder">Choose folder</string>
-    <string name="onboarding_folder_hint">Folder access is needed to read your books. Try again, or continue without linking.</string>
-    <string name="onboarding_folder_note">You can link a folder later from the library.</string>
-    <string name="onboarding_continue_without_linking">Continue without linking</string>
+    <string name="onboarding_access_title">One permission first</string>
+    <string name="onboarding_access_body">Iridium scans your device for EPUBs — every folder, automatically. Grant all-files access once and your whole library appears. Files stay exactly where they are — nothing is copied or uploaded.</string>
+    <string name="onboarding_access_grant">Grant access</string>
+    <string name="onboarding_access_granted">Access granted — your books will appear in the library.</string>
+    <string name="onboarding_access_hint">Without access Iridium can\'t find your books. You can grant it later from system settings.</string>
+    <string name="onboarding_access_note">Only EPUB discovery uses this. Your files never leave the device.</string>
+    <string name="onboarding_reading_title">Make reading yours</string>
+    <string name="onboarding_reading_body">Set your text size, line spacing and book colors now — everything stays changeable while reading.</string>
+    <string name="onboarding_reading_text_size">Text size</string>
+    <string name="onboarding_reading_line_spacing">Line spacing</string>
+    <string name="onboarding_reading_colors">Book colors</string>
+    <string name="onboarding_text_smaller">Smaller text</string>
+    <string name="onboarding_text_larger">Larger text</string>
 
     <string name="onboarding_appearance_title">Make it yours</string>
     <string name="onboarding_appearance_body">Pick a theme now — you can change it any time in Settings.</string>

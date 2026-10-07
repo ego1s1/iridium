@@ -2,7 +2,6 @@ package com.iridium.feature.reader.impl
 
 import android.content.Intent
 import android.view.KeyEvent
-import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -10,23 +9,25 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -37,7 +38,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,6 +65,11 @@ import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
     composable<ReaderRoute>(
@@ -124,7 +129,9 @@ internal fun ReaderRoute(
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
             sessionReady = sessionReady,
+            dictionaryState = viewModel.dictionaryUi.collectAsStateWithLifecycle().value,
             onAction = viewModel::onAction,
+            onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
             onBackClick = onBackClick,
             snackbarHost = snackbarHost,
             modifier = modifier,
@@ -132,19 +139,38 @@ internal fun ReaderRoute(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalHazeMaterialsApi::class,
+    ExperimentalLayoutApi::class,
+)
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState.Ready,
     sessionReady: Boolean,
+    dictionaryState: DictionaryUiState?,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
     snackbarHost: SnackbarHostState,
+    onVolumeKeyEvent: (KeyEvent) -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     var showAddDialog by remember { mutableStateOf(false) }
+
+    // Backdrop-blur source for the floating chrome (M3 Expressive bars blur
+    // the book text behind them instead of sitting on solid color).
+    val hazeState = remember { HazeState() }
+    val chromeHazeStyle = HazeMaterials.thin(
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+    )
+    // Book text always stays clear of the status and navigation zones, even
+    // in immersive mode: visibility-ignoring insets are stable, so toggling
+    // the chrome never resizes the navigator (no repagination).
+    val topSafeInsets = WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)
+    val bottomSafeInsets =
+        WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)
 
     // Per-book brightness override (-1 = system).
     DisposableEffect(state.prefs.brightness) {
@@ -196,42 +222,49 @@ internal fun ReaderScreen(
      */
     DisposableEffect(
         state.prefs.volumeKeys,
+        state.chromeVisible,
         state.settingsOpen,
         state.tocOpen,
         state.highlightsOpen,
     ) {
-        val active = state.prefs.volumeKeys &&
+        val active = state.prefs.volumeKeys && !state.chromeVisible &&
             !state.settingsOpen && !state.tocOpen && !state.highlightsOpen
-        ReaderKeyInterceptor.handler = if (active) {
-            { event ->
-                when (event.keyCode) {
-                    KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_UP -> {
-                        if (event.action == KeyEvent.ACTION_UP) {
-                            if (event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                                onAction(ReaderAction.GoForward())
-                            } else {
-                                onAction(ReaderAction.GoBackward())
-                            }
-                        }
-                        true
-                    }
-                    else -> false
-                }
-            }
-        } else {
-            null
-        }
+        // Mirrors the ViewModel gate (hidden-chrome + invert swap); installing
+        // only while active keeps volume normal everywhere else.
+        ReaderKeyInterceptor.handler = if (active) onVolumeKeyEvent else null
         onDispose { ReaderKeyInterceptor.handler = null }
     }
 
-    Scaffold(
-        topBar = {
-            AnimatedVisibility(
-                visible = state.chromeVisible,
-                enter = slideInVertically { -it } + fadeIn(),
-                exit = slideOutVertically { -it } + fadeOut(),
-            ) {
+    // Full-bleed reader: the book fills the whole window and the chrome floats
+    // transparently above it. The old Scaffold slots + content padding resized
+    // the navigator on every chrome toggle, making Readium repaginate (text jump).
+    Box(modifier = modifier.fillMaxSize()) {
+        // Readium content fills the whole area; chrome overlays it.
+        NavigatorHost(
+            bookId = state.book.id,
+            sessionReady = sessionReady,
+            modifier = Modifier.fillMaxSize()
+                .hazeSource(state = hazeState)
+                .windowInsetsPadding(topSafeInsets)
+                .windowInsetsPadding(bottomSafeInsets),
+        )
+        if (!state.chromeVisible && state.prefs.showPageCounter) {
+            state.positionText?.let {
+                IridiumScrimPill(
+                    text = it,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = state.chromeVisible,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
                 TopAppBar(
+                    modifier = Modifier.statusBarsPadding()
+                        .hazeEffect(state = hazeState, style = chromeHazeStyle),
                     title = {
                         Column {
                             Text(
@@ -281,35 +314,44 @@ internal fun ReaderScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                        containerColor = Color.Transparent,
                     ),
                 )
-            }
-        },
-        bottomBar = {
-            AnimatedVisibility(
-                visible = state.chromeVisible,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
+        }
+        AnimatedVisibility(
+            visible = state.chromeVisible,
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.navigationBarsPadding()
+                    .hazeEffect(state = hazeState, style = chromeHazeStyle)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
-                ReaderBottomBar(state = state, onAction = onAction)
-            }
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHost) },
-        modifier = modifier,
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            // Readium content fills the whole area; chrome overlays it.
-            NavigatorHost(bookId = state.book.id, sessionReady = sessionReady)
-            if (!state.chromeVisible && state.prefs.showPageCounter) {
-                state.positionText?.let {
-                    IridiumScrimPill(
-                        text = it,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
-                    )
-                }
+                ReaderScrubberIsland(
+                    positionIndex = state.positionIndex,
+                    positionCount = state.positionCount,
+                    direction = ChromeReadingDirection.LEFT_TO_RIGHT,
+                    onSeek = { onAction(ReaderAction.SeekTo(it)) },
+                    onPrevious = { onAction(ReaderAction.GoBackward()) },
+                    onNext = { onAction(ReaderAction.GoForward()) },
+                )
+                ReaderEpubDock(
+                    onFlowCycle = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
+                    onThemeCycle = { onAction(ReaderAction.SetTheme(nextColorScheme(state.prefs.theme))) },
+                    onTocClick = { onAction(ReaderAction.OpenToc) },
+                    onHighlightsClick = { onAction(ReaderAction.OpenHighlights) },
+                    onSettingsClick = { onAction(ReaderAction.OpenSettings) },
+                )
             }
         }
+        SnackbarHost(
+            hostState = snackbarHost,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+        )
     }
 
     if (state.settingsOpen) {
@@ -330,6 +372,12 @@ internal fun ReaderScreen(
             onDismiss = { onAction(ReaderAction.CloseHighlights) },
         )
     }
+    dictionaryState?.let { dict ->
+        DictionaryPopup(
+            state = dict,
+            onDismiss = { onAction(ReaderAction.DismissDictionary) },
+        )
+    }
     if (showAddDialog) {
         AddHighlightDialog(
             onSave = { color, note ->
@@ -340,6 +388,19 @@ internal fun ReaderScreen(
         )
     }
 }
+
+
+private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
+    com.iridium.core.model.ReadingFlow.entries[
+        (com.iridium.core.model.ReadingFlow.entries.indexOf(flow) + 1) %
+            com.iridium.core.model.ReadingFlow.entries.size,
+    ]
+
+private fun nextColorScheme(theme: com.iridium.core.model.ColorSchemeChoice) =
+    com.iridium.core.model.ColorSchemeChoice.entries[
+        (com.iridium.core.model.ColorSchemeChoice.entries.indexOf(theme) + 1) %
+            com.iridium.core.model.ColorSchemeChoice.entries.size,
+    ]
 
 /** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
 @Composable
@@ -396,45 +457,6 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
             fm.findFragmentByTag(tag)?.takeIf { it.isAdded }?.let {
                 fm.beginTransaction().remove(it).commitAllowingStateLoss()
             }
-        }
-    }
-}
-
-@Composable
-private fun ReaderBottomBar(
-    state: ReaderUiState.Ready,
-    onAction: (ReaderAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var scrub by remember(state.progression) { mutableFloatStateOf(state.progression) }
-    var scrubbing by remember { mutableStateOf(false) }
-    BottomAppBar(modifier = modifier) {
-        IconButton(onClick = { onAction(ReaderAction.GoBackward()) }) {
-            Icon(IridiumIcons.Previous, contentDescription = "Previous")
-        }
-        Column(Modifier.weight(1f)) {
-            Slider(
-                value = if (scrubbing) scrub else state.progression,
-                onValueChange = {
-                    scrub = it
-                    scrubbing = true
-                },
-                onValueChangeFinished = {
-                    scrubbing = false
-                    onAction(ReaderAction.SeekTo(scrub))
-                },
-            )
-            state.positionText?.let {
-                Text(
-                    text = "${(state.progression * 100).toInt()}% · $it",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-            }
-        }
-        IconButton(onClick = { onAction(ReaderAction.GoForward()) }) {
-            Icon(IridiumIcons.Next, contentDescription = "Next")
         }
     }
 }

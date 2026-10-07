@@ -1,6 +1,5 @@
 package com.iridium.feature.library.impl
 
-import android.net.Uri
 import com.iridium.core.data.ContentHit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryFilter
@@ -19,8 +18,6 @@ data class LibraryUiState(
     val refreshing: Boolean,
     val filterOpen: Boolean,
     val searchOpen: Boolean,
-    /** True once a source folder has been linked. */
-    val linked: Boolean,
     /** In-progress books by recency, backing the continue shelf. */
     val continueReading: List<Book>,
     /** Determinate scan progress (done/total); null when idle. */
@@ -29,6 +26,13 @@ data class LibraryUiState(
     val contentHits: List<ContentHit> = emptyList(),
     /** True while chapter text is being indexed for search. */
     val indexing: Boolean = false,
+    /** Persisted display options (card density, grid width). */
+    val display: com.iridium.core.model.LibraryDisplay =
+        com.iridium.core.model.LibraryDisplay(),
+    /** Book id for the open quick-actions sheet; null when closed. */
+    val menuBookId: String? = null,
+    /** True while the menu's remove-confirm dialog is showing. */
+    val menuDeleteConfirm: Boolean = false,
 ) {
     val isEmpty: Boolean get() = books.isEmpty()
 }
@@ -44,16 +48,30 @@ sealed interface LibraryAction {
     data object OpenFilter : LibraryAction
     data object CloseFilter : LibraryAction
     data object ToggleSearch : LibraryAction
+    data class DisplayModeSelected(val mode: com.iridium.core.model.LibraryDisplayMode) : LibraryAction
+    data class GridColumnsSelected(val columns: Int) : LibraryAction
     data object Rescan : LibraryAction
-
-    /** A SAF folder picked for linking; its EPUBs are indexed in place. */
-    data class LinkFolder(val uri: Uri) : LibraryAction
 
     /** Extracts chapter text for every book so content search has data. */
     data object IndexLibrary : LibraryAction
 
     /** Unlinks a book (the user's original file is never touched). */
     data class RemoveBook(val bookId: String) : LibraryAction
+
+    /** Opens the long-press quick-actions sheet for a book. */
+    data class OpenMenu(val bookId: String) : LibraryAction
+
+    /** Closes the quick-actions sheet and any confirm dialog. */
+    data object CloseMenu : LibraryAction
+
+    /** Toggles the bookmark flag of the book in the open menu. */
+    data object ToggleMenuBookmark : LibraryAction
+
+    /** Shows the remove-confirm dialog inside the open menu. */
+    data object OpenMenuDelete : LibraryAction
+
+    /** Confirms removal of the book in the open menu. */
+    data object ConfirmMenuDelete : LibraryAction
 }
 
 /** One-shot library messages; the UI maps each to localized copy. */

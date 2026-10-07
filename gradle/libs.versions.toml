@@ -21,6 +21,8 @@ lifecycle = "2.8.6"
 activityCompose = "1.9.3"
 hilt = "2.57.2"
 hiltNavigationCompose = "1.2.0"
+# Haze 1.6.10: last line compiling against SDK 35 (1.7.x needs 37).
+haze = "1.6.10"
 ksp = "2.1.21-2.0.2"
 room = "2.7.0"
 datastore = "1.1.1"
@@ -28,7 +30,6 @@ coil = "3.0.4"
 turbine = "1.1.0"
 serialization = "1.7.3"
 javapoet = "1.13.0"
-documentfile = "1.0.1"
 readium = "3.1.1"
 binaryCompatibilityValidator = "0.17.0"
 pulsar = "1.3.0"
@@ -74,7 +75,6 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
-androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 
 # Images
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
@@ -94,6 +94,10 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 # Expressive UI & Haptics
 androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes-android", version.ref = "graphics-shapes" }
 pulsar = { group = "com.swmansion", name = "pulsar", version.ref = "pulsar" }
+
+# Expressive blur-behind-chrome (reader top/bottom bars)
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
+haze-materials = { group = "dev.chrisbanes.haze", name = "haze-materials", version.ref = "haze" }
 
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }

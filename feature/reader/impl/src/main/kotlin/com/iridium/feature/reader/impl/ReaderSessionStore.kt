@@ -32,6 +32,13 @@ sealed interface ReaderSessionEvent {
 
     /** A resource failed to load inside the navigator. */
     data object ResourceFailed : ReaderSessionEvent
+
+    /**
+     * The user's text selection changed. Non-null [text] is the freshly
+     * selected word/phrase (highlight text from the selection locator);
+     * null means the selection was cleared (tap, page turn, dismiss).
+     */
+    data class SelectionChanged(val text: String?) : ReaderSessionEvent
 }
 
 /**
@@ -66,6 +73,15 @@ class ReaderSessionStore @Inject constructor() {
 
     private val _latestLocator = MutableStateFlow<Locator?>(null)
     val latestLocator: StateFlow<Locator?> = _latestLocator
+
+    /**
+     * Currently selected word/phrase, from the navigator's selection
+     * locator highlight text. Drives the dictionary lookup popup; null
+     * when nothing is selected. Owned by the host fragment (writes) and
+     * observed by the reader screen/ViewModel (reads).
+     */
+    private val _selectedText = MutableStateFlow<String?>(null)
+    val selectedText: StateFlow<String?> = _selectedText.asStateFlow()
 
     /** True once [publish] has run; the reader host may attach only then. */
     private val _sessionReady = MutableStateFlow(false)
@@ -111,6 +127,23 @@ class ReaderSessionStore @Inject constructor() {
 
     fun onLocator(locator: Locator) {
         _latestLocator.value = locator
+        // A page turn invalidates any active text selection.
+        clearSelection()
+    }
+
+    /** Records a fresh user selection and notifies popup listeners. */
+    fun onSelection(text: String) {
+        val cleaned = text.trim()
+        if (cleaned.isEmpty()) return
+        _selectedText.value = cleaned
+        tryEmit(ReaderSessionEvent.SelectionChanged(cleaned))
+    }
+
+    /** Clears the active selection; no-op (no event) when already empty. */
+    fun clearSelection() {
+        if (_selectedText.value == null) return
+        _selectedText.value = null
+        tryEmit(ReaderSessionEvent.SelectionChanged(null))
     }
 
     suspend fun emit(event: ReaderSessionEvent) {
@@ -129,6 +162,7 @@ class ReaderSessionStore @Inject constructor() {
     private fun closeCurrent() {
         navigator = null
         _latestLocator.value = null
+        _selectedText.value = null
         runCatching { publication?.close() }
         publication = null
         navigatorFactory = null

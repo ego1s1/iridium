@@ -1,5 +1,6 @@
 package com.iridium.feature.reader.impl
 
+import android.view.KeyEvent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -60,6 +62,7 @@ class ReaderViewModel @Inject constructor(
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private var chromeJob: Job? = null
+    private var dictionaryJob: Job? = null
     /** Publication positions for the slider/position text (no fixed pages). */
     private var positionsCache: List<Locator> = emptyList()
 
@@ -116,6 +119,8 @@ class ReaderViewModel @Inject constructor(
                 highlightsOpen = hlOpen,
                 progression = (b.progress.takeIf { prog == 0f } ?: prog),
                 positionText = positionText(),
+                positionIndex = positionIndexAndCount().first,
+                positionCount = positionIndexAndCount().second,
                 focusedHighlightId = focused,
                 navigatorAttached = attached,
             )
@@ -142,6 +147,16 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             // Re-apply decorations whenever the highlight list changes.
             highlights.collect { applyDecorations(it) }
+        }
+        viewModelScope.launch {
+            // Mori PageChanged -> hide parity: any locator change (page turn)
+            // hides the chrome; the pending auto-hide timer is redundant then.
+            store.latestLocator.collect { locator ->
+                if (locator != null) {
+                    chromeVisible.value = false
+                    chromeJob?.cancel()
+                }
+            }
         }
         scheduleChromeHide()
     }
@@ -179,20 +194,45 @@ class ReaderViewModel @Inject constructor(
                 focusedHighlightId.value = null
                 scheduleChromeHide()
             }
-            is ReaderAction.SeekTo -> seekTo(action.progression)
+            ReaderAction.DismissDictionary -> dismissDictionary()
+            is ReaderAction.SeekTo -> {
+                seekTo(action.progression)
+                scheduleChromeHide()
+            }
             is ReaderAction.GoTocEntry -> goTocEntry(action.entry)
-            is ReaderAction.GoForward -> store.navigator?.goForward(action.animated)
-            is ReaderAction.GoBackward -> store.navigator?.goBackward(action.animated)
+            is ReaderAction.GoForward -> {
+                store.navigator?.goForward(action.animated)
+                scheduleChromeHide()
+            }
+            is ReaderAction.GoBackward -> {
+                store.navigator?.goBackward(action.animated)
+                scheduleChromeHide()
+            }
             is ReaderAction.AddHighlight -> addHighlight(action.color, action.note)
             is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
             is ReaderAction.SetFlow -> updateReaderPrefs { it.copy(flow = action.flow) }
             is ReaderAction.SetFontScale -> updateReaderPrefs {
                 it.copy(fontScale = action.scale.coerceIn(0.5f, 3f))
             }
+            is ReaderAction.SetLineHeight -> updateReaderPrefs {
+                it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f))
+            }
             is ReaderAction.SetTextAlign -> updateReaderPrefs { it.copy(textAlign = action.align) }
             is ReaderAction.SetTheme -> updateReaderPrefs { it.copy(theme = action.theme) }
             is ReaderAction.SetBrightness -> updateReaderPrefs {
                 it.copy(brightness = action.brightness.coerceIn(-1f, 1f))
+            }
+            is ReaderAction.SetKeepScreenOn -> updateReaderPrefs {
+                it.copy(keepScreenOn = action.enabled)
+            }
+            is ReaderAction.SetShowPageCounter -> updateReaderPrefs {
+                it.copy(showPageCounter = action.enabled)
+            }
+            is ReaderAction.SetVolumeKeys -> updateReaderPrefs {
+                it.copy(volumeKeys = action.enabled)
+            }
+            is ReaderAction.SetVolumeKeysInverted -> updateReaderPrefs {
+                it.copy(volumeKeysInverted = action.inverted)
             }
         }
     }
@@ -262,7 +302,15 @@ class ReaderViewModel @Inject constructor(
     private suspend fun handleSessionEvent(event: ReaderSessionEvent) {
         when (event) {
             ReaderSessionEvent.SessionLost -> messageChannel.send(ReaderMessage.Pop)
-            ReaderSessionEvent.ContentTapped -> toggleChrome()
+            ReaderSessionEvent.ContentTapped -> {
+                // A content tap with the dictionary open dismisses the popup
+                // instead of toggling chrome.
+                if (_dictionaryUi.value != null) {
+                    dismissDictionary()
+                } else {
+                    toggleChrome()
+                }
+            }
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
                 // Fresh navigator: submit current prefs + decorations.
@@ -280,6 +328,7 @@ class ReaderViewModel @Inject constructor(
                 messageChannel.send(ReaderMessage.OpenUrl(event.url))
             ReaderSessionEvent.ResourceFailed ->
                 messageChannel.send(ReaderMessage.Text("Couldn't load part of this book"))
+            is ReaderSessionEvent.SelectionChanged -> onSelectionChanged(event.text)
         }
     }
 
@@ -296,6 +345,79 @@ class ReaderViewModel @Inject constructor(
                 chromeVisible.value = false
             }
         }
+    }
+
+    /**
+     * Volume-key paging gate (Mori parity): volume keys turn pages only while
+     * paging is enabled, the chrome is hidden, and no sheet is open — so
+     * volume always works normally everywhere else.
+     */
+    fun isVolumePagingActive(): Boolean {
+        val state = uiState.value as? ReaderUiState.Ready ?: return false
+        return isVolumePagingActive(state)
+    }
+
+    private fun isVolumePagingActive(state: ReaderUiState.Ready): Boolean {
+        return state.prefs.volumeKeys &&
+            !state.chromeVisible &&
+            !state.settingsOpen && !state.tocOpen && !state.highlightsOpen
+    }
+
+    /**
+     * Handles a hardware key event for volume-key paging. Consumes key-down
+     * (plus repeats) and key-up so the system volume panel never appears
+     * during a page turn; navigates only on key-up. When
+     * `prefs.volumeKeysInverted` is on, volume-down goes back and volume-up
+     * goes forward.
+     *
+     * @return true when the event was consumed.
+     */
+    fun onVolumeKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN &&
+            event.keyCode != KeyEvent.KEYCODE_VOLUME_UP
+        ) {
+            return false
+        }
+        val state = uiState.value as? ReaderUiState.Ready ?: return false
+        if (!isVolumePagingActive(state)) return false
+        if (event.action == KeyEvent.ACTION_UP) {
+            val forward = if (state.prefs.volumeKeysInverted) {
+                event.keyCode == KeyEvent.KEYCODE_VOLUME_UP
+            } else {
+                event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+            }
+            onAction(if (forward) ReaderAction.GoForward() else ReaderAction.GoBackward())
+        }
+        return true
+    }
+
+    private val dictionaryLookup = HttpDictionaryLookup()
+    private val _dictionaryUi = MutableStateFlow<DictionaryUiState?>(null)
+    val dictionaryUi: StateFlow<DictionaryUiState?> = _dictionaryUi.asStateFlow()
+
+    private fun onSelectionChanged(text: String?) {
+        dictionaryJob?.cancel()
+        if (text.isNullOrBlank()) {
+            _dictionaryUi.value = null
+            return
+        }
+        _dictionaryUi.value = DictionaryUiState(word = text, loading = true)
+        dictionaryJob = viewModelScope.launch {
+            val result = dictionaryLookup.define(text)
+            _dictionaryUi.value = result.fold(
+                onSuccess = { DictionaryUiState(word = text, definition = it) },
+                onFailure = {
+                    DictionaryUiState(word = text, error = it.message ?: "Couldn't look up this word")
+                },
+            )
+        }
+    }
+
+    private fun dismissDictionary() {
+        dictionaryJob?.cancel()
+        _dictionaryUi.value = null
+        store.clearSelection()
+        runCatching { store.navigator?.clearSelection() }
     }
 
     // Navigation + annotations
@@ -371,18 +493,25 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun positionText(): String? {
+        val (index, count) = positionIndexAndCount()
+        if (count == 0) return null
+        return "${index + 1} / $count"
+    }
+
+    /** 0-based position index + total count from the cached positions table. */
+    private fun positionIndexAndCount(): Pair<Int, Int> {
         val positions = positionsCache
-        if (positions.isEmpty()) return null
-        val current = store.latestLocator.value ?: return "1 / ${positions.size}"
+        if (positions.isEmpty()) return 0 to 0
+        val current = store.latestLocator.value ?: return 0 to positions.size
         val index = positions.indexOfFirst { it.href == current.href }
         // Fallback to nearest by total progression when hrefs diverge.
         val pos = if (index >= 0) {
-            index + 1
+            index
         } else {
             ((current.locations.totalProgression ?: 0.0) * positions.size).toInt()
-                .coerceIn(1, positions.size)
+                .coerceIn(0, positions.size - 1)
         }
-        return "$pos / ${positions.size}"
+        return pos to positions.size
     }
 
     private fun updateReaderPrefs(transform: (com.iridium.core.model.ReaderPreferences) -> com.iridium.core.model.ReaderPreferences) {
