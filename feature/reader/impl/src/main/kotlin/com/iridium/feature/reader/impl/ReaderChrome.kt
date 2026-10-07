@@ -100,15 +100,11 @@ enum class ChromeTapZone {
 /**
  * Tap-zone layout modes (Mori `ReaderNavMode` parity).
  * DISABLED routes every tap to MENU (chrome toggle only).
+ *
+ * Alias of the model-owned [TapZoneMode] so prefs and datastore can persist
+ * the selection; existing `ChromeNavMode.X` references keep compiling.
  */
-enum class ChromeNavMode {
-    DEFAULT,
-    L_SHAPE,
-    KINDLISH,
-    EDGE,
-    RIGHT_AND_LEFT,
-    DISABLED,
-}
+typealias ChromeNavMode = com.iridium.core.model.TapZoneMode
 
 /** Stateless chrome configuration; the host owns persistence/wiring. */
 data class ReaderChromeConfig(
@@ -148,6 +144,10 @@ object ReaderChromeTestTags {
     const val EpubHighlightsButton = "chromeEpubHighlights"
     const val EpubSettingsButton = "chromeEpubSettings"
     const val TapZoneOverlay = "chromeTapZoneOverlay"
+    const val TapZoneInvertNone = "tapZoneInvertNone"
+    const val TapZoneInvertHorizontal = "tapZoneInvertHorizontal"
+    const val TapZoneInvertVertical = "tapZoneInvertVertical"
+    const val TapZoneInvertBoth = "tapZoneInvertBoth"
 
     fun navCardFor(mode: ChromeNavMode): String = "chromeNavCard:${mode.name}"
 }
@@ -183,6 +183,15 @@ fun progressionForIndex(index: Int, count: Int): Float {
 fun canChromeGoForward(index: Int, count: Int): Boolean = index < count - 1
 
 fun canChromeGoBackward(index: Int): Boolean = index > 0
+
+/** Warm scrim color for night light at [intensity] 0f..1f (max 40% alpha). */
+fun nightLightColor(intensity: Float): Color {
+    val alpha = (intensity.coerceIn(0f, 1f) * MaxNightLightAlpha * 255f)
+        .roundToInt().coerceIn(0, 255)
+    return Color(red = 0xFF, green = 0x9E, blue = 0x42, alpha = alpha)
+}
+
+private const val MaxNightLightAlpha = 0.4f
 
 /** "12 / 173" style counter; [oneBased] is 1-based. */
 fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total"

@@ -135,12 +135,24 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
         store.tryEmit(ReaderSessionEvent.ExternalLink(url.toString()))
     }
 
-    /** Center-tap toggles chrome; never consumed so links keep working. */
+    /** Content taps route through the tap-zone map; links keep working. */
     private val chromeTapListener = object : InputListener {
         override fun onTap(event: TapEvent): Boolean {
             // A content tap dismisses any active selection (and its popup).
             store.clearSelection()
-            store.tryEmit(ReaderSessionEvent.ContentTapped)
+            val view = navigator?.view
+            val width = view?.width ?: 0
+            val height = view?.height ?: 0
+            if (width > 0 && height > 0) {
+                store.tryEmit(
+                    ReaderSessionEvent.ContentTappedAt(
+                        fractionX = event.point.x / width,
+                        fractionY = event.point.y / height,
+                    ),
+                )
+            } else {
+                store.tryEmit(ReaderSessionEvent.ContentTapped)
+            }
             return false
         }
 

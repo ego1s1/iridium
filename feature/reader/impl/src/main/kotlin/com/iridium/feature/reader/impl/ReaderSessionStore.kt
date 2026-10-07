@@ -24,6 +24,13 @@ sealed interface ReaderSessionEvent {
     /** A tap on the content (chrome toggle). */
     data object ContentTapped : ReaderSessionEvent
 
+    /**
+     * A tap at a position inside the content, as fractions of the navigator
+     * view (0f..1f). Powers tap-zone page turns; falls back to a chrome
+     * toggle when the position is unavailable.
+     */
+    data class ContentTappedAt(val fractionX: Float, val fractionY: Float) : ReaderSessionEvent
+
     /** The user tapped a highlight decoration. */
     data class DecorationTapped(val decorationId: String) : ReaderSessionEvent
 

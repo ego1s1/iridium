@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -255,6 +256,16 @@ internal fun ReaderScreen(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
                 )
             }
+        }
+        // Night light: warm scrim above the page, below the chrome. Purely
+        // visual — it never resizes or repaginates content, and it carries
+        // no touch handling so taps fall through to the book.
+        if (state.prefs.nightLight) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(nightLightColor(state.prefs.nightLightIntensity)),
+            )
         }
         AnimatedVisibility(
             visible = state.chromeVisible,

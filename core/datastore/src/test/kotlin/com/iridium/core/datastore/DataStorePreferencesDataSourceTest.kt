@@ -9,6 +9,8 @@ import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ReadingFlow
+import com.iridium.core.model.TapInvertMode
+import com.iridium.core.model.TapZoneMode
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import java.io.File
@@ -83,6 +85,10 @@ class DataStorePreferencesDataSourceTest {
                 showPageCounter = false,
                 volumeKeys = true,
                 volumeKeysInverted = true,
+                tapZoneMode = TapZoneMode.KINDLISH,
+                tapZoneInvert = TapInvertMode.BOTH,
+                nightLight = true,
+                nightLightIntensity = 0.6f,
                 pageMargins = 1.5f,
                 lineHeight = 1.8f,
             )
@@ -97,6 +103,10 @@ class DataStorePreferencesDataSourceTest {
         assertFalse(reader.showPageCounter)
         assertTrue(reader.volumeKeys)
         assertTrue(reader.volumeKeysInverted)
+        assertEquals(TapZoneMode.KINDLISH, reader.tapZoneMode)
+        assertEquals(TapInvertMode.BOTH, reader.tapZoneInvert)
+        assertTrue(reader.nightLight)
+        assertEquals(0.6f, reader.nightLightIntensity)
         assertEquals(1.5f, reader.pageMargins)
         assertEquals(1.8f, reader.lineHeight)
     }

@@ -18,7 +18,11 @@ android {
             }
         }
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            // 64-bit only: Play's 16 KB page-size gate applies to 64-bit ABIs, and the
+            // NDK's prebuilt 32-bit libc++_shared.so stays 4 KB-aligned. Every modern
+            // device (including all 16 KB-page devices) is 64-bit, so shipping
+            // armeabi-v7a would only add size plus an unwinnable Play warning.
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 

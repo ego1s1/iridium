@@ -234,6 +234,18 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetVolumeKeysInverted -> updateReaderPrefs {
                 it.copy(volumeKeysInverted = action.inverted)
             }
+            is ReaderAction.SetTapZoneMode -> updateReaderPrefs {
+                it.copy(tapZoneMode = action.mode)
+            }
+            is ReaderAction.SetTapZoneInvert -> updateReaderPrefs {
+                it.copy(tapZoneInvert = action.mode)
+            }
+            is ReaderAction.SetNightLight -> updateReaderPrefs {
+                it.copy(nightLight = action.enabled)
+            }
+            is ReaderAction.SetNightLightIntensity -> updateReaderPrefs {
+                it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
+            }
         }
     }
 
@@ -311,6 +323,8 @@ class ReaderViewModel @Inject constructor(
                     toggleChrome()
                 }
             }
+            is ReaderSessionEvent.ContentTappedAt ->
+                handleZonedTap(event.fractionX, event.fractionY)
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
                 // Fresh navigator: submit current prefs + decorations.
@@ -335,6 +349,38 @@ class ReaderViewModel @Inject constructor(
     private fun toggleChrome() {
         chromeVisible.update { !it }
         if (chromeVisible.value) scheduleChromeHide() else chromeJob?.cancel()
+    }
+
+    /**
+     * Routes a positioned content tap through the tap-zone map: outer
+     * partitions turn positions, the center toggles chrome (user-confirmed).
+     * Links keep working — Readium follows those before listeners run.
+     */
+    private suspend fun handleZonedTap(fractionX: Float, fractionY: Float) {
+        if (_dictionaryUi.value != null) {
+            dismissDictionary()
+            return
+        }
+        val prefs = preferences.readerPreferences.first()
+        when (
+            chromeZoneForTap(
+                fractionX,
+                fractionY,
+                ChromeReadingDirection.LEFT_TO_RIGHT,
+                prefs.tapZoneMode,
+                prefs.tapZoneInvert,
+            )
+        ) {
+            ChromeTapZone.PREV -> {
+                store.navigator?.goBackward(true)
+                scheduleChromeHide()
+            }
+            ChromeTapZone.NEXT -> {
+                store.navigator?.goForward(true)
+                scheduleChromeHide()
+            }
+            ChromeTapZone.MENU -> toggleChrome()
+        }
     }
 
     private fun scheduleChromeHide() {

@@ -34,4 +34,19 @@
     <string name="reader_settings_volume_keys">Volume keys turn pages</string>
     <string name="reader_settings_volume_invert">Invert volume keys</string>
     <string name="reader_settings_page_counter">Show page counter</string>
+    <string name="reader_settings_tap_zones">Tap zones</string>
+    <string name="reader_settings_tap_zones_body">Outer partitions turn pages; the center toggles chrome.</string>
+    <string name="reader_settings_invert_none">Off</string>
+    <string name="reader_settings_invert_horizontal">Horizontal</string>
+    <string name="reader_settings_invert_vertical">Vertical</string>
+    <string name="reader_settings_invert_both">Both</string>
+    <string name="reader_settings_night_light">Night light</string>
+    <string name="reader_settings_night_light_body">Warm tint for late reading. Slightly lifts pure black.</string>
+    <string name="reader_settings_night_light_intensity">Warmth</string>
+    <string name="reader_settings_nav_default">Default</string>
+    <string name="reader_settings_nav_l_shape">L-shape</string>
+    <string name="reader_settings_nav_kindlish">Kindlish</string>
+    <string name="reader_settings_nav_edge">Edge</string>
+    <string name="reader_settings_nav_sides">Sides</string>
+    <string name="reader_settings_nav_off">Off</string>
 </resources>

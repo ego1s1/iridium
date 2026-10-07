@@ -68,6 +68,10 @@ sealed interface ReaderAction {
     data class SetShowPageCounter(val enabled: Boolean) : ReaderAction
     data class SetVolumeKeys(val enabled: Boolean) : ReaderAction
     data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction
+    data class SetTapZoneMode(val mode: com.iridium.core.model.TapZoneMode) : ReaderAction
+    data class SetTapZoneInvert(val mode: com.iridium.core.model.TapInvertMode) : ReaderAction
+    data class SetNightLight(val enabled: Boolean) : ReaderAction
+    data class SetNightLightIntensity(val intensity: Float) : ReaderAction
 }
 
 /** One-shot UI messages. */

@@ -285,13 +285,14 @@ fun ChromeNavModeChoiceCards(
     }
 }
 
+@Composable
 fun chromeNavModeLabel(mode: ChromeNavMode): String = when (mode) {
-    ChromeNavMode.DEFAULT -> "Default"
-    ChromeNavMode.L_SHAPE -> "L-shape"
-    ChromeNavMode.KINDLISH -> "Kindlish"
-    ChromeNavMode.EDGE -> "Edge"
-    ChromeNavMode.RIGHT_AND_LEFT -> "Sides"
-    ChromeNavMode.DISABLED -> "Off"
+    ChromeNavMode.DEFAULT -> stringResource(R.string.reader_settings_nav_default)
+    ChromeNavMode.L_SHAPE -> stringResource(R.string.reader_settings_nav_l_shape)
+    ChromeNavMode.KINDLISH -> stringResource(R.string.reader_settings_nav_kindlish)
+    ChromeNavMode.EDGE -> stringResource(R.string.reader_settings_nav_edge)
+    ChromeNavMode.RIGHT_AND_LEFT -> stringResource(R.string.reader_settings_nav_sides)
+    ChromeNavMode.DISABLED -> stringResource(R.string.reader_settings_nav_off)
 }
 
 @Composable

@@ -10,6 +10,7 @@ import com.iridium.core.testing.TestData
 import com.iridium.core.testing.TestDispatcherRule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -77,5 +78,31 @@ class ReaderViewModelTest {
         assertFalse(viewModel.sessionReady.value)
         store.failOpen()
         assertFalse(viewModel.sessionReady.value)
+    }
+
+    @Test
+    fun `tap zone and night light prefs persist through actions`() = runTest {
+        viewModel.onAction(
+            ReaderAction.SetTapZoneMode(com.iridium.core.model.TapZoneMode.KINDLISH),
+        )
+        viewModel.onAction(
+            ReaderAction.SetTapZoneInvert(com.iridium.core.model.TapInvertMode.BOTH),
+        )
+        viewModel.onAction(ReaderAction.SetNightLight(true))
+        viewModel.onAction(ReaderAction.SetNightLightIntensity(0.6f))
+
+        val prefs = preferences.readerPreferences.first()
+        assertEquals(com.iridium.core.model.TapZoneMode.KINDLISH, prefs.tapZoneMode)
+        assertEquals(com.iridium.core.model.TapInvertMode.BOTH, prefs.tapZoneInvert)
+        assertTrue(prefs.nightLight)
+        assertEquals(0.6f, prefs.nightLightIntensity, 0.0001f)
+    }
+
+    @Test
+    fun `night light intensity clamps to the 0 to 1 range`() = runTest {
+        viewModel.onAction(ReaderAction.SetNightLightIntensity(99f))
+        assertEquals(1f, preferences.readerPreferences.first().nightLightIntensity, 0.0001f)
+        viewModel.onAction(ReaderAction.SetNightLightIntensity(-99f))
+        assertEquals(0f, preferences.readerPreferences.first().nightLightIntensity, 0.0001f)
     }
 }
