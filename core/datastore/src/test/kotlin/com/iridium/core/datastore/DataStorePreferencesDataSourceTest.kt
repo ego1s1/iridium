@@ -3,14 +3,14 @@ package com.iridium.core.datastore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ReadingFlow
-import com.iridium.core.model.TapInvertMode
-import com.iridium.core.model.TapZoneMode
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import java.io.File
@@ -56,6 +56,21 @@ class DataStorePreferencesDataSourceTest {
     }
 
     @Test
+    fun `legacy four-way invert migrates to the single switch`() = runTest {
+        dataStore.edit {
+            it[stringPreferencesKey("tap_zone_invert")] = "HORIZONTAL"
+        }
+        assertTrue(source.readerPreferences.first().invertTaps)
+
+        dataStore.edit {
+            it[stringPreferencesKey("tap_zone_invert")] = "VERTICAL"
+        }
+        // Toggle the new key once so the write path drops legacy keys.
+        source.updateReaderPreferences { it.copy(invertTaps = false) }
+        assertFalse(source.readerPreferences.first().invertTaps)
+    }
+
+    @Test
     fun `theme preferences round-trip`() = runTest {
         source.updateThemePreferences {
             it.copy(
@@ -85,8 +100,7 @@ class DataStorePreferencesDataSourceTest {
                 showPageCounter = false,
                 volumeKeys = true,
                 volumeKeysInverted = true,
-                tapZoneMode = TapZoneMode.KINDLISH,
-                tapZoneInvert = TapInvertMode.BOTH,
+                invertTaps = true,
                 nightLight = true,
                 nightLightIntensity = 0.6f,
                 pageMargins = 1.5f,
@@ -103,8 +117,7 @@ class DataStorePreferencesDataSourceTest {
         assertFalse(reader.showPageCounter)
         assertTrue(reader.volumeKeys)
         assertTrue(reader.volumeKeysInverted)
-        assertEquals(TapZoneMode.KINDLISH, reader.tapZoneMode)
-        assertEquals(TapInvertMode.BOTH, reader.tapZoneInvert)
+        assertTrue(reader.invertTaps)
         assertTrue(reader.nightLight)
         assertEquals(0.6f, reader.nightLightIntensity)
         assertEquals(1.5f, reader.pageMargins)

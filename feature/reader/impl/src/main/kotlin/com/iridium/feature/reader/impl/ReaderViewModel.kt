@@ -18,6 +18,7 @@ import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +57,7 @@ class ReaderViewModel @Inject constructor(
 
     private val chromeVisible = MutableStateFlow(true)
     private val settingsOpen = MutableStateFlow(false)
+    private val themeSheetOpen = MutableStateFlow(false)
     private val tocOpen = MutableStateFlow(false)
     private val highlightsOpen = MutableStateFlow(false)
     private val focusedHighlightId = MutableStateFlow<String?>(null)
@@ -90,6 +92,7 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = combine(
         book, toc, highlights, preferences.readerPreferences, chromeVisible, settingsOpen, tocOpen,
         highlightsOpen, focusedHighlightId, navigatorAttached, openFailed, progression,
+        themeSheetOpen,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val b = args[0] as Book?
@@ -104,6 +107,7 @@ class ReaderViewModel @Inject constructor(
         val attached = args[9] as Boolean
         val failed = args[10] as Boolean
         val prog = args[11] as Float
+        val themeSheet = args[12] as Boolean
         when {
             b == null && failed -> ReaderUiState.OpenFailed
             b == null -> ReaderUiState.Gone
@@ -123,6 +127,7 @@ class ReaderViewModel @Inject constructor(
                 positionCount = positionIndexAndCount().second,
                 focusedHighlightId = focused,
                 navigatorAttached = attached,
+                themeSheetOpen = themeSheet,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -166,7 +171,6 @@ class ReaderViewModel @Inject constructor(
     fun onAction(action: ReaderAction) {
         when (action) {
             ReaderAction.Back -> viewModelScope.launch { messageChannel.send(ReaderMessage.Pop) }
-            ReaderAction.ContentTapped -> toggleChrome()
             ReaderAction.OpenSettings -> {
                 settingsOpen.value = true
                 chromeVisible.value = true
@@ -174,6 +178,15 @@ class ReaderViewModel @Inject constructor(
             }
             ReaderAction.CloseSettings -> {
                 settingsOpen.value = false
+                scheduleChromeHide()
+            }
+            ReaderAction.OpenThemeSheet -> {
+                themeSheetOpen.value = true
+                chromeVisible.value = true
+                chromeJob?.cancel()
+            }
+            ReaderAction.CloseThemeSheet -> {
+                themeSheetOpen.value = false
                 scheduleChromeHide()
             }
             ReaderAction.OpenToc -> {
@@ -220,8 +233,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetShowPageCounter,
             is ReaderAction.SetVolumeKeys,
             is ReaderAction.SetVolumeKeysInverted,
-            is ReaderAction.SetTapZoneMode,
-            is ReaderAction.SetTapZoneInvert,
+            is ReaderAction.SetInvertTaps,
             is ReaderAction.SetNightLight,
             is ReaderAction.SetNightLightIntensity,
             -> onPrefsAction(action)
@@ -255,11 +267,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetVolumeKeysInverted -> updateReaderPrefs {
                 it.copy(volumeKeysInverted = action.inverted)
             }
-            is ReaderAction.SetTapZoneMode -> updateReaderPrefs {
-                it.copy(tapZoneMode = action.mode)
-            }
-            is ReaderAction.SetTapZoneInvert -> updateReaderPrefs {
-                it.copy(tapZoneInvert = action.mode)
+            is ReaderAction.SetInvertTaps -> updateReaderPrefs {
+                it.copy(invertTaps = action.inverted)
             }
             is ReaderAction.SetNightLight -> updateReaderPrefs {
                 it.copy(nightLight = action.enabled)
@@ -374,23 +383,23 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Routes a positioned content tap through the tap-zone map: outer
-     * partitions turn positions, the center toggles chrome (user-confirmed).
-     * Links keep working — Readium follows those before listeners run.
+     * Routes a positioned content tap through the fixed tap zones: outer
+     * thirds turn positions, the center toggles chrome (optionally mirrored
+     * by the invert-taps switch). Links keep working — Readium follows those
+     * before listeners run.
      */
     private suspend fun handleZonedTap(fractionX: Float, fractionY: Float) {
         if (_dictionaryUi.value != null) {
             dismissDictionary()
             return
         }
-        val prefs = preferences.readerPreferences.first()
+        val invert = preferences.readerPreferences.first().invertTaps
         when (
             chromeZoneForTap(
                 fractionX,
                 fractionY,
                 ChromeReadingDirection.LEFT_TO_RIGHT,
-                prefs.tapZoneMode,
-                prefs.tapZoneInvert,
+                invert,
             )
         ) {
             ChromeTapZone.PREV -> {
@@ -409,7 +418,9 @@ class ReaderViewModel @Inject constructor(
         chromeJob?.cancel()
         chromeJob = viewModelScope.launch {
             delay(CHROME_AUTO_HIDE_MS)
-            if (!settingsOpen.value && !tocOpen.value && !highlightsOpen.value) {
+            if (!settingsOpen.value && !themeSheetOpen.value &&
+                !tocOpen.value && !highlightsOpen.value
+            ) {
                 chromeVisible.value = false
             }
         }
@@ -428,7 +439,8 @@ class ReaderViewModel @Inject constructor(
     private fun isVolumePagingActive(state: ReaderUiState.Ready): Boolean {
         return state.prefs.volumeKeys &&
             !state.chromeVisible &&
-            !state.settingsOpen && !state.tocOpen && !state.highlightsOpen
+            !state.settingsOpen && !state.themeSheetOpen &&
+            !state.tocOpen && !state.highlightsOpen
     }
 
     /**
@@ -465,17 +477,28 @@ class ReaderViewModel @Inject constructor(
 
     private fun onSelectionChanged(text: String?) {
         dictionaryJob?.cancel()
-        if (text.isNullOrBlank()) {
+        val query = text?.trim().orEmpty()
+        if (query.isBlank()) {
             _dictionaryUi.value = null
             return
         }
-        _dictionaryUi.value = DictionaryUiState(word = text, loading = true)
         dictionaryJob = viewModelScope.launch {
-            val result = dictionaryLookup.define(text)
+            // Lookup starts immediately; the popup itself waits a beat. Cache
+            // hits resolve inside the delay (popup appears once, with content)
+            // while slow network lookups show a skeleton instead of flashing.
+            val lookup = async { dictionaryLookup.define(query) }
+            delay(DICTIONARY_REVEAL_DELAY_MS)
+            if (!lookup.isCompleted) {
+                _dictionaryUi.value = DictionaryUiState(word = query, loading = true)
+            }
+            val result = lookup.await()
             _dictionaryUi.value = result.fold(
-                onSuccess = { DictionaryUiState(word = text, definition = it) },
+                onSuccess = { DictionaryUiState(word = query, definition = it) },
                 onFailure = {
-                    DictionaryUiState(word = text, error = it.message ?: "Couldn't look up this word")
+                    DictionaryUiState(
+                        word = query,
+                        error = it.message ?: "Couldn't look up this word",
+                    )
                 },
             )
         }
@@ -611,6 +634,12 @@ class ReaderViewModel @Inject constructor(
 
     private companion object {
         const val CHROME_AUTO_HIDE_MS = 3000L
+
+        /**
+         * Grace period before the dictionary popup reveals: lookups finishing
+         * inside it (cache hits) skip the loading skeleton entirely.
+         */
+        const val DICTIONARY_REVEAL_DELAY_MS = 200L
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
         const val DECORATION_GROUP = "highlights"
     }

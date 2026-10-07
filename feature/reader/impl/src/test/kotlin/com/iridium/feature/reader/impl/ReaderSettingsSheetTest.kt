@@ -1,15 +1,15 @@
 package com.iridium.feature.reader.impl
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.iridium.core.designsystem.IridiumTheme
+import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.ReaderPreferences
-import com.iridium.core.model.TapInvertMode
-import com.iridium.core.model.TapZoneMode
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -19,9 +19,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Live settings sheet coverage for tap zones and night light: rows render,
- * selections dispatch the persisted actions, and the zone preview reflects
- * the current mode.
+ * Live settings sheet coverage for tap inversion and night light: rows
+ * render, selections dispatch the persisted actions.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -44,27 +43,35 @@ class ReaderSettingsSheetTest {
     }
 
     @Test
-    fun `tap zones section renders with preview and invert options`() {
+    fun `invert switch renders off by default`() {
         setSheet()
 
-        composeTestRule.onNodeWithText("Tap zones").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.TapZoneInvertNone).performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Horizontal").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Vertical").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Both").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Invert tap zones").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Invert tap zones").assertIsOff()
     }
 
     @Test
-    fun `invert selection dispatches the persisted action`() {
+    fun `invert switch reflects prefs and dispatches the persisted action`() {
+        val actions = mutableListOf<ReaderAction>()
+        setSheet(
+            prefs = ReaderPreferences(invertTaps = true),
+            onAction = actions::add,
+        )
+
+        composeTestRule.onNodeWithText("Invert tap zones").performScrollTo().assertIsOn()
+        composeTestRule.onNodeWithText("Invert tap zones").performClick()
+
+        assertEquals(listOf(ReaderAction.SetInvertTaps(false)), actions)
+    }
+
+    @Test
+    fun `enabling invert dispatches true`() {
         val actions = mutableListOf<ReaderAction>()
         setSheet(onAction = actions::add)
 
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.TapZoneInvertBoth).performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Invert tap zones").performScrollTo().performClick()
 
-        assertEquals(
-            listOf(ReaderAction.SetTapZoneInvert(TapInvertMode.BOTH)),
-            actions,
-        )
+        assertEquals(listOf(ReaderAction.SetInvertTaps(true)), actions)
     }
 
     @Test
@@ -79,8 +86,6 @@ class ReaderSettingsSheetTest {
         composeTestRule.onNodeWithText("Warmth").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("50%").performScrollTo().assertIsDisplayed()
     }
-
-
 
     @Test
     fun `night light warmth hides while the light is off`() {
@@ -100,9 +105,21 @@ class ReaderSettingsSheetTest {
     }
 
     @Test
-    fun `tap zone mode round-trips through the mode enum`() {
-        // Guard against drift between persisted prefs and the zone map.
-        assertEquals(TapZoneMode.DEFAULT, TapZoneMode.valueOf("DEFAULT"))
-        assertEquals(TapZoneMode.DISABLED, TapZoneMode.valueOf("DISABLED"))
+    fun `theme sheet previews every scheme and dispatches selection`() {
+        val actions = mutableListOf<ReaderAction>()
+        composeTestRule.setContent {
+            IridiumTheme(expressiveMotion = false) {
+                ReaderThemeSheetContent(
+                    selected = ColorSchemeChoice.SEPIA,
+                    onAction = actions::add,
+                )
+            }
+        }
+
+        listOf("Reading theme", "Light", "Sepia", "Grey", "Dark", "Pitch black").forEach {
+            composeTestRule.onNodeWithText(it).assertIsDisplayed()
+        }
+        composeTestRule.onNodeWithText("Dark").performClick()
+        assertEquals(listOf(ReaderAction.SetTheme(ColorSchemeChoice.DARK)), actions)
     }
 }

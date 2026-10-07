@@ -29,6 +29,8 @@ sealed interface ReaderUiState {
         val positionCount: Int = 0,
         /** True once the navigator fragment attached (content visible). */
         val navigatorAttached: Boolean = false,
+        /** Theme chooser sheet (dock colorscheme button) is open. */
+        val themeSheetOpen: Boolean = false,
     ) : ReaderUiState
 
     /** Book row vanished (removed elsewhere). */
@@ -40,9 +42,10 @@ sealed interface ReaderUiState {
 
 sealed interface ReaderAction {
     data object Back : ReaderAction
-    data object ContentTapped : ReaderAction
     data object OpenSettings : ReaderAction
     data object CloseSettings : ReaderAction
+    data object OpenThemeSheet : ReaderAction
+    data object CloseThemeSheet : ReaderAction
     data object OpenToc : ReaderAction
     data object CloseToc : ReaderAction
     data object OpenHighlights : ReaderAction
@@ -68,8 +71,7 @@ sealed interface ReaderAction {
     data class SetShowPageCounter(val enabled: Boolean) : ReaderAction
     data class SetVolumeKeys(val enabled: Boolean) : ReaderAction
     data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction
-    data class SetTapZoneMode(val mode: com.iridium.core.model.TapZoneMode) : ReaderAction
-    data class SetTapZoneInvert(val mode: com.iridium.core.model.TapInvertMode) : ReaderAction
+    data class SetInvertTaps(val inverted: Boolean) : ReaderAction
     data class SetNightLight(val enabled: Boolean) : ReaderAction
     data class SetNightLightIntensity(val intensity: Float) : ReaderAction
 }

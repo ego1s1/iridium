@@ -58,35 +58,24 @@ import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ReadingFlow
-import com.iridium.core.model.TapInvertMode
 import kotlin.math.roundToInt
 
 /**
  * Mori reader-chrome parity for Iridium's EPUB reader (UI hierarchy.md §3.3).
  *
- * New chrome only: floating scrubber island with tooltip, floating action
- * dock (direction / fit / crop / overview / settings). The existing reader
- * engine ([ReaderScreen], [ReaderViewModel]) is untouched; this chrome is
- * stateless and driven by [ReaderChromeConfig] so the host can adopt it
- * without rewiring Readium plumbing.
+ * New chrome only: floating scrubber island with tooltip, floating EPUB
+ * action dock (flow / theme / contents / highlights / settings). The existing
+ * reader engine ([ReaderScreen], [ReaderViewModel]) is untouched; the chrome
+ * is stateless and driven by callbacks so the host adopts it without
+ * rewiring Readium plumbing.
  *
  * EPUB adaptation notes (comic pages -> reflowable positions):
  * - Mori's page index/count becomes the EPUB position index/count.
  * - Mori's reading direction still mirrors the scrubber + tap zones.
- * - Mori's page fit (width/height/original) is kept as a display preference
- *   for the paged flow; scrolled flow ignores it.
- * - Mori's margin crop maps to Iridium's page-margin trimming.
  */
 enum class ChromeReadingDirection {
     LEFT_TO_RIGHT,
     RIGHT_TO_LEFT,
-}
-
-/** Page-fit preference for the paged EPUB flow (Mori §3.3 "Page Fit"). */
-enum class ChromePageFit {
-    WIDTH,
-    HEIGHT,
-    ORIGINAL,
 }
 
 /** Tap-zone outcome for a tap inside the reading surface. */
@@ -96,25 +85,6 @@ enum class ChromeTapZone {
     NEXT,
 }
 
-
-/**
- * Tap-zone layout modes (Mori `ReaderNavMode` parity).
- * DISABLED routes every tap to MENU (chrome toggle only).
- *
- * Alias of the model-owned [TapZoneMode] so prefs and datastore can persist
- * the selection; existing `ChromeNavMode.X` references keep compiling.
- */
-typealias ChromeNavMode = com.iridium.core.model.TapZoneMode
-
-/** Stateless chrome configuration; the host owns persistence/wiring. */
-data class ReaderChromeConfig(
-    val direction: ChromeReadingDirection = ChromeReadingDirection.LEFT_TO_RIGHT,
-    val pageFit: ChromePageFit = ChromePageFit.WIDTH,
-    val cropMargins: Boolean = false,
-    val navMode: ChromeNavMode = ChromeNavMode.DEFAULT,
-    val flow: ReadingFlow = ReadingFlow.PAGED,
-)
-
 /** Test tags for the Mori-parity reader chrome. */
 object ReaderChromeTestTags {
     const val ScrubberIsland = "chromeScrubberIsland"
@@ -122,50 +92,16 @@ object ReaderChromeTestTags {
     const val ScrubSlider = "chromeScrubSlider"
     const val ScrubPrev = "chromeScrubPrev"
     const val ScrubNext = "chromeScrubNext"
-    const val ActionDock = "chromeActionDock"
-    const val DirectionButton = "chromeDirectionButton"
-    const val FitButton = "chromeFitButton"
-    const val CropButton = "chromeCropButton"
-    const val OverviewButton = "chromeOverviewButton"
-    const val SettingsButton = "chromeSettingsButton"
-    const val SettingsSheet = "chromeSettingsSheet"
-    const val FlowPaged = "chromeFlowPaged"
-    const val FlowScrolled = "chromeFlowScrolled"
-    const val DirectionLtr = "chromeDirectionLtr"
-    const val DirectionRtl = "chromeDirectionRtl"
-    const val FitWidth = "chromeFitWidth"
-    const val FitHeight = "chromeFitHeight"
-    const val FitOriginal = "chromeFitOriginal"
-    const val CropSwitch = "chromeCropSwitch"
     const val EpubDock = "chromeEpubDock"
     const val EpubFlowButton = "chromeEpubFlow"
     const val EpubThemeButton = "chromeEpubTheme"
     const val EpubTocButton = "chromeEpubToc"
     const val EpubHighlightsButton = "chromeEpubHighlights"
     const val EpubSettingsButton = "chromeEpubSettings"
-    const val TapZoneOverlay = "chromeTapZoneOverlay"
-    const val TapZoneInvertNone = "tapZoneInvertNone"
-    const val TapZoneInvertHorizontal = "tapZoneInvertHorizontal"
-    const val TapZoneInvertVertical = "tapZoneInvertVertical"
-    const val TapZoneInvertBoth = "tapZoneInvertBoth"
-
-    fun navCardFor(mode: ChromeNavMode): String = "chromeNavCard:${mode.name}"
+    const val TapZoneInvertSwitch = "tapZoneInvertSwitch"
 }
 
 // Pure helpers (unit-testable without composition)
-
-fun nextChromeDirection(direction: ChromeReadingDirection): ChromeReadingDirection =
-    when (direction) {
-        ChromeReadingDirection.LEFT_TO_RIGHT -> ChromeReadingDirection.RIGHT_TO_LEFT
-        ChromeReadingDirection.RIGHT_TO_LEFT -> ChromeReadingDirection.LEFT_TO_RIGHT
-    }
-
-fun nextChromeFit(fit: ChromePageFit): ChromePageFit =
-    when (fit) {
-        ChromePageFit.WIDTH -> ChromePageFit.HEIGHT
-        ChromePageFit.HEIGHT -> ChromePageFit.ORIGINAL
-        ChromePageFit.ORIGINAL -> ChromePageFit.WIDTH
-    }
 
 /** 0-based position index for a 0f..1f progression over [count] positions. */
 fun scrubIndexForProgression(progression: Float, count: Int): Int {
@@ -197,80 +133,29 @@ private const val MaxNightLightAlpha = 0.4f
 fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total"
 
 /**
- * Resolves which tap zone a tap at ([fractionX], [fractionY]) falls into,
- * mirroring Mori's `zoneForTap`: outer partitions navigate, the center
- * toggles chrome; right-to-left mirrors "forward" to the reading direction.
+ * Resolves which tap zone a tap at ([fractionX], [fractionY]) falls into:
+ * fixed horizontal thirds (outer partitions navigate, the center toggles
+ * chrome), optionally mirrored for right-to-left reading or the user's
+ * invert-taps switch. Taps landing on the top chrome strip always toggle.
  */
 fun chromeZoneForTap(
     fractionX: Float,
     fractionY: Float,
     direction: ChromeReadingDirection,
-    navMode: ChromeNavMode = ChromeNavMode.DEFAULT,
-    invertMode: TapInvertMode = TapInvertMode.NONE,
+    invertTaps: Boolean = false,
 ): ChromeTapZone {
-    if (navMode == ChromeNavMode.DISABLED) return ChromeTapZone.MENU
-    val x = when (invertMode) {
-        TapInvertMode.HORIZONTAL, TapInvertMode.BOTH -> 1f - fractionX.coerceIn(0f, 1f)
-        TapInvertMode.NONE, TapInvertMode.VERTICAL -> fractionX.coerceIn(0f, 1f)
-    }
-    val y = when (invertMode) {
-        TapInvertMode.VERTICAL, TapInvertMode.BOTH -> 1f - fractionY.coerceIn(0f, 1f)
-        TapInvertMode.NONE, TapInvertMode.HORIZONTAL -> fractionY.coerceIn(0f, 1f)
-    }
-    if (y < 0.05f) return ChromeTapZone.MENU
-
-    val forwardRight = direction == ChromeReadingDirection.LEFT_TO_RIGHT
-    val rawZone = when (navMode) {
-        ChromeNavMode.DEFAULT -> zoneForThirds(x)
-        ChromeNavMode.L_SHAPE -> zoneForLShape(x, y)
-        ChromeNavMode.KINDLISH -> zoneForKindlish(x, y)
-        ChromeNavMode.EDGE -> zoneForEdge(x, y)
-        ChromeNavMode.RIGHT_AND_LEFT -> zoneForSides(x, forwardRight)
-        ChromeNavMode.DISABLED -> ChromeTapZone.MENU
-    }
-    return if (navMode != ChromeNavMode.RIGHT_AND_LEFT && !forwardRight) {
-        mirrorTapZone(rawZone)
+    val mirror = invertTaps != (direction == ChromeReadingDirection.RIGHT_TO_LEFT)
+    val x = if (mirror) {
+        1f - fractionX.coerceIn(0f, 1f)
     } else {
-        rawZone
+        fractionX.coerceIn(0f, 1f)
     }
-}
-
-private fun zoneForThirds(x: Float): ChromeTapZone = when {
-    x < 1f / 3f -> ChromeTapZone.PREV
-    x > 2f / 3f -> ChromeTapZone.NEXT
-    else -> ChromeTapZone.MENU
-}
-
-private fun zoneForLShape(x: Float, y: Float): ChromeTapZone = when {
-    y < 1f / 3f -> ChromeTapZone.PREV
-    y > 2f / 3f -> ChromeTapZone.NEXT
-    x < 1f / 3f -> ChromeTapZone.PREV
-    x > 2f / 3f -> ChromeTapZone.NEXT
-    else -> ChromeTapZone.MENU
-}
-
-private fun zoneForKindlish(x: Float, y: Float): ChromeTapZone = when {
-    y < 1f / 3f -> ChromeTapZone.MENU
-    x < 1f / 3f -> ChromeTapZone.PREV
-    else -> ChromeTapZone.NEXT
-}
-
-private fun zoneForEdge(x: Float, y: Float): ChromeTapZone = when {
-    x in (1f / 3f)..(2f / 3f) && y in (1f / 3f)..(2f / 3f) -> ChromeTapZone.MENU
-    x in (1f / 3f)..(2f / 3f) && y > 2f / 3f -> ChromeTapZone.PREV
-    else -> ChromeTapZone.NEXT
-}
-
-private fun zoneForSides(x: Float, forwardRight: Boolean): ChromeTapZone = when {
-    x < 1f / 3f -> if (forwardRight) ChromeTapZone.PREV else ChromeTapZone.NEXT
-    x > 2f / 3f -> if (forwardRight) ChromeTapZone.NEXT else ChromeTapZone.PREV
-    else -> ChromeTapZone.MENU
-}
-
-private fun mirrorTapZone(zone: ChromeTapZone): ChromeTapZone = when (zone) {
-    ChromeTapZone.PREV -> ChromeTapZone.NEXT
-    ChromeTapZone.NEXT -> ChromeTapZone.PREV
-    ChromeTapZone.MENU -> ChromeTapZone.MENU
+    if (fractionY < 0.05f) return ChromeTapZone.MENU
+    return when {
+        x < 1f / 3f -> ChromeTapZone.PREV
+        x > 2f / 3f -> ChromeTapZone.NEXT
+        else -> ChromeTapZone.MENU
+    }
 }
 
 // Composables
@@ -456,180 +341,6 @@ fun ReaderScrubberIsland(
     }
 }
 
-/**
- * Floating action dock: one elevated segmented pill with the five Mori
- * reader actions — direction, fit, crop, overview, settings.
- */
-@Composable
-fun ReaderActionDock(
-    config: ReaderChromeConfig,
-    onDirectionToggle: () -> Unit,
-    onFitCycle: () -> Unit,
-    onCropToggle: () -> Unit,
-    onOverviewClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = rememberIridiumHaptics()
-    val segmentShape = RoundedCornerShape(14.dp)
-    val cropContainer by animateColorAsState(
-        targetValue = if (config.cropMargins) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            Color.Transparent
-        },
-        animationSpec = IridiumMotion.defaultEffectsSpec(),
-        label = "cropContainer",
-    )
-    val cropContent by animateColorAsState(
-        targetValue = if (config.cropMargins) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = IridiumMotion.defaultEffectsSpec(),
-        label = "cropContent",
-    )
-
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-        ),
-        modifier = modifier
-            .widthIn(max = 480.dp)
-            .fillMaxWidth()
-            .testTag(ReaderChromeTestTags.ActionDock),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            val directionState = when (config.direction) {
-                ChromeReadingDirection.LEFT_TO_RIGHT -> "Left to right"
-                ChromeReadingDirection.RIGHT_TO_LEFT -> "Right to left"
-            }
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onDirectionToggle()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .testTag(ReaderChromeTestTags.DirectionButton)
-                    .semantics {
-                        onClick(label = "Reading direction", action = null)
-                        stateDescription = directionState
-                    },
-            ) {
-                Icon(Icons.Rounded.ScreenRotation, contentDescription = "Reading direction")
-            }
-
-            DockDivider()
-
-            val fitState = when (config.pageFit) {
-                ChromePageFit.WIDTH -> "Fit width"
-                ChromePageFit.HEIGHT -> "Fit height"
-                ChromePageFit.ORIGINAL -> "Original size"
-            }
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onFitCycle()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .testTag(ReaderChromeTestTags.FitButton)
-                    .semantics {
-                        onClick(label = "Page fit", action = null)
-                        stateDescription = fitState
-                    },
-            ) {
-                Icon(Icons.Rounded.FitScreen, contentDescription = "Page fit")
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onCropToggle()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = cropContainer,
-                    contentColor = cropContent,
-                ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .testTag(ReaderChromeTestTags.CropButton)
-                    .semantics {
-                        onClick(label = "Crop margins", action = null)
-                        stateDescription = if (config.cropMargins) "On" else "Off"
-                    },
-            ) {
-                Icon(Icons.Rounded.Crop, contentDescription = "Crop margins")
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onOverviewClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .testTag(ReaderChromeTestTags.OverviewButton),
-            ) {
-                Icon(Icons.Rounded.GridView, contentDescription = "Contents overview")
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onSettingsClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .testTag(ReaderChromeTestTags.SettingsButton),
-            ) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Reader settings")
-            }
-        }
-    }
-}
-
 @Composable
 private fun DockDivider() {
     Box(
@@ -648,7 +359,7 @@ private fun DockDivider() {
 @Composable
 fun ReaderEpubDock(
     onFlowCycle: () -> Unit,
-    onThemeCycle: () -> Unit,
+    onThemeClick: () -> Unit,
     onTocClick: () -> Unit,
     onHighlightsClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -705,7 +416,7 @@ fun ReaderEpubDock(
             FilledTonalIconButton(
                 onClick = {
                     haptics(IridiumHaptic.Select)
-                    onThemeCycle()
+                    onThemeClick()
                 },
                 shape = segmentShape,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -720,7 +431,7 @@ fun ReaderEpubDock(
                         stateDescription = "Reading theme"
                     },
             ) {
-                Icon(IridiumIcons.Contrast, contentDescription = "Cycle reading theme")
+                Icon(IridiumIcons.Contrast, contentDescription = "Choose reading theme")
             }
 
             DockDivider()

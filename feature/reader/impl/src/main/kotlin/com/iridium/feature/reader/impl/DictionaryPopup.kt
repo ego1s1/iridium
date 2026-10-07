@@ -1,5 +1,8 @@
 package com.iridium.feature.reader.impl
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,8 +12,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -38,6 +47,12 @@ internal object DictionaryTestTags {
     const val CloseButton = "dictionary_close"
 }
 
+/** Entrance scale duration for [DictionaryPopup] (ms). */
+internal const val DICTIONARY_ENTER_MS = 220
+
+/** Entrance fade duration for [DictionaryPopup] (ms). */
+internal const val DICTIONARY_FADE_MS = 180
+
 /**
  * Lithium-style word lookup popup: word header with phonetic, then short
  * per-part-of-speech definitions — no clutter. Copy puts the word on the
@@ -53,6 +68,20 @@ fun DictionaryPopup(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
+    // Scale/fade entrance: the host keys this popup by word, so every fresh
+    // selection replays the reveal once the lookup grace period elapses.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val enterScale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.92f,
+        animationSpec = tween(DICTIONARY_ENTER_MS, easing = FastOutSlowInEasing),
+        label = "dictionaryEnterScale",
+    )
+    val enterAlpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(DICTIONARY_FADE_MS),
+        label = "dictionaryEnterAlpha",
+    )
     IridiumAlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -82,7 +111,13 @@ fun DictionaryPopup(
                 Text("Close")
             }
         },
-        modifier = modifier.testTag(DictionaryTestTags.Dialog),
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = enterScale
+                scaleY = enterScale
+                alpha = enterAlpha
+            }
+            .testTag(DictionaryTestTags.Dialog),
     )
 }
 

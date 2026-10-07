@@ -37,8 +37,6 @@ import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
-import com.iridium.core.model.TapInvertMode
-import com.iridium.core.model.TapZoneMode
 import com.iridium.core.model.TextAlign
 
 /**
@@ -192,54 +190,12 @@ internal fun ReaderSettingsContent(
             }
 
             Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.reader_settings_tap_zones), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                stringResource(R.string.reader_settings_tap_zones_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            ChromeNavModeChoiceCards(
-                selectedMode = prefs.tapZoneMode,
-                direction = ChromeReadingDirection.LEFT_TO_RIGHT,
-                onSelectMode = { onAction(ReaderAction.SetTapZoneMode(it)) },
-            )
-            Spacer(Modifier.height(8.dp))
-            ButtonGroup(modifier = Modifier.fillMaxWidth()) {
-                InvertOption(
-                    selected = prefs.tapZoneInvert == TapInvertMode.NONE,
-                    onSelect = { onAction(ReaderAction.SetTapZoneInvert(TapInvertMode.NONE)) },
-                    label = stringResource(R.string.reader_settings_invert_none),
-                    modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.TapZoneInvertNone),
-                )
-                InvertOption(
-                    selected = prefs.tapZoneInvert == TapInvertMode.HORIZONTAL,
-                    onSelect = { onAction(ReaderAction.SetTapZoneInvert(TapInvertMode.HORIZONTAL)) },
-                    label = stringResource(R.string.reader_settings_invert_horizontal),
-                    modifier = Modifier.weight(1f),
-                )
-                InvertOption(
-                    selected = prefs.tapZoneInvert == TapInvertMode.VERTICAL,
-                    onSelect = { onAction(ReaderAction.SetTapZoneInvert(TapInvertMode.VERTICAL)) },
-                    label = stringResource(R.string.reader_settings_invert_vertical),
-                    modifier = Modifier.weight(1f),
-                )
-                InvertOption(
-                    selected = prefs.tapZoneInvert == TapInvertMode.BOTH,
-                    onSelect = { onAction(ReaderAction.SetTapZoneInvert(TapInvertMode.BOTH)) },
-                    label = stringResource(R.string.reader_settings_invert_both),
-                    modifier = Modifier.weight(1f).testTag(ReaderChromeTestTags.TapZoneInvertBoth),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            TapZoneOverlay(
-                direction = ChromeReadingDirection.LEFT_TO_RIGHT,
-                navMode = prefs.tapZoneMode,
-                invertMode = prefs.tapZoneInvert,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(MaterialTheme.shapes.medium),
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_invert_taps),
+                subtitle = stringResource(R.string.reader_settings_invert_taps_body),
+                checked = prefs.invertTaps,
+                onCheckedChange = { onAction(ReaderAction.SetInvertTaps(it)) },
+                modifier = Modifier.testTag(ReaderChromeTestTags.TapZoneInvertSwitch),
             )
 
             Spacer(Modifier.height(8.dp))
@@ -273,21 +229,6 @@ internal fun ReaderSettingsContent(
             }
         }
     }
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun InvertOption(
-    selected: Boolean,
-    onSelect: () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    ToggleButton(
-        checked = selected,
-        onCheckedChange = { if (it) onSelect() },
-        modifier = modifier,
-    ) { Text(label, style = MaterialTheme.typography.labelSmall) }
-}
 
 @Composable
 private fun ThemeSwatch(

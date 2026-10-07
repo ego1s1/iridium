@@ -146,9 +146,10 @@ internal fun MainScreen(
     }
 
     Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing.only(
-            WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
-        ),
+        // Top insets belong to each tab's own top bar (all three tabs draw
+        // one); consuming them here too pushed every header a status-bar
+        // height down the screen. Horizontal only.
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         modifier = modifier,
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {

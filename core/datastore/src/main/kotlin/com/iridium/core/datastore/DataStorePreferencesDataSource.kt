@@ -16,8 +16,6 @@ import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
-import com.iridium.core.model.TapInvertMode
-import com.iridium.core.model.TapZoneMode
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
@@ -53,12 +51,12 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 showPageCounter = prefs[SHOW_PAGE_COUNTER] ?: true,
                 volumeKeys = prefs[VOLUME_KEYS] ?: false,
                 volumeKeysInverted = prefs[VOLUME_KEYS_INVERTED] ?: false,
-                tapZoneMode = prefs[TAP_ZONE_MODE]?.let {
-                    runCatching { TapZoneMode.valueOf(it) }.getOrDefault(TapZoneMode.DEFAULT)
-                } ?: TapZoneMode.DEFAULT,
-                tapZoneInvert = prefs[TAP_ZONE_INVERT]?.let {
-                    runCatching { TapInvertMode.valueOf(it) }.getOrDefault(TapInvertMode.NONE)
-                } ?: TapInvertMode.NONE,
+                // Single-switch era: legacy four-way invert maps to mirrored
+                // taps when it flipped the horizontal axis; legacy keys are
+                // dropped on the next write below.
+                invertTaps = prefs[TAP_INVERT] ?: prefs[TAP_ZONE_INVERT].let { legacy ->
+                    legacy == LEGACY_INVERT_HORIZONTAL || legacy == LEGACY_INVERT_BOTH
+                },
                 nightLight = prefs[NIGHT_LIGHT] ?: false,
                 nightLightIntensity = prefs[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
                 pageMargins = prefs[PAGE_MARGINS] ?: 1f,
@@ -78,8 +76,9 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             it[SHOW_PAGE_COUNTER] = updated.showPageCounter
             it[VOLUME_KEYS] = updated.volumeKeys
             it[VOLUME_KEYS_INVERTED] = updated.volumeKeysInverted
-            it[TAP_ZONE_MODE] = updated.tapZoneMode.name
-            it[TAP_ZONE_INVERT] = updated.tapZoneInvert.name
+            it[TAP_INVERT] = updated.invertTaps
+            it.remove(TAP_ZONE_MODE)
+            it.remove(TAP_ZONE_INVERT)
             it[NIGHT_LIGHT] = updated.nightLight
             it[NIGHT_LIGHT_INTENSITY] = updated.nightLightIntensity
             it[PAGE_MARGINS] = updated.pageMargins
@@ -189,9 +188,15 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val SHOW_PAGE_COUNTER = booleanPreferencesKey("show_page_counter")
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
         val VOLUME_KEYS_INVERTED = booleanPreferencesKey("volume_keys_inverted")
+        val TAP_INVERT = booleanPreferencesKey("tap_invert")
+        // Legacy tap-zone keys (pre single-switch): read once for migration.
         val TAP_ZONE_MODE = stringPreferencesKey("tap_zone_mode")
         val TAP_ZONE_INVERT = stringPreferencesKey("tap_zone_invert")
         val NIGHT_LIGHT = booleanPreferencesKey("night_light")
+
+        /** Legacy four-way invert values that mirrored the horizontal axis. */
+        const val LEGACY_INVERT_HORIZONTAL = "HORIZONTAL"
+        const val LEGACY_INVERT_BOTH = "BOTH"
         val NIGHT_LIGHT_INTENSITY = floatPreferencesKey("night_light_intensity")
         val PAGE_MARGINS = floatPreferencesKey("page_margins")
         val LINE_HEIGHT = floatPreferencesKey("line_height")

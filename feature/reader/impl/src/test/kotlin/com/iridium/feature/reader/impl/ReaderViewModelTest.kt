@@ -81,19 +81,13 @@ class ReaderViewModelTest {
     }
 
     @Test
-    fun `tap zone and night light prefs persist through actions`() = runTest {
-        viewModel.onAction(
-            ReaderAction.SetTapZoneMode(com.iridium.core.model.TapZoneMode.KINDLISH),
-        )
-        viewModel.onAction(
-            ReaderAction.SetTapZoneInvert(com.iridium.core.model.TapInvertMode.BOTH),
-        )
+    fun `tap invert and night light prefs persist through actions`() = runTest {
+        viewModel.onAction(ReaderAction.SetInvertTaps(true))
         viewModel.onAction(ReaderAction.SetNightLight(true))
         viewModel.onAction(ReaderAction.SetNightLightIntensity(0.6f))
 
         val prefs = preferences.readerPreferences.first()
-        assertEquals(com.iridium.core.model.TapZoneMode.KINDLISH, prefs.tapZoneMode)
-        assertEquals(com.iridium.core.model.TapInvertMode.BOTH, prefs.tapZoneInvert)
+        assertTrue(prefs.invertTaps)
         assertTrue(prefs.nightLight)
         assertEquals(0.6f, prefs.nightLightIntensity, 0.0001f)
     }

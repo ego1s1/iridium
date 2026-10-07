@@ -18,8 +18,8 @@ data class ReaderPreferences(
     val showPageCounter: Boolean = true,
     val volumeKeys: Boolean = false,
     val volumeKeysInverted: Boolean = false,
-    val tapZoneMode: TapZoneMode = TapZoneMode.DEFAULT,
-    val tapZoneInvert: TapInvertMode = TapInvertMode.NONE,
+    /** Mirror left/right page-turn tap zones (accessibility/read-handedness). */
+    val invertTaps: Boolean = false,
     val nightLight: Boolean = false,
     val nightLightIntensity: Float = 0.25f,
     val pageMargins: Float = 1f,

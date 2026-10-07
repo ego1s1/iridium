@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -41,10 +39,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,19 +58,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumScrimPill
+import com.iridium.core.designsystem.rememberIridiumHaptics
+import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.materials.HazeMaterials
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
     composable<ReaderRoute>(
@@ -142,7 +140,6 @@ internal fun ReaderRoute(
 
 @OptIn(
     ExperimentalMaterial3Api::class,
-    ExperimentalHazeMaterialsApi::class,
     ExperimentalLayoutApi::class,
 )
 @Composable
@@ -159,13 +156,8 @@ internal fun ReaderScreen(
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     var showAddDialog by remember { mutableStateOf(false) }
+    val haptics = rememberIridiumHaptics()
 
-    // Backdrop-blur source for the floating chrome (M3 Expressive bars blur
-    // the book text behind them instead of sitting on solid color).
-    val hazeState = remember { HazeState() }
-    val chromeHazeStyle = HazeMaterials.thin(
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
-    )
     // Book text always stays clear of the status and navigation zones, even
     // in immersive mode: visibility-ignoring insets are stable, so toggling
     // the chrome never resizes the navigator (no repagination).
@@ -204,6 +196,32 @@ internal fun ReaderScreen(
         onDispose { }
     }
 
+    // Seamless system bars: tint status + navigation bars to the page
+    // background of the active reader theme so no black strips frame the
+    // page, with icon contrast to match. Unrelated to the visibility effect
+    // above (that one only shows/hides); restored when the theme changes.
+    DisposableEffect(state.prefs.theme) {
+        val window = activity?.window
+        val controller =
+            activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        if (window == null || controller == null) return@DisposableEffect onDispose { }
+        val previousStatus = window.statusBarColor
+        val previousNav = window.navigationBarColor
+        val previousLightStatus = controller.isAppearanceLightStatusBars
+        val previousLightNav = controller.isAppearanceLightNavigationBars
+        val pageBg = state.prefs.theme.pageBackground()
+        window.statusBarColor = pageBg.toArgb()
+        window.navigationBarColor = pageBg.toArgb()
+        controller.isAppearanceLightStatusBars = state.prefs.theme.lightSystemBars()
+        controller.isAppearanceLightNavigationBars = state.prefs.theme.lightSystemBars()
+        onDispose {
+            window.statusBarColor = previousStatus
+            window.navigationBarColor = previousNav
+            controller.isAppearanceLightStatusBars = previousLightStatus
+            controller.isAppearanceLightNavigationBars = previousLightNav
+        }
+    }
+
     // Keep the screen awake while reading, when the user asked for it.
     DisposableEffect(state.prefs.keepScreenOn) {
         val window = activity?.window
@@ -225,11 +243,13 @@ internal fun ReaderScreen(
         state.prefs.volumeKeys,
         state.chromeVisible,
         state.settingsOpen,
+        state.themeSheetOpen,
         state.tocOpen,
         state.highlightsOpen,
     ) {
         val active = state.prefs.volumeKeys && !state.chromeVisible &&
-            !state.settingsOpen && !state.tocOpen && !state.highlightsOpen
+            !state.settingsOpen && !state.themeSheetOpen &&
+            !state.tocOpen && !state.highlightsOpen
         // Mirrors the ViewModel gate (hidden-chrome + invert swap); installing
         // only while active keeps volume normal everywhere else.
         ReaderKeyInterceptor.handler = if (active) onVolumeKeyEvent else null
@@ -245,7 +265,6 @@ internal fun ReaderScreen(
             bookId = state.book.id,
             sessionReady = sessionReady,
             modifier = Modifier.fillMaxSize()
-                .hazeSource(state = hazeState)
                 .windowInsetsPadding(topSafeInsets)
                 .windowInsetsPadding(bottomSafeInsets),
         )
@@ -274,8 +293,11 @@ internal fun ReaderScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
                 TopAppBar(
-                    modifier = Modifier.statusBarsPadding()
-                        .hazeEffect(state = hazeState, style = chromeHazeStyle),
+                    // Stable top offset: ignoring-visibility insets never change
+                    // when the system bars show/hide, so the slide/fade toggle
+                    // animation never jumps mid-flight (was: statusBarsPadding).
+                    // Opaque surface: no blur means text must not show through.
+                    modifier = Modifier.windowInsetsPadding(topSafeInsets),
                     title = {
                         Column {
                             Text(
@@ -325,7 +347,7 @@ internal fun ReaderScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
+                        containerColor = MaterialTheme.colorScheme.surface,
                     ),
                 )
         }
@@ -338,8 +360,9 @@ internal fun ReaderScreen(
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.navigationBarsPadding()
-                    .hazeEffect(state = hazeState, style = chromeHazeStyle)
+                // Stable bottom offset for the same reason as the top bar.
+                // The pills themselves are opaque surfaces; no blur needed.
+                modifier = Modifier.windowInsetsPadding(bottomSafeInsets)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 ReaderScrubberIsland(
@@ -352,7 +375,7 @@ internal fun ReaderScreen(
                 )
                 ReaderEpubDock(
                     onFlowCycle = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
-                    onThemeCycle = { onAction(ReaderAction.SetTheme(nextColorScheme(state.prefs.theme))) },
+                    onThemeClick = { onAction(ReaderAction.OpenThemeSheet) },
                     onTocClick = { onAction(ReaderAction.OpenToc) },
                     onHighlightsClick = { onAction(ReaderAction.OpenHighlights) },
                     onSettingsClick = { onAction(ReaderAction.OpenSettings) },
@@ -367,6 +390,9 @@ internal fun ReaderScreen(
 
     if (state.settingsOpen) {
         ReaderSettingsSheet(prefs = state.prefs, onAction = onAction)
+    }
+    if (state.themeSheetOpen) {
+        ReaderThemeSheet(selected = state.prefs.theme, onAction = onAction)
     }
     if (state.tocOpen) {
         ReaderTocSheet(
@@ -384,10 +410,18 @@ internal fun ReaderScreen(
         )
     }
     dictionaryState?.let { dict ->
-        DictionaryPopup(
-            state = dict,
-            onDismiss = { onAction(ReaderAction.DismissDictionary) },
-        )
+        // Crisp Pulsar tick the moment a word is selected. This fires from
+        // the user's selection gesture (not idle composition); the framework
+        // fallback guarantees feedback even where Pulsar can't play.
+        LaunchedEffect(dict.word) { haptics(IridiumHaptic.Tick) }
+        // Keyed by word so each fresh selection replays the popup's
+        // entrance after the lookup grace period.
+        key(dict.word) {
+            DictionaryPopup(
+                state = dict,
+                onDismiss = { onAction(ReaderAction.DismissDictionary) },
+            )
+        }
     }
     if (showAddDialog) {
         AddHighlightDialog(
@@ -407,11 +441,21 @@ private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
             com.iridium.core.model.ReadingFlow.entries.size,
     ]
 
-private fun nextColorScheme(theme: com.iridium.core.model.ColorSchemeChoice) =
-    com.iridium.core.model.ColorSchemeChoice.entries[
-        (com.iridium.core.model.ColorSchemeChoice.entries.indexOf(theme) + 1) %
-            com.iridium.core.model.ColorSchemeChoice.entries.size,
-    ]
+/**
+ * Page background per reader theme (mirrors the settings swatches): system
+ * bars tint to this so they read as a seamless frame around the page.
+ */
+internal fun ColorSchemeChoice.pageBackground(): Color = when (this) {
+    ColorSchemeChoice.LIGHT -> Color(0xFFFFFFFF)
+    ColorSchemeChoice.SEPIA -> Color(0xFFF5E6C8)
+    ColorSchemeChoice.GREY -> Color(0xFF444444)
+    ColorSchemeChoice.DARK -> Color(0xFF121212)
+    ColorSchemeChoice.BLACK -> Color(0xFF000000)
+}
+
+/** Dark status/nav icons on the light page themes, light icons otherwise. */
+internal fun ColorSchemeChoice.lightSystemBars(): Boolean =
+    this == ColorSchemeChoice.LIGHT || this == ColorSchemeChoice.SEPIA
 
 /** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
 @Composable

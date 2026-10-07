@@ -91,13 +91,14 @@ class UrlConnectionDictionaryHttpClient(
 }
 
 /**
- * Free Wiktionary lookup (MediaWiki REST API, no key required) with an
- * injected in-memory cache. The cache map is caller-owned (e.g. a
- * session-scoped `mutableMapOf`) so eviction policy stays with the caller.
+ * Free Wiktionary lookup (MediaWiki REST API, no key required) with a
+ * bounded LRU cache. The cache map is caller-owned (e.g. a session-scoped
+ * map) so eviction policy stays with the caller; the default cap keeps
+ * repeat lookups instant without unbounded growth.
  */
 class HttpDictionaryLookup(
     private val httpClient: DictionaryHttpClient = UrlConnectionDictionaryHttpClient(),
-    private val cache: MutableMap<String, WordDefinition> = mutableMapOf(),
+    private val cache: MutableMap<String, WordDefinition> = synchronizedLruCache(),
 ) : DictionaryLookup {
 
     override suspend fun define(word: String): Result<WordDefinition> {
@@ -211,3 +212,21 @@ internal fun stripDefinitionHtml(html: String): String {
 private const val MAX_MEANINGS = 3
 private const val MAX_DEFINITIONS = 2
 private const val PART_OF_SPEECH_FALLBACK = "unknown"
+
+/** Default cap for [HttpDictionaryLookup]'s session cache (words). */
+internal const val DICTIONARY_CACHE_MAX = 100
+
+/**
+ * Access-ordered, thread-safe LRU map: repeat lookups inside a session hit
+ * memory instead of the network, and the eldest entry drops past [maxSize].
+ */
+internal fun synchronizedLruCache(
+    maxSize: Int = DICTIONARY_CACHE_MAX,
+): MutableMap<String, WordDefinition> =
+    java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, WordDefinition>(maxSize, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<String, WordDefinition>?,
+            ): Boolean = size > maxSize
+        },
+    )

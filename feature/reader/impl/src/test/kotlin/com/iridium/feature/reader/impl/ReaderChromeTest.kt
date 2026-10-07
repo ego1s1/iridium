@@ -7,9 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.iridium.core.designsystem.IridiumTheme
-import com.iridium.core.model.ReadingFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -18,10 +16,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Mori chrome parity coverage for the EPUB reader: pure scrub/zone math
- * plus composition of the scrubber island, action dock, and settings sheet
- * content (rendered directly — the modal sheet does not settle under
- * Robolectric).
+ * Reader-chrome coverage: pure scrub/zone math plus composition of the
+ * scrubber island and the EPUB dock (rendered directly — sheets and modals
+ * do not settle under Robolectric).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -55,82 +52,36 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun `direction and fit cycle through every option`() {
-        assertEquals(
-            ChromeReadingDirection.RIGHT_TO_LEFT,
-            nextChromeDirection(ChromeReadingDirection.LEFT_TO_RIGHT),
-        )
-        assertEquals(
-            ChromeReadingDirection.LEFT_TO_RIGHT,
-            nextChromeDirection(ChromeReadingDirection.RIGHT_TO_LEFT),
-        )
-        assertEquals(ChromePageFit.HEIGHT, nextChromeFit(ChromePageFit.WIDTH))
-        assertEquals(ChromePageFit.ORIGINAL, nextChromeFit(ChromePageFit.HEIGHT))
-        assertEquals(ChromePageFit.WIDTH, nextChromeFit(ChromePageFit.ORIGINAL))
-    }
-
-    @Test
     fun `counter formats as one-based position over total`() {
         assertEquals("13 / 173", formatChromeCounter(13, 173))
     }
 
     @Test
-    fun `default zones split thirds and mirror for rtl`() {
-        assertEquals(
-            ChromeTapZone.PREV,
-            chromeZoneForTap(0.1f, 0.5f, ChromeReadingDirection.LEFT_TO_RIGHT),
-        )
-        assertEquals(
-            ChromeTapZone.MENU,
-            chromeZoneForTap(0.5f, 0.5f, ChromeReadingDirection.LEFT_TO_RIGHT),
-        )
-        assertEquals(
-            ChromeTapZone.NEXT,
-            chromeZoneForTap(0.9f, 0.5f, ChromeReadingDirection.LEFT_TO_RIGHT),
-        )
+    fun `zones split thirds and mirror for rtl`() {
+        val ltr = ChromeReadingDirection.LEFT_TO_RIGHT
+        val rtl = ChromeReadingDirection.RIGHT_TO_LEFT
+        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.1f, 0.5f, ltr))
+        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f, ltr))
+        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.9f, 0.5f, ltr))
         // RTL mirrors forward: the left third advances.
-        assertEquals(
-            ChromeTapZone.NEXT,
-            chromeZoneForTap(0.1f, 0.5f, ChromeReadingDirection.RIGHT_TO_LEFT),
-        )
-        assertEquals(
-            ChromeTapZone.PREV,
-            chromeZoneForTap(0.9f, 0.5f, ChromeReadingDirection.RIGHT_TO_LEFT),
-        )
+        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.1f, 0.5f, rtl))
+        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.9f, 0.5f, rtl))
     }
 
     @Test
-    fun `top strip always toggles chrome and disabled routes to menu`() {
-        ChromeNavMode.entries.forEach { mode ->
-            assertEquals(
-                "mode $mode",
-                ChromeTapZone.MENU,
-                chromeZoneForTap(
-                    0.5f,
-                    0.01f,
-                    ChromeReadingDirection.LEFT_TO_RIGHT,
-                    mode,
-                ),
-            )
-        }
+    fun `invert switch mirrors the thirds`() {
+        val ltr = ChromeReadingDirection.LEFT_TO_RIGHT
+        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.1f, 0.5f, ltr, invertTaps = true))
+        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f, ltr, invertTaps = true))
+        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.9f, 0.5f, ltr, invertTaps = true))
+    }
+
+    @Test
+    fun `top strip always toggles chrome`() {
         assertEquals(
             ChromeTapZone.MENU,
-            chromeZoneForTap(
-                0.05f,
-                0.6f,
-                ChromeReadingDirection.LEFT_TO_RIGHT,
-                ChromeNavMode.DISABLED,
-            ),
+            chromeZoneForTap(0.5f, 0.01f, ChromeReadingDirection.LEFT_TO_RIGHT),
         )
-    }
-
-    @Test
-    fun `kindlish keeps a menu header with a narrow prev column`() {
-        val mode = ChromeNavMode.KINDLISH
-        val dir = ChromeReadingDirection.LEFT_TO_RIGHT
-        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.1f, dir, mode))
-        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.1f, 0.6f, dir, mode))
-        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.6f, 0.6f, dir, mode))
     }
 
     // Composables
@@ -201,102 +152,28 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun `action dock exposes all five mori actions`() {
-        var docked = ""
+    fun `epub dock exposes flow theme toc highlights and settings`() {
+        var themeClicks = 0
+        var settingsClicks = 0
         composeTestRule.setContent {
             IridiumTheme {
-                ReaderActionDock(
-                    config = ReaderChromeConfig(),
-                    onDirectionToggle = { docked = "direction" },
-                    onFitCycle = { docked = "fit" },
-                    onCropToggle = { docked = "crop" },
-                    onOverviewClick = { docked = "overview" },
-                    onSettingsClick = { docked = "settings" },
+                ReaderEpubDock(
+                    onFlowCycle = {},
+                    onThemeClick = { themeClicks++ },
+                    onTocClick = {},
+                    onHighlightsClick = {},
+                    onSettingsClick = { settingsClicks++ },
                 )
             }
         }
 
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ActionDock).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.DirectionButton).performClick()
-        assertEquals("direction", docked)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.FitButton).performClick()
-        assertEquals("fit", docked)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.CropButton).performClick()
-        assertEquals("crop", docked)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.OverviewButton).performClick()
-        assertEquals("overview", docked)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.SettingsButton).performClick()
-        assertEquals("settings", docked)
-    }
-
-    @Test
-    fun `settings content renders every mori section`() {
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderChromeSettingsContent(
-                    config = ReaderChromeConfig(),
-                    onDirectionChange = {},
-                    onFitChange = {},
-                    onCropChange = {},
-                    onNavModeChange = {},
-                    onFlowChange = {},
-                )
-            }
-        }
-
-        // Sections below the fold are scrolled into view (the sheet body
-        // is a scrolled column, like the Mori settings sheet).
-        composeTestRule.onNodeWithText("Reading settings").assertIsDisplayed()
-        listOf("Flow", "Reading direction", "Page fit", "Crop page margins", "Tap zones")
-            .forEach { section ->
-                composeTestRule.onNodeWithText(section).performScrollTo()
-                composeTestRule.onNodeWithText(section).assertIsDisplayed()
-            }
-        // One choice card per nav mode.
-        ChromeNavMode.entries.forEach { mode ->
-            composeTestRule
-                .onNodeWithTag(ReaderChromeTestTags.navCardFor(mode))
-                .performScrollTo()
-            composeTestRule
-                .onNodeWithTag(ReaderChromeTestTags.navCardFor(mode))
-                .assertIsDisplayed()
-        }
-    }
-
-    @Test
-    fun `settings choices dispatch typed callbacks`() {
-        var direction: ChromeReadingDirection? = null
-        var fit: ChromePageFit? = null
-        var navMode: ChromeNavMode? = null
-        var flow: ReadingFlow? = null
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderChromeSettingsContent(
-                    config = ReaderChromeConfig(),
-                    onDirectionChange = { direction = it },
-                    onFitChange = { fit = it },
-                    onCropChange = {},
-                    onNavModeChange = { navMode = it },
-                    onFlowChange = { flow = it },
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.DirectionRtl).performScrollTo()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.DirectionRtl).performClick()
-        assertEquals(ChromeReadingDirection.RIGHT_TO_LEFT, direction)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.FitHeight).performScrollTo()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.FitHeight).performClick()
-        assertEquals(ChromePageFit.HEIGHT, fit)
-        composeTestRule
-            .onNodeWithTag(ReaderChromeTestTags.navCardFor(ChromeNavMode.KINDLISH))
-            .performScrollTo()
-        composeTestRule
-            .onNodeWithTag(ReaderChromeTestTags.navCardFor(ChromeNavMode.KINDLISH))
-            .performClick()
-        assertEquals(ChromeNavMode.KINDLISH, navMode)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.FlowScrolled).performScrollTo()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.FlowScrolled).performClick()
-        assertEquals(ReadingFlow.SCROLLED, flow)
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubDock).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubFlowButton).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubThemeButton).performClick()
+        assertEquals(1, themeClicks)
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubTocButton).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubHighlightsButton).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubSettingsButton).performClick()
+        assertEquals(1, settingsClicks)
     }
 }
