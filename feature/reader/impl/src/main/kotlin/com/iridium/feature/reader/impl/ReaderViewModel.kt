@@ -210,6 +210,27 @@ class ReaderViewModel @Inject constructor(
             }
             is ReaderAction.AddHighlight -> addHighlight(action.color, action.note)
             is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
+            is ReaderAction.SetFlow,
+            is ReaderAction.SetFontScale,
+            is ReaderAction.SetLineHeight,
+            is ReaderAction.SetTextAlign,
+            is ReaderAction.SetTheme,
+            is ReaderAction.SetBrightness,
+            is ReaderAction.SetKeepScreenOn,
+            is ReaderAction.SetShowPageCounter,
+            is ReaderAction.SetVolumeKeys,
+            is ReaderAction.SetVolumeKeysInverted,
+            is ReaderAction.SetTapZoneMode,
+            is ReaderAction.SetTapZoneInvert,
+            is ReaderAction.SetNightLight,
+            is ReaderAction.SetNightLightIntensity,
+            -> onPrefsAction(action)
+        }
+    }
+
+    /** Reader-preference writes, split out so onAction stays under the complexity gate. */
+    private fun onPrefsAction(action: ReaderAction) {
+        when (action) {
             is ReaderAction.SetFlow -> updateReaderPrefs { it.copy(flow = action.flow) }
             is ReaderAction.SetFontScale -> updateReaderPrefs {
                 it.copy(fontScale = action.scale.coerceIn(0.5f, 3f))
@@ -246,6 +267,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetNightLightIntensity -> updateReaderPrefs {
                 it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
             }
+            else -> Unit
         }
     }
 
