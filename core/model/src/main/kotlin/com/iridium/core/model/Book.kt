@@ -60,7 +60,7 @@ fun List<Book>.applyQuery(query: LibraryQuery): List<Book> {
     when (query.filter) {
         LibraryFilter.ALL -> Unit
         LibraryFilter.IN_PROGRESS -> result = result.filter { it.isInProgress }
-        LibraryFilter.UNREAD -> result = result.filter { it.progress <= 0f }
+        LibraryFilter.UNREAD -> result = result.filter { it.progress <= 0f && it.error == null }
         LibraryFilter.FINISHED -> result = result.filter { it.isFinished }
         LibraryFilter.FAVORITES -> result = result.filter { it.bookmarked }
     }

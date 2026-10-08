@@ -59,7 +59,7 @@ class LibraryViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = LibraryQuery(),
     )
-    private val menuBookId = MutableStateFlow<String?>(null)
+    private val menuBook = MutableStateFlow<Book?>(null)
     private val menuDeleteConfirm = MutableStateFlow(false)
 
     private val refreshing = MutableStateFlow(false)
@@ -111,7 +111,7 @@ class LibraryViewModel @Inject constructor(
         contentHits,
         indexing,
         preferences.libraryDisplay,
-        combine(menuBookId, menuDeleteConfirm, ::MenuChrome),
+        combine(menuBook, menuDeleteConfirm, ::MenuChrome),
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val books = args[0] as List<Book>
@@ -133,7 +133,7 @@ class LibraryViewModel @Inject constructor(
             contentHits = hits,
             indexing = isIndexing,
             display = display,
-            menuBookId = menu.bookId,
+            menuBook = menu.book,
             menuDeleteConfirm = menu.deleteConfirm,
         )
     }.stateIn(
@@ -159,6 +159,14 @@ class LibraryViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null,
+        )
+
+    /** SAF folders linked for scans; empty means the grant UI shows. */
+    val linkedFolders: StateFlow<Set<String>> = preferences.linkedFolders
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptySet(),
         )
 
     init {
@@ -199,26 +207,29 @@ class LibraryViewModel @Inject constructor(
             LibraryAction.CloseFilter -> filterOpen.value = false
             LibraryAction.ToggleSearch -> searchOpen.update { !it }
             LibraryAction.Rescan -> scan()
+            is LibraryAction.AddLinkedFolder -> viewModelScope.launch {
+                preferences.addLinkedFolder(action.uri)
+            }
             LibraryAction.IndexLibrary -> indexLibrary()
             is LibraryAction.RemoveBook -> remove(action.bookId)
             is LibraryAction.OpenMenu -> {
-                menuBookId.value = action.bookId
+                menuBook.value = books.value.firstOrNull { it.id == action.bookId }
                 menuDeleteConfirm.value = false
             }
             LibraryAction.CloseMenu -> {
-                menuBookId.value = null
+                menuBook.value = null
                 menuDeleteConfirm.value = false
             }
             LibraryAction.ToggleMenuBookmark -> {
-                val id = menuBookId.value ?: return
+                val id = menuBook.value?.id ?: return
                 val current = books.value.firstOrNull { it.id == id }?.bookmarked ?: return
                 viewModelScope.launch { repository.setBookmarked(id, !current) }
             }
             LibraryAction.OpenMenuDelete -> menuDeleteConfirm.value = true
             LibraryAction.ConfirmMenuDelete -> {
-                val id = menuBookId.value ?: return
+                val id = menuBook.value?.id ?: return
                 menuDeleteConfirm.value = false
-                menuBookId.value = null
+                menuBook.value = null
                 remove(id)
             }
         }
@@ -234,7 +245,7 @@ class LibraryViewModel @Inject constructor(
 
     /** Ephemeral menu chrome kept out of the query/data flows. */
     private data class MenuChrome(
-        val bookId: String?,
+        val book: Book?,
         val deleteConfirm: Boolean,
     )
 
@@ -253,6 +264,10 @@ class LibraryViewModel @Inject constructor(
      */
     private fun scan() {
         viewModelScope.launch {
+            // No linked folders, no scan: running the repository with an
+            // empty folder set would read as an empty device and prune the
+            // whole library.
+            if (preferences.linkedFolders.first().isEmpty()) return@launch
             if (scanMutex.isLocked) {
                 scanQueued.set(true)
                 return@launch

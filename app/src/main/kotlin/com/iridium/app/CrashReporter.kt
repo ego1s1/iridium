@@ -30,6 +30,7 @@ class CrashReporter @Inject constructor(
     private val directory: File get() = File(context.cacheDir, DIR).apply { mkdirs() }
 
     private val previousHandler = AtomicReference<Thread.UncaughtExceptionHandler?>()
+    private var ourHandler: Thread.UncaughtExceptionHandler? = null
 
     /**
      * Explicit installed flag rather than a null sentinel: the platform's
@@ -43,16 +44,25 @@ class CrashReporter @Inject constructor(
         if (!installed.compareAndSet(false, true)) return
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         previousHandler.set(previous)
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        val ours = Thread.UncaughtExceptionHandler { thread, throwable ->
             runCatching { writeTombstone(thread, throwable) }
             // Never swallow the crash: the system must still see it.
             previous?.uncaughtException(thread, throwable)
         }
+        ourHandler = ours
+        Thread.setDefaultUncaughtExceptionHandler(ours)
+        // A crash loop must not fill the cache: prune previous runs.
+        runCatching { prune() }
     }
 
     fun uninstall() {
         if (!installed.compareAndSet(true, false)) return
-        Thread.setDefaultUncaughtExceptionHandler(previousHandler.getAndSet(null))
+        // Only restore when ours is still installed: another SDK may have
+        // chained itself on top of us while we were running.
+        if (Thread.getDefaultUncaughtExceptionHandler() === ourHandler) {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler.getAndSet(null))
+        }
+        ourHandler = null
     }
 
     /** Tombstones waiting to be offered to the user, newest first. */
@@ -76,8 +86,7 @@ class CrashReporter @Inject constructor(
         Unit
     }
 
-    private fun writeTombstone(thread: Thread, throwable: Throwable) {
-        val stackTrace = StringWriter().also { writer ->
+    private fun writeTombstone(thread: Thread, throwable: Throwable) {        val stackTrace = StringWriter().also { writer ->
             PrintWriter(writer).use { throwable.printStackTrace(it) }
         }.toString()
 
@@ -92,10 +101,23 @@ class CrashReporter @Inject constructor(
             appendLine(stackTrace)
         }
         runCatching { File(directory, fileName).writeText(body) }
+        runCatching { prune() }
+    }
+
+    /** Keeps only the newest tombstones so a crash loop cannot fill storage. */
+    private fun prune() {
+        val files = directory.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(EXT) }
+            ?.sortedByDescending { it.lastModified() }
+            .orEmpty()
+        files.drop(MAX_TOMBSTONES).forEach { runCatching { it.delete() } }
     }
 
     private companion object {
         const val DIR = "crashes"
         const val EXT = ".txt"
+
+        /** Newest tombstones retained; older ones are pruned on write. */
+        const val MAX_TOMBSTONES = 10
     }
 }

@@ -82,7 +82,10 @@ private fun List<Book>.groupByDay(now: Long = System.currentTimeMillis()): List<
     calendar.set(Calendar.SECOND, 0)
     calendar.set(Calendar.MILLISECOND, 0)
     val startOfToday = calendar.timeInMillis
-    val startOfYesterday = startOfToday - DAY_MS
+    // Calendar arithmetic, not minus-24h: DST transitions make yesterday
+    // 23 or 25 hours long.
+    calendar.add(Calendar.DAY_OF_YEAR, -1)
+    val startOfYesterday = calendar.timeInMillis
 
     val formatter = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
     return groupBy { book ->
@@ -96,7 +99,6 @@ private fun List<Book>.groupByDay(now: Long = System.currentTimeMillis()): List<
     }
 }
 
-private const val DAY_MS = 24L * 60 * 60 * 1000
 
 /** Public tab content for the main viewport. */
 @Composable
@@ -222,13 +224,14 @@ private fun HistoryRow(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
+                val progress = book.progress.coerceIn(0f, 1f)
                 LinearProgressIndicator(
-                    progress = { book.progress },
+                    progress = { progress },
                     modifier = Modifier.fillMaxWidth().height(3.dp),
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${(book.progress * 100).toInt()}% read",
+                    text = "${(progress * 100).toInt()}% read",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

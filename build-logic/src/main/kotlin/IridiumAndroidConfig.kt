@@ -38,7 +38,6 @@ internal fun Project.configureAndroidLibraryDefaults() {
     extensions.configure<LibraryExtension> {
         configureAndroidCommon(this)
         defaultConfig {
-            targetSdk = TARGET_SDK
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
         testOptions {
@@ -53,6 +52,7 @@ internal fun Project.configureAndroidApplicationDefaults() {
         configureAndroidCommon(this)
         defaultConfig {
             targetSdk = TARGET_SDK
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
         testOptions {
             unitTests.isIncludeAndroidResources = true

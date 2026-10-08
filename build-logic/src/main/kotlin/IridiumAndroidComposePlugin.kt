@@ -1,5 +1,4 @@
-import com.android.build.gradle.AppExtension
-import com.android.build.gradle.LibraryExtension
+import com.android.build.api.dsl.CommonExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
@@ -13,9 +12,14 @@ class IridiumAndroidComposePlugin : Plugin<Project> {
             // plugins block; convention plugins cannot resolve external plugin ids.
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
+            // New AGP DSL (AppExtension/LibraryExtension are deprecated and
+            // break on AGP 9). Lenient afterEvaluate lookup: the Android
+            // extension is registered by AGP after this plugin applies.
             afterEvaluate {
-                extensions.findByType(LibraryExtension::class.java)?.buildFeatures?.compose = true
-                extensions.findByType(AppExtension::class.java)?.buildFeatures?.compose = true
+                @Suppress("UNCHECKED_CAST")
+                (extensions.findByName("android") as? CommonExtension<*, *, *, *, *, *>)
+                    ?.buildFeatures
+                    ?.compose = true
             }
 
             dependencies {

@@ -17,7 +17,9 @@ import com.iridium.core.model.TocEntry
 import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import android.os.SystemClock
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -65,6 +67,21 @@ class ReaderViewModel @Inject constructor(
     private val openFailed = MutableStateFlow(false)
     private var chromeJob: Job? = null
     private var dictionaryJob: Job? = null
+
+    /**
+     * Suppresses locator-driven chrome hides right after programmatic
+     * navigation (open, seek, TOC jump): only user page turns hide chrome.
+     */
+    private var lastProgrammaticNavMs: Long = 0L
+
+    /** Cached prefs for tap paths that must not suspend on DataStore IO. */
+    private val prefsFlow: StateFlow<com.iridium.core.model.ReaderPreferences> =
+        preferences.readerPreferences.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = com.iridium.core.model.ReaderPreferences(),
+        )
+
     /** Publication positions for the slider/position text (no fixed pages). */
     private var positionsCache: List<Locator> = emptyList()
 
@@ -112,23 +129,26 @@ class ReaderViewModel @Inject constructor(
             b == null && failed -> ReaderUiState.OpenFailed
             b == null -> ReaderUiState.Gone
             failed -> ReaderUiState.OpenFailed
-            else -> ReaderUiState.Ready(
-                book = b,
-                toc = t,
-                highlights = h,
-                prefs = p,
-                chromeVisible = chrome,
-                settingsOpen = settings,
-                tocOpen = tocOpenV,
-                highlightsOpen = hlOpen,
-                progression = (b.progress.takeIf { prog == 0f } ?: prog),
-                positionText = positionText(),
-                positionIndex = positionIndexAndCount().first,
-                positionCount = positionIndexAndCount().second,
-                focusedHighlightId = focused,
-                navigatorAttached = attached,
-                themeSheetOpen = themeSheet,
-            )
+            else -> {
+                val (positionIndex, positionCount) = positionIndexAndCount()
+                ReaderUiState.Ready(
+                    book = b,
+                    toc = t,
+                    highlights = h,
+                    prefs = p,
+                    chromeVisible = chrome,
+                    settingsOpen = settings,
+                    tocOpen = tocOpenV,
+                    highlightsOpen = hlOpen,
+                    progression = (b.progress.takeIf { prog == 0f } ?: prog),
+                    positionText = positionText(),
+                    positionIndex = positionIndex,
+                    positionCount = positionCount,
+                    focusedHighlightId = focused,
+                    navigatorAttached = attached,
+                    themeSheetOpen = themeSheet,
+                )
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
 
@@ -138,13 +158,8 @@ class ReaderViewModel @Inject constructor(
             store.events.collect { handleSessionEvent(it) }
         }
         viewModelScope.launch {
-            // Persist progress on every debounced locator (skip the initial 0).
-            var first = true
+            // Persist progress on every debounced locator value.
             progression.collect { prog ->
-                if (first) {
-                    first = false
-                    return@collect
-                }
                 val locator = store.latestLocator.value ?: return@collect
                 repository.updateProgress(bookId, prog, locator.toJSON().toString())
             }
@@ -154,10 +169,12 @@ class ReaderViewModel @Inject constructor(
             highlights.collect { applyDecorations(it) }
         }
         viewModelScope.launch {
-            // Mori PageChanged -> hide parity: any locator change (page turn)
-            // hides the chrome; the pending auto-hide timer is redundant then.
+            // User page turns hide the chrome; programmatic jumps (open,
+            // seek, TOC) and the initial publish must not.
             store.latestLocator.collect { locator ->
-                if (locator != null) {
+                if (locator != null &&
+                    SystemClock.uptimeMillis() - lastProgrammaticNavMs > LOCATOR_HIDE_GRACE_MS
+                ) {
                     chromeVisible.value = false
                     chromeJob?.cancel()
                 }
@@ -276,6 +293,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetNightLightIntensity -> updateReaderPrefs {
                 it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
             }
+            // Statement position: anything else was routed here by mistake and
+            // is intentionally ignored (callers only pass prefs actions).
             else -> Unit
         }
     }
@@ -347,17 +366,21 @@ class ReaderViewModel @Inject constructor(
             ReaderSessionEvent.SessionLost -> messageChannel.send(ReaderMessage.Pop)
             ReaderSessionEvent.ContentTapped -> {
                 // A content tap with the dictionary open dismisses the popup
-                // instead of toggling chrome.
+                // instead of toggling chrome; taps behind any sheet are the
+                // modal's, not the page's.
                 if (_dictionaryUi.value != null) {
                     dismissDictionary()
-                } else {
+                } else if (!settingsOpen.value && !themeSheetOpen.value &&
+                    !tocOpen.value && !highlightsOpen.value
+                ) {
                     toggleChrome()
                 }
             }
             is ReaderSessionEvent.ContentTappedAt ->
-                handleZonedTap(event.fractionX, event.fractionY)
+                handleZonedTap(event.fractionX, event.fractionY, event.dismissedPopup)
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
+                lastProgrammaticNavMs = SystemClock.uptimeMillis()
                 // Fresh navigator: submit current prefs + decorations.
                 val prefs = EpubPreferencesMapper.map(preferences.readerPreferences.first())
                 runCatching { store.navigator?.submitPreferences(prefs) }
@@ -386,20 +409,26 @@ class ReaderViewModel @Inject constructor(
      * Routes a positioned content tap through the fixed tap zones: outer
      * thirds turn positions, the center toggles chrome (optionally mirrored
      * by the invert-taps switch). Links keep working — Readium follows those
-     * before listeners run.
+     * before listeners run. Taps landing while a sheet or the dictionary is
+     * open do nothing: the modal owns the gesture.
      */
-    private suspend fun handleZonedTap(fractionX: Float, fractionY: Float) {
-        if (_dictionaryUi.value != null) {
+    private fun handleZonedTap(fractionX: Float, fractionY: Float, dismissedPopup: Boolean) {
+        if (dismissedPopup) {
             dismissDictionary()
             return
         }
-        val invert = preferences.readerPreferences.first().invertTaps
+        if (_dictionaryUi.value != null ||
+            settingsOpen.value || themeSheetOpen.value ||
+            tocOpen.value || highlightsOpen.value
+        ) {
+            return
+        }
         when (
             chromeZoneForTap(
                 fractionX,
                 fractionY,
                 ChromeReadingDirection.LEFT_TO_RIGHT,
-                invert,
+                prefsFlow.value.invertTaps,
             )
         ) {
             ChromeTapZone.PREV -> {
@@ -435,6 +464,12 @@ class ReaderViewModel @Inject constructor(
         val state = uiState.value as? ReaderUiState.Ready ?: return false
         return isVolumePagingActive(state)
     }
+
+    /** Single source of truth for the volume-key paging gate. */
+    val volumePagingActive: StateFlow<Boolean> = uiState
+        .map { state -> (state as? ReaderUiState.Ready)?.let { ready -> isVolumePagingActive(ready) } ?: false }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private fun isVolumePagingActive(state: ReaderUiState.Ready): Boolean {
         return state.prefs.volumeKeys &&
@@ -477,16 +512,22 @@ class ReaderViewModel @Inject constructor(
 
     private fun onSelectionChanged(text: String?) {
         dictionaryJob?.cancel()
-        val query = text?.trim().orEmpty()
-        if (query.isBlank()) {
+        // Normalize first: punctuation-only or blank selections show no
+        // popup at all, and the popup titles the clean headword rather than
+        // the raw multi-word drag.
+        val query = text?.let(::normalizeLookupWord)
+        if (query.isNullOrEmpty()) {
             _dictionaryUi.value = null
             return
         }
         dictionaryJob = viewModelScope.launch {
-            // Lookup starts immediately; the popup itself waits a beat. Cache
-            // hits resolve inside the delay (popup appears once, with content)
-            // while slow network lookups show a skeleton instead of flashing.
+            // Debounce first: selection drags fire per word, and a blocking
+            // HTTP call cannot be cancelled mid-flight — superseded words
+            // must never reach the network.
+            delay(DICTIONARY_DEBOUNCE_MS)
             val lookup = async { dictionaryLookup.define(query) }
+            // Reveal delay: cache hits resolve inside it (popup appears once,
+            // with content); slow lookups show a skeleton instead of flashing.
             delay(DICTIONARY_REVEAL_DELAY_MS)
             if (!lookup.isCompleted) {
                 _dictionaryUi.value = DictionaryUiState(word = query, loading = true)
@@ -517,6 +558,7 @@ class ReaderViewModel @Inject constructor(
         val nav = store.navigator ?: return
         val positions = positionsCache
         if (positions.isEmpty()) return
+        lastProgrammaticNavMs = SystemClock.uptimeMillis()
         val index = (progression * (positions.size - 1)).toInt().coerceIn(0, positions.size - 1)
         nav.go(positions[index])
     }
@@ -531,6 +573,7 @@ class ReaderViewModel @Inject constructor(
                 entry.href.substringBefore('#').endsWith(it.href.toString().substringBefore('#'))
         } ?: return
         val locator = runCatching { publication.locatorFromLink(link) }.getOrNull() ?: return
+        lastProgrammaticNavMs = SystemClock.uptimeMillis()
         nav.go(locator)
     }
 
@@ -615,13 +658,12 @@ class ReaderViewModel @Inject constructor(
 
     override fun onCleared() {
         if (store.bookId == bookId) {
-            // Flush the latest locator synchronously before closing.
+            // Flush the latest locator before closing. NonCancellable: the
+            // scope is already tearing down, and a cancelled tail write
+            // silently loses the last page turn on process death.
             store.latestLocator.value?.let { locator ->
                 val prog = locator.locations.totalProgression?.toFloat() ?: 0f
-                // Fire-and-forget is unsafe in onCleared; Room write races
-                // process death, but the debounced collector already saved
-                // everything older than 500ms — this covers only the tail.
-                viewModelScope.launch {
+                viewModelScope.launch(NonCancellable) {
                     runCatching {
                         repository.updateProgress(bookId, prog, locator.toJSON().toString())
                     }
@@ -636,10 +678,24 @@ class ReaderViewModel @Inject constructor(
         const val CHROME_AUTO_HIDE_MS = 3000L
 
         /**
+         * Locator changes inside this window after programmatic navigation
+         * (open, seek, TOC jump) never hide the chrome: only user page turns
+         * do.
+         */
+        const val LOCATOR_HIDE_GRACE_MS = 750L
+
+        /**
+         * Selection debounce before the lookup starts: drags fire per word
+         * and a blocking HTTP call cannot be cancelled mid-flight, so
+         * superseded words must never reach the network.
+         */
+        const val DICTIONARY_DEBOUNCE_MS = 150L
+
+        /**
          * Grace period before the dictionary popup reveals: lookups finishing
          * inside it (cache hits) skip the loading skeleton entirely.
          */
-        const val DICTIONARY_REVEAL_DELAY_MS = 200L
+        const val DICTIONARY_REVEAL_DELAY_MS = 150L
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
         const val DECORATION_GROUP = "highlights"
     }

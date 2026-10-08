@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,15 +75,17 @@ internal fun BookCard(
     sharedCover: Boolean = true,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    // Wrappers keyed by click-relevant fields (identity, progress, error) —
-    // not full-book equality: cover/metadata re-emissions no longer
-    // invalidate the handler, while a real progress save still refreshes it.
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(book) } }
+    // Handlers read the latest book at click time: keying only on
+    // click-relevant fields (identity, progress, error) avoids rebuilding on
+    // cover/metadata re-emissions, while title/author/bookmark/cover updates
+    // still reach the tap through latestBook.
+    val latestBook by rememberUpdatedState(book)
+    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
     val haptics = rememberIridiumHaptics()
     val longClick = remember(book.id, onDetails, haptics) {
         {
             haptics(IridiumHaptic.LongPress)
-            onDetails(book)
+            onDetails(latestBook)
         }
     }
     val interactionSource = remember { MutableInteractionSource() }

@@ -175,6 +175,9 @@ internal fun DetailScreen(
                 IridiumPrimaryButton(
                     onClick = onReadClick,
                     haptic = IridiumHaptic.PrimaryAction,
+                    // Unreadable books fail gracefully here instead of
+                    // crashing-or-bouncing inside the reader.
+                    enabled = book.error == null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("detailRead"),

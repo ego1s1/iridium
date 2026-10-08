@@ -38,7 +38,8 @@
     <string name="settings_reading_volume_keys">Volume keys turn pages</string>
 
     <string name="settings_storage_location_title">Your library</string>
-    <string name="settings_storage_location_subtitle">Iridium finds every EPUB on your device. Books are read in place — only covers and reading state are stored on device.</string>
+    <string name="settings_storage_location_subtitle">Pick folders for Iridium to scan. Books are read in place — only covers and reading state are stored on device.</string>
+    <string name="settings_storage_linked">%d folders linked — tap to add another</string>
 
     <string name="settings_about_app">Iridium</string>
     <string name="settings_about_tagline">A calm, high-craft EPUB reader</string>

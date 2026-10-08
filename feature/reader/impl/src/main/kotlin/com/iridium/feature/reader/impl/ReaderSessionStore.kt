@@ -27,9 +27,15 @@ sealed interface ReaderSessionEvent {
     /**
      * A tap at a position inside the content, as fractions of the navigator
      * view (0f..1f). Powers tap-zone page turns; falls back to a chrome
-     * toggle when the position is unavailable.
+     * toggle when the position is unavailable. [dismissedPopup] is true when
+     * the tap cleared an active text selection first — the tap is then fully
+     * consumed by the dismiss and must not also turn pages or toggle chrome.
      */
-    data class ContentTappedAt(val fractionX: Float, val fractionY: Float) : ReaderSessionEvent
+    data class ContentTappedAt(
+        val fractionX: Float,
+        val fractionY: Float,
+        val dismissedPopup: Boolean = false,
+    ) : ReaderSessionEvent
 
     /** The user tapped a highlight decoration. */
     data class DecorationTapped(val decorationId: String) : ReaderSessionEvent
@@ -146,11 +152,12 @@ class ReaderSessionStore @Inject constructor() {
         tryEmit(ReaderSessionEvent.SelectionChanged(cleaned))
     }
 
-    /** Clears the active selection; no-op (no event) when already empty. */
-    fun clearSelection() {
-        if (_selectedText.value == null) return
+    /** Clears the active selection; returns true when one was dismissed. */
+    fun clearSelection(): Boolean {
+        if (_selectedText.value == null) return false
         _selectedText.value = null
         tryEmit(ReaderSessionEvent.SelectionChanged(null))
+        return true
     }
 
     suspend fun emit(event: ReaderSessionEvent) {

@@ -27,7 +27,8 @@ class IridiumAndroidFeaturePlugin : Plugin<Project> {
                 add("implementation", libs.findLibrary("kotlinx-coroutines-android").get())
                 add("implementation", libs.findLibrary("coil-compose").get())
 
-                add("testImplementation", platform(libs.findLibrary("androidx-compose-bom").get()))
+                // Compose BOM alignment comes from the compose convention
+                // plugin (implementation scope); no test-only duplicate here.
                 add("testImplementation", libs.findLibrary("junit").get())
                 add("testImplementation", libs.findLibrary("kotlinx-coroutines-test").get())
                 add("testImplementation", libs.findLibrary("turbine").get())

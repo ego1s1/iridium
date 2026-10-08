@@ -11,11 +11,11 @@
     <string name="onboarding_get_started">Get started</string>
     <string name="onboarding_get_started_caption">No account, no ads, no tracking.</string>
 
-    <string name="onboarding_access_title">One permission first</string>
-    <string name="onboarding_access_body">Iridium scans your device for EPUBs — every folder, automatically. Grant all-files access once and your whole library appears. Files stay exactly where they are — nothing is copied or uploaded.</string>
-    <string name="onboarding_access_grant">Grant access</string>
-    <string name="onboarding_access_granted">Access granted — your books will appear in the library.</string>
-    <string name="onboarding_access_hint">Without access Iridium can\'t find your books. You can grant it later from system settings.</string>
+    <string name="onboarding_access_title">Where are your books?</string>
+    <string name="onboarding_access_body">Pick the folders Iridium should scan for EPUBs — Downloads, your ebook folder, an SD card. Files stay exactly where they are; nothing is copied or uploaded.</string>
+    <string name="onboarding_access_grant">Choose folders</string>
+    <string name="onboarding_access_granted">%d folders linked — your books will appear in the library.</string>
+    <string name="onboarding_access_hint">Without a folder Iridium can\'t find your books. You can add one later from the library.</string>
     <string name="onboarding_access_note">Only EPUB discovery uses this. Your files never leave the device.</string>
     <string name="onboarding_reading_title">Make reading yours</string>
     <string name="onboarding_reading_body">Set your text size, line spacing and book colors now — everything stays changeable while reading.</string>

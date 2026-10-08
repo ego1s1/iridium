@@ -100,8 +100,15 @@ internal fun LibrarySortFilterSheet(
                         IridiumChoiceOption("5"),
                         IridiumChoiceOption("6"),
                     ),
-                    selectedIndex = display.gridColumns.coerceIn(0, 6),
-                    onSelect = { onAction(LibraryAction.GridColumnsSelected(it)) },
+                    selectedIndex = listOf(0, 2, 3, 4, 5, 6)
+                        .indexOf(display.gridColumns)
+                        .coerceAtLeast(0),
+                    // Option position is not the column count: index 0 is
+                    // auto (0), the rest are literal 2..6.
+                    onSelect = {
+                        val columns = listOf(0, 2, 3, 4, 5, 6)[it.coerceIn(0, 5)]
+                        onAction(LibraryAction.GridColumnsSelected(columns))
+                    },
                 )
             }
             Spacer(Modifier.height(4.dp))

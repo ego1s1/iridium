@@ -7,16 +7,16 @@ import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
 
 /**
- * Permission-first wizard: Welcome → Access → Reading → Appearance. Theme
- * and reading choices persist immediately so quitting mid-wizard never loses
- * them; Skip finishes from anywhere. Nothing is copied or indexed here — the
- * library scans all of shared storage on arrival.
+ * Folder-first wizard: Welcome → Access → Reading → Appearance. Theme,
+ * reading and folder choices persist immediately so quitting mid-wizard
+ * never loses them; Skip finishes from anywhere. The library scans only
+ * the linked SAF folders on arrival.
  */
 sealed interface OnboardingUiState {
     data object Welcome : OnboardingUiState
 
-    /** All-files access step: the library reads every EPUB on the device. */
-    data object Access : OnboardingUiState
+    /** Folder-link step: which SAF folders the library scans for EPUBs. */
+    data class Access(val folderCount: Int) : OnboardingUiState
 
     /** Reader defaults step: text size, line spacing, book colors. */
     data class Reading(
@@ -57,6 +57,9 @@ sealed interface OnboardingAction {
     data class SetColorScheme(val scheme: AppColorScheme) : OnboardingAction
 
     data class SetAmoled(val enabled: Boolean) : OnboardingAction
+
+    /** Link one SAF folder for library scans. */
+    data class AddLinkedFolder(val uri: String) : OnboardingAction
 
     /** Mark onboarding complete and continue to the library. */
     data object Finish : OnboardingAction

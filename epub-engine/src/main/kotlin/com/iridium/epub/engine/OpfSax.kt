@@ -117,7 +117,14 @@ internal object OpfSax {
                         )
                     }
                 }
-                "itemref" -> attrs.value("idref")?.let { spine += it }
+                "itemref" -> {
+                    // Non-linear spine items (covers, splash pages) are not
+                    // readable content: skipping matches the native engine.
+                    val linear = attrs.value("linear")
+                    if (linear == null || !linear.equals("no", ignoreCase = true)) {
+                        attrs.value("idref")?.let { spine += it }
+                    }
+                }
                 "meta" -> {
                     if (attrs.value("name").equals("cover", ignoreCase = true)) {
                         coverId = attrs.value("content")

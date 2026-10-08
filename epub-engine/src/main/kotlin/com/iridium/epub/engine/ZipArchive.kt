@@ -76,7 +76,9 @@ internal class ZipArchive private constructor(
         val inflater = Inflater(true)
         return try {
             inflater.setInput(data)
-            val initial = expected.coerceIn(64L, maxBytes).toInt()
+            // Cap the pre-size: a hostile expected size above Int range would
+            // overflow toInt() into a negative buffer size.
+            val initial = expected.coerceIn(64L, minOf(maxBytes, MAX_PRESIZE)).toInt()
             val out = ByteArrayOutputStream(initial)
             val buffer = ByteArray(INFLATE_BUFFER)
             var total = 0L
@@ -87,7 +89,9 @@ internal class ZipArchive private constructor(
                 if (total > maxBytes) return null
                 out.write(buffer, 0, count)
             }
-            out.toByteArray()
+            // A truncated stream exits the loop via needsInput: only a
+            // finished stream is a successful inflate.
+            out.toByteArray().takeIf { inflater.finished() }
         } catch (_: Exception) {
             null
         } finally {
@@ -111,6 +115,9 @@ internal class ZipArchive private constructor(
         private const val ZIP64_LOCATOR_SIZE = 20
         private const val MAX_COMMENT = 0xFFFF
         private const val INFLATE_BUFFER = 16 * 1024
+
+        /** Upper bound for the inflate pre-size (also the default entry cap). */
+        private const val MAX_PRESIZE = 64L * 1024 * 1024
 
         /** Caps: refuse rather than buffer. */
         const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
@@ -165,9 +172,19 @@ internal class ZipArchive private constructor(
                     val extraEnd = minOf(extraStart + extraLength, cd.size)
                     val zip64 = parseZip64Extra(cd, extraStart, extraEnd)
                     if (zip64 != null) {
-                        uncompressedSize = zip64.getOrElse(0) { uncompressedSize }
-                        compressedSize = zip64.getOrElse(1) { compressedSize }
-                        localOffset = zip64.getOrElse(2) { localOffset }
+                        // Positional by spec, but ONLY for fields flagged
+                        // 0xFFFFFFFF: consuming unconditionally misassigns
+                        // e.g. the offset as the uncompressed size.
+                        var i = 0
+                        if (uncompressedSize == 0xFFFFFFFFL && i < zip64.size) {
+                            uncompressedSize = zip64[i++]
+                        }
+                        if (compressedSize == 0xFFFFFFFFL && i < zip64.size) {
+                            compressedSize = zip64[i++]
+                        }
+                        if (localOffset == 0xFFFFFFFFL && i < zip64.size) {
+                            localOffset = zip64[i++]
+                        }
                     }
                 }
 

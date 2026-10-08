@@ -7,6 +7,7 @@ import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.testing.TestData
 import com.iridium.core.testing.TestDispatcherRule
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,7 +31,9 @@ class LibraryViewModelTest {
     private lateinit var viewModel: LibraryViewModel
 
     @Before
-    fun setup() {
+    fun setup() = runTest {
+        // Scans require at least one linked folder (SAF model).
+        preferences.addLinkedFolder("content://com.example/tree/books")
         viewModel = LibraryViewModel(
             savedStateHandle = SavedStateHandle(),
             repository = repository,
@@ -116,6 +119,21 @@ class LibraryViewModelTest {
         viewModel.onAction(LibraryAction.Rescan)
         // The message channel is consumed by the UI; assert the scan ran.
         viewModel.uiState.first { repository.filesystemScans > 1 }
+    }
+
+    @Test
+    fun `scan is skipped with no linked folders`() = runTest {
+        val bare = TestPreferencesDataSource()
+        val quiet = LibraryViewModel(
+            savedStateHandle = SavedStateHandle(),
+            repository = repository,
+            preferences = bare,
+        )
+        val scans = repository.filesystemScans
+        quiet.onAction(LibraryAction.Rescan)
+        // Let the skipped scan settle: no new filesystem pass may start.
+        runCurrent()
+        assertEquals(scans, repository.filesystemScans)
     }
 
     @Test

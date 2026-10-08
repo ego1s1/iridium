@@ -122,13 +122,19 @@ internal class OfflineFirstBooksRepository @Inject constructor(
             .flowOn(Dispatchers.Default)
 
     override fun observeToc(bookId: String): Flow<List<TocEntry>> =
-        bookDao.observeById(bookId).map { it?.tocEntries().orEmpty() }.flowOn(Dispatchers.Default)
+        bookDao.observeById(bookId).map { it?.tocEntries().orEmpty() }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override fun observeHighlights(bookId: String): Flow<List<Highlight>> =
         highlightDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override fun observeBookmarks(bookId: String): Flow<List<Bookmark>> =
         bookmarkDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
@@ -144,10 +150,12 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 val known = knownById[uri]
                 val row = if (
                     known != null &&
+                    known.error == null &&
                     known.sourceModified == doc.modified &&
                     known.coverPath?.let { File(it).isFile } == true
                 ) {
-                    // Fast path: unchanged file with a live thumbnail.
+                    // Fast path: healthy unchanged file with a live thumbnail.
+                    // Error rows always re-inspect so transient failures retry.
                     known
                 } else {
                     indexDocument(doc, known)
@@ -161,20 +169,41 @@ internal class OfflineFirstBooksRepository @Inject constructor(
             }
             onProgress(index + 1, docs.size)
         }
-        if (rows.isNotEmpty()) bookDao.upsertAll(rows)
+        if (rows.isNotEmpty()) {
+            // Re-read: a reader progress write may have landed after the
+            // snapshot above; last-writer-wins with stale rows would eat it.
+            val fresh = bookDao.getAll().associateBy { it.id }
+            val merged = rows.map { row ->
+                val live = fresh[row.id]
+                val snap = knownById[row.id]
+                if (live != null && (live.updatedAt > (snap?.updatedAt ?: 0L))) {
+                    row.copy(
+                        progress = live.progress,
+                        lastLocator = live.lastLocator,
+                        updatedAt = live.updatedAt,
+                        bookmarked = live.bookmarked,
+                    )
+                } else {
+                    row
+                }
+            }
+            bookDao.upsertAll(merged)
+        }
         // Prune rows deleted from the tree out from under us — never on a
         // failed walk, which would read as an empty folder and wipe rows the
-        // user still owns. Pruned covers go with their rows.
+        // user still owns. Pruned covers and FTS rows go with their books.
         if (!walkFailed) {
-            // Full-device scan: anything not found is gone, whatever scheme
-            // its row used (legacy SAF rows included) — except on a failed
-            // walk, which must never read as an empty device.
+            // Anything not found is gone, whatever scheme its row used
+            // (legacy rows included) — except on a failed walk, which must
+            // never read as an empty device.
             val foundIds = rows.map { it.id }.toSet()
             val pruned = knownById.values.filter { it.id !in foundIds }
             if (rows.isEmpty() && pruned.isNotEmpty()) {
                 bookDao.deleteAllLinked()
+                chapterTextDao.clear()
             } else if (pruned.isNotEmpty()) {
                 bookDao.deleteMissingLinked(foundIds.toList())
+                chapterTextDao.deleteForBooks(pruned.map { it.id })
             }
             pruned.forEach { deleteCover(it.coverPath) }
         }
@@ -212,10 +241,11 @@ internal class OfflineFirstBooksRepository @Inject constructor(
             chapterIndexer.extract(row.sourcePath, row.sourceDisplayName, toc)
         }.getOrDefault(emptyList())
 
-        // Replace atomically enough: a failure mid-insert leaves the previous
-        // index in place rather than a half-built one.
-        chapterTextDao.deleteForBook(bookId)
-        if (chapters.isNotEmpty()) chapterTextDao.insertAll(chapters)
+        // Never wipe a good index for a failed extract (unmounted file,
+        // transient parse error): the atomic replace below only runs when
+        // there is something to replace with.
+        if (chapters.isEmpty()) return@withContext 0
+        chapterTextDao.replaceForBook(bookId, chapters)
         chapters.size
     }
 
@@ -370,5 +400,5 @@ internal object EpubModule {
 
     @Provides
     @Singleton
-    fun provideLinkedTreeLister(): LinkedTreeLister = FilesystemLinkedTreeLister()
+    fun provideLinkedTreeLister(lister: SafLinkedTreeLister): LinkedTreeLister = lister
 }

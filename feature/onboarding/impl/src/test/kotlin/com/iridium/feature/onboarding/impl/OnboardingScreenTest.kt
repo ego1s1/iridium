@@ -61,18 +61,18 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun `the access step explains the permission and offers the grant`() {
+    fun `the access step explains folders and offers the picker`() {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
-                    uiState = OnboardingUiState.Access,
+                    uiState = OnboardingUiState.Access(folderCount = 0),
                     onAction = {},
                     onOnboardingComplete = {},
                 )
             }
         }
-        composeTestRule.onNodeWithText("One permission first").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Grant access").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Where are your books?").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Choose folders").assertIsDisplayed()
         composeTestRule.onNodeWithText("Continue").assertIsDisplayed()
     }
 

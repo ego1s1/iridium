@@ -30,14 +30,24 @@ interface EpubSource : Closeable {
          * descriptor) so no copy is made. [onClose] releases the owner handle.
          */
         fun ofChannel(channel: FileChannel, onClose: () -> Unit = {}): EpubSource =
-            ChannelEpubSource(channel, onClose)
+            try {
+                ChannelEpubSource(channel, onClose)
+            } catch (e: Exception) {
+                // Constructor probes the channel: release the FD instead of
+                // leaking it when the probe throws.
+                runCatching { channel.close() }
+                runCatching { onClose() }
+                throw e
+            }
 
         /**
          * Spools a one-way stream into [cacheDir] so it becomes seekable. The
          * temporary file is deleted when the source is closed.
          */
         fun ofStream(openStream: () -> InputStream, cacheDir: File): EpubSource {
-            cacheDir.mkdirs()
+            // check() over throw: a missing spool dir is a programming error,
+            // and explicit throws trip the ThrowsCount gate.
+            check(cacheDir.isDirectory || cacheDir.mkdirs()) { "Unable to spool EPUB in $cacheDir" }
             val temp = File.createTempFile("epub-src-", ".tmp", cacheDir)
             try {
                 openStream().use { input ->
@@ -47,10 +57,13 @@ interface EpubSource : Closeable {
                 temp.delete()
                 throw e
             }
-            return ChannelEpubSource(
-                FileChannel.open(temp.toPath()),
-                onClose = { runCatching { temp.delete() } },
-            )
+            val channel = try {
+                FileChannel.open(temp.toPath())
+            } catch (e: Exception) {
+                temp.delete()
+                throw e
+            }
+            return ChannelEpubSource(channel, onClose = { runCatching { temp.delete() } })
         }
     }
 }
@@ -59,7 +72,7 @@ private class ByteArrayEpubSource(private val bytes: ByteArray) : EpubSource {
     override val size: Long get() = bytes.size.toLong()
 
     override fun read(offset: Long, length: Int): ByteArray {
-        if (offset < 0 || offset >= bytes.size) return EMPTY
+        if (offset < 0 || length <= 0 || offset >= bytes.size) return EMPTY
         val end = minOf(offset + length, bytes.size.toLong()).toInt()
         return bytes.copyOfRange(offset.toInt(), end)
     }
@@ -85,7 +98,8 @@ private class ChannelEpubSource(
         var position = offset
         while (buffer.hasRemaining()) {
             val read = channel.read(buffer, position)
-            if (read < 0) break
+            // <= 0 (not just EOF): a 0-returning channel would spin forever.
+            if (read <= 0) break
             position += read
         }
         return buffer.array().copyOf(buffer.position())

@@ -3,6 +3,7 @@ package com.iridium.core.data
 import android.content.Context
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.Closeable
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,35 +39,62 @@ class ReadiumOpener @Inject constructor(
     private val opener = PublicationOpener(parser, emptyList())
 
     suspend fun open(sourcePath: String): OpenResult {
-        val asset = retrieveAsset(sourcePath) ?: return OpenResult.ParseFailed
-        return when (val result = opener.open(asset, allowUserInteraction = false)) {
-            is Try.Success<*, *> -> {
-                // The publication borrows the asset's resources lazily: it must
-                // stay open until the reader session ends (closed in onCleared).
-                @Suppress("UNCHECKED_CAST")
-                OpenResult.Opened((result as Try.Success<Publication, *>).value)
+        return when (val retrieved = retrieveAsset(sourcePath)) {
+            Retrieved.Gone -> OpenResult.FileMissing
+            Retrieved.Unreadable -> OpenResult.ParseFailed
+            is Retrieved.Found -> {
+                val result = runCatching {
+                    opener.open(retrieved.asset, allowUserInteraction = false)
+                }.getOrNull()
+                when (result) {
+                    is Try.Success<*, *> -> {
+                        // The publication borrows the asset's resources lazily:
+                        // it must stay open until the reader session ends
+                        // (closed in onCleared).
+                        @Suppress("UNCHECKED_CAST")
+                        OpenResult.Opened((result as Try.Success<Publication, *>).value)
+                    }
+                    else -> {
+                        runCatching { (retrieved.asset as? Closeable)?.close() }
+                        OpenResult.ParseFailed
+                    }
+                }
             }
-            else -> OpenResult.ParseFailed
         }
     }
 
-    private suspend fun retrieveAsset(sourcePath: String): Asset? {
-        val result = if (isLinkedSourcePath(sourcePath)) {
-            val url = Uri.parse(sourcePath).toAbsoluteUrl() ?: return null
-            assetRetriever.retrieve(url)
-        } else {
-            // file:// URIs from the filesystem scan, or plain absolute
-            // paths: both resolve to the same File.
-            val file = File(Uri.parse(sourcePath).path ?: sourcePath)
-            if (!file.exists()) return null
-            assetRetriever.retrieve(file)
+    /** Retrieval outcome, so gone files and corrupt files stay distinct. */
+    private sealed interface Retrieved {
+        data class Found(val asset: Asset) : Retrieved
+        data object Gone : Retrieved
+        data object Unreadable : Retrieved
+    }
+
+    private suspend fun retrieveAsset(sourcePath: String): Retrieved {
+        if (isLinkedSourcePath(sourcePath)) {
+            val url = Uri.parse(sourcePath).toAbsoluteUrl() ?: return Retrieved.Gone
+            // A revoked SAF grant throws out of retrieve(): map to ParseFailed
+            // at the call site instead of crashing the open coroutine.
+            val result = runCatching { assetRetriever.retrieve(url) }.getOrNull()
+            return when (result) {
+                is Try.Success<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    Retrieved.Found((result as Try.Success<Asset, *>).value)
+                }
+                else -> Retrieved.Unreadable
+            }
         }
+        // file:// URIs from legacy scans, or plain absolute paths: both
+        // resolve to the same File.
+        val file = File(Uri.parse(sourcePath).path ?: sourcePath)
+        if (!file.exists()) return Retrieved.Gone
+        val result = runCatching { assetRetriever.retrieve(file) }.getOrNull()
         return when (result) {
             is Try.Success<*, *> -> {
                 @Suppress("UNCHECKED_CAST")
-                (result as Try.Success<Asset, *>).value
+                Retrieved.Found((result as Try.Success<Asset, *>).value)
             }
-            else -> null
+            else -> Retrieved.Unreadable
         }
     }
 }

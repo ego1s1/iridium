@@ -251,6 +251,18 @@ std::string localName(const std::string& tag) {
     return colon == std::string::npos ? tag : tag.substr(colon + 1);
 }
 
+/** ASCII case-insensitive equality (XML attribute values like linear="No"). */
+bool iequals(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /** Finds `name="value"` (or single quotes) with an attribute boundary before it. */
 std::string attr(const std::string& tag, const std::string& name) {
     size_t pos = 0;
@@ -392,9 +404,13 @@ bool parseOpf(const std::string& xml, OpfData& out) {
             }
         } else if (local == "itemref") {
             const std::string idref = attr(tag.full, "idref");
-            if (!idref.empty()) out.spine.push_back(idref);
+            // Non-linear spine items (covers, splash pages) are not
+            // readable content: skipping matches the JVM engine.
+            if (!idref.empty() && !iequals(attr(tag.full, "linear"), "no")) {
+                out.spine.push_back(idref);
+            }
         } else if (local == "meta") {
-            if (attr(tag.full, "name") == "cover") {
+            if (iequals(attr(tag.full, "name"), "cover")) {
                 out.coverId = attr(tag.full, "content");
             }
         } else if (local == "reference") {

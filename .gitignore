@@ -59,6 +59,10 @@ Desktop.ini
 *.key
 store.pass
 key.pass
+.store.pass
+.key.pass
+*.pass
+ci-keystore.*
 keystore.properties
 signing.properties
 secrets.properties

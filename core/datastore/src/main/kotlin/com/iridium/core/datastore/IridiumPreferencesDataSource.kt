@@ -28,11 +28,13 @@ interface IridiumPreferencesDataSource {
     /** True when the user opted in to sending crash reports. Defaults to off. */
     val crashReportingEnabled: Flow<Boolean>
 
+    /** SAF tree URIs (folders) the user linked for book scans. */
+    val linkedFolders: Flow<Set<String>>
+
     /** True once the user has answered the crash-reporting prompt. */
     val crashReportingAsked: Flow<Boolean>
 
     suspend fun setOnboardingCompleted(completed: Boolean)
-
     suspend fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences)
 
     suspend fun updateThemePreferences(transform: (ThemePreferences) -> ThemePreferences)
@@ -44,4 +46,8 @@ interface IridiumPreferencesDataSource {
     suspend fun setCrashReporting(enabled: Boolean)
 
     suspend fun setCrashReportingAsked(asked: Boolean)
+
+    suspend fun addLinkedFolder(uri: String)
+
+    suspend fun removeLinkedFolder(uri: String)
 }

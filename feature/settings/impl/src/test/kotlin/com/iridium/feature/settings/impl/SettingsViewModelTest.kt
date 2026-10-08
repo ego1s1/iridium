@@ -83,12 +83,21 @@ class SettingsViewModelTest {
     @Test
     fun `reading sliders write through and persist values`() = runTest {
         viewModel.onAction(SettingsAction.SetFontSize(1.25f))
+        assertEquals(1.25f, preferences.readerPreferences.first { it.fontScale == 1.25f }.fontScale)
         viewModel.onAction(SettingsAction.SetMargins(1.8f))
+        assertEquals(1.8f, preferences.readerPreferences.first { it.pageMargins == 1.8f }.pageMargins)
         viewModel.onAction(SettingsAction.SetLineHeight(2.1f))
-        val reader = viewModel.uiState.first { it.reader.fontScale == 1.25f }.reader
-        assertEquals(1.25f, reader.fontScale)
-        assertEquals(1.8f, reader.pageMargins)
-        assertEquals(2.1f, reader.lineHeight)
+        assertEquals(2.1f, preferences.readerPreferences.first { it.lineHeight == 2.1f }.lineHeight)
+    }
+
+    @Test
+    fun `rapid slider ticks coalesce to the last value`() = runTest {
+        viewModel.onAction(SettingsAction.SetFontSize(1.1f))
+        viewModel.onAction(SettingsAction.SetFontSize(1.2f))
+        viewModel.onAction(SettingsAction.SetFontSize(1.3f))
+
+        // Superseded ticks never reach DataStore: only the settle persists.
+        assertEquals(1.3f, preferences.readerPreferences.first { it.fontScale == 1.3f }.fontScale)
     }
 
     @Test

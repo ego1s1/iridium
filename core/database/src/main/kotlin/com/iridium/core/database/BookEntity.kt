@@ -2,13 +2,17 @@ package com.iridium.core.database
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Indexed book row. The source of truth for the library UI; EPUB bytes live
  * in app-private storage, covers as extracted image files.
  */
-@Entity(tableName = "books")
+@Entity(
+    tableName = "books",
+    indices = [Index(value = ["sourcePath"])],
+)
 data class BookEntity(
     /** Stable id (UUID) assigned at import. */
     @PrimaryKey val id: String,

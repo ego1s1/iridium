@@ -35,31 +35,37 @@ internal class ChapterIndexer @Inject constructor(
         source.use { open ->
             val book = runCatching { engine.open(open, displayName) }.getOrNull()
                 ?: return@withContext emptyList()
+            try {
+                val titlesByHref = toc.associate { it.href.substringBefore('#') to it.title }
+                val rows = ArrayList<ChapterTextEntity>()
+                val hrefs = book.chapterHrefs().take(MAX_CHAPTERS)
 
-            val titlesByHref = toc.associate { it.href.substringBefore('#') to it.title }
-            val rows = ArrayList<ChapterTextEntity>()
-            val hrefs = book.chapterHrefs().take(MAX_CHAPTERS)
+                hrefs.forEachIndexed { index, href ->
+                    ensureActive()
+                    // One bad chapter must not abort the whole book's index.
+                    val bytes = runCatching { book.chapterBytes(href) }.getOrNull()
+                        ?: return@forEachIndexed
+                    if (bytes.size > MAX_CHAPTER_BYTES) return@forEachIndexed
 
-            hrefs.forEachIndexed { index, href ->
-                ensureActive()
-                val bytes = book.chapterBytes(href) ?: return@forEachIndexed
-                if (bytes.size > MAX_CHAPTER_BYTES) return@forEachIndexed
+                    val text = runCatching { HtmlText.toPlainText(String(bytes, Charsets.UTF_8)) }
+                        .getOrNull() ?: return@forEachIndexed
+                    if (text.length < MIN_CHAPTER_CHARS) return@forEachIndexed
 
-                val text = HtmlText.toPlainText(String(bytes, Charsets.UTF_8))
-                if (text.length < MIN_CHAPTER_CHARS) return@forEachIndexed
+                    // TOC title when the href matches; a numbered label reads far
+                    // better in search results than a raw file name.
+                    val title = titlesByHref[href.substringBefore('#')] ?: "Chapter ${index + 1}"
 
-                // TOC title when the href matches; a numbered label reads far
-                // better in search results than a raw file name.
-                val title = titlesByHref[href.substringBefore('#')] ?: "Chapter ${index + 1}"
-
-                rows += ChapterTextEntity(
-                    bookId = sourcePath,
-                    href = href,
-                    title = title,
-                    body = text.take(MAX_BODY_CHARS),
-                )
+                    rows += ChapterTextEntity(
+                        bookId = sourcePath,
+                        href = href,
+                        title = title,
+                        body = text.take(MAX_BODY_CHARS),
+                    )
+                }
+                rows
+            } finally {
+                runCatching { book.close() }
             }
-            rows
         }
     }
 

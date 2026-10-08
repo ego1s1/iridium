@@ -24,6 +24,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,15 +98,37 @@ internal fun ReaderSettingsContent(
 
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.reader_settings_brightness), style = MaterialTheme.typography.titleSmall)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("A", style = MaterialTheme.typography.bodySmall)
-                Slider(
-                    value = prefs.brightness,
-                    onValueChange = { onAction(ReaderAction.SetBrightness(it)) },
-                    valueRange = -1f..1f,
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                )
-                Text("A", style = MaterialTheme.typography.titleMedium)
+            // WindowManager only accepts -1 (system) or 0..1: a switch owns
+            // the -1 detent so the slider can never emit an invalid value,
+            // and persistence happens on release, not per drag tick.
+            var systemBrightness by remember(prefs.brightness < 0f) {
+                mutableStateOf(prefs.brightness < 0f)
+            }
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_brightness_system),
+                checked = systemBrightness,
+                onCheckedChange = {
+                    systemBrightness = it
+                    onAction(ReaderAction.SetBrightness(if (it) -1f else 0.5f))
+                },
+            )
+            if (!systemBrightness) {
+                var draft by remember(prefs.brightness) {
+                    mutableFloatStateOf(prefs.brightness.coerceIn(0f, 1f))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("A", style = MaterialTheme.typography.bodySmall)
+                    Slider(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        onValueChangeFinished = {
+                            onAction(ReaderAction.SetBrightness(draft.coerceIn(0f, 1f)))
+                        },
+                        valueRange = 0f..1f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
+                    Text("A", style = MaterialTheme.typography.titleMedium)
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -139,18 +166,24 @@ internal fun ReaderSettingsContent(
             }
 
             Spacer(Modifier.height(8.dp))
+            var lineHeightDraft by remember(prefs.lineHeight) {
+                mutableFloatStateOf(prefs.lineHeight.coerceIn(1f, 2.5f))
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.reader_settings_line_height), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "${(prefs.lineHeight * 100).toInt()}%",
+                        "${(lineHeightDraft * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Slider(
-                    value = prefs.lineHeight,
-                    onValueChange = { onAction(ReaderAction.SetLineHeight(it)) },
+                    value = lineHeightDraft,
+                    onValueChange = { lineHeightDraft = it },
+                    onValueChangeFinished = {
+                        onAction(ReaderAction.SetLineHeight(lineHeightDraft.coerceIn(1f, 2.5f)))
+                    },
                     valueRange = 1f..2.5f,
                     modifier = Modifier.weight(1.4f),
                 )
@@ -206,6 +239,9 @@ internal fun ReaderSettingsContent(
                 onCheckedChange = { onAction(ReaderAction.SetNightLight(it)) },
             )
             if (prefs.nightLight) {
+                var warmthDraft by remember(prefs.nightLightIntensity) {
+                    mutableFloatStateOf(prefs.nightLightIntensity.coerceIn(0f, 1f))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -213,20 +249,48 @@ internal fun ReaderSettingsContent(
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Text(
-                            "${(prefs.nightLightIntensity * 100).toInt()}%",
+                            "${(warmthDraft * 100).toInt()}%",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Slider(
-                        value = prefs.nightLightIntensity,
-                        onValueChange = { onAction(ReaderAction.SetNightLightIntensity(it)) },
+                        value = warmthDraft,
+                        onValueChange = { warmthDraft = it },
+                        onValueChangeFinished = {
+                            onAction(ReaderAction.SetNightLightIntensity(warmthDraft.coerceIn(0f, 1f)))
+                        },
                         valueRange = 0f..1f,
                         modifier = Modifier.weight(1.4f),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
             }
+
+            Spacer(Modifier.height(8.dp))
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_volume_keys),
+                checked = prefs.volumeKeys,
+                onCheckedChange = { onAction(ReaderAction.SetVolumeKeys(it)) },
+            )
+            if (prefs.volumeKeys) {
+                IridiumSettingSwitch(
+                    title = stringResource(R.string.reader_settings_volume_invert),
+                    subtitle = stringResource(R.string.reader_settings_volume_invert_subtitle),
+                    checked = prefs.volumeKeysInverted,
+                    onCheckedChange = { onAction(ReaderAction.SetVolumeKeysInverted(it)) },
+                )
+            }
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_keep_screen_on),
+                checked = prefs.keepScreenOn,
+                onCheckedChange = { onAction(ReaderAction.SetKeepScreenOn(it)) },
+            )
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_page_counter),
+                checked = prefs.showPageCounter,
+                onCheckedChange = { onAction(ReaderAction.SetShowPageCounter(it)) },
+            )
         }
     }
 

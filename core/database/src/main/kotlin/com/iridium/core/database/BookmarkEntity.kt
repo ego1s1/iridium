@@ -16,7 +16,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("bookId")],
+    indices = [Index(value = ["bookId", "createdAt"])],
 )
 data class BookmarkEntity(
     @PrimaryKey val id: String,

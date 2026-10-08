@@ -29,7 +29,6 @@ android {
             ?.toIntOrNull() ?: commitCount.coerceAtLeast(1)
         versionName = (project.findProperty("appVersionName") as String?)
             ?.removePrefix("v") ?: "0.1.$commitCount"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 64-bit only (see epub-native/build.gradle.kts): strips 32-bit .so files that
         // transitive deps (graphics-path, datastore) would otherwise package, keeping
         // the bundle 16 KB-page compliant and smaller.

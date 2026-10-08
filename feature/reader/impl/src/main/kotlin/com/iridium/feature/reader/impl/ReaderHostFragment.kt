@@ -138,8 +138,10 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
     /** Content taps route through the tap-zone map; links keep working. */
     private val chromeTapListener = object : InputListener {
         override fun onTap(event: TapEvent): Boolean {
-            // A content tap dismisses any active selection (and its popup).
-            store.clearSelection()
+            // Snapshot before clearing: a tap that dismisses an active
+            // selection is consumed by the dismiss and must not also turn
+            // pages or toggle chrome.
+            val dismissedPopup = store.clearSelection()
             val view = navigator?.view
             val width = view?.width ?: 0
             val height = view?.height ?: 0
@@ -148,6 +150,7 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
                     ReaderSessionEvent.ContentTappedAt(
                         fractionX = event.point.x / width,
                         fractionY = event.point.y / height,
+                        dismissedPopup = dismissedPopup,
                     ),
                 )
             } else {

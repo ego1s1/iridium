@@ -15,6 +15,7 @@ data class SettingsUiState(
     val reader: ReaderPreferences = ReaderPreferences(),
     val libraryDisplay: LibraryDisplay = LibraryDisplay(),
     val crashReportingEnabled: Boolean = false,
+    val linkedFolders: Set<String> = emptySet(),
 )
 
 sealed interface SettingsAction {
@@ -34,5 +35,8 @@ sealed interface SettingsAction {
     data class SetMargins(val margins: Float) : SettingsAction
     data class SetLineHeight(val lineHeight: Float) : SettingsAction
     data class SetCrashReporting(val enabled: Boolean) : SettingsAction
+
+    /** Links one SAF folder for library scans. */
+    data class AddLinkedFolder(val uri: String) : SettingsAction
 }
 

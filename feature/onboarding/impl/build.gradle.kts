@@ -15,4 +15,5 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:datastore"))
     implementation(project(":feature:onboarding:api"))
+    testImplementation(libs.turbine)
 }

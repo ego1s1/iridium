@@ -3,9 +3,12 @@ package com.iridium.feature.settings.impl
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,11 +88,26 @@ internal fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            viewModel.onAction(SettingsAction.AddLinkedFolder(uri.toString()))
+        }
+    }
     SettingsScreen(
         state = state,
         appVersion = appVersion,
         onAction = viewModel::onAction,
         onLicensesClick = onLicensesClick,
+        onAddFolder = { folderPicker.launch(null) },
         modifier = modifier,
     )
 }
@@ -102,6 +120,7 @@ internal fun SettingsScreen(
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
     onLicensesClick: () -> Unit = {},
+    onAddFolder: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -169,7 +188,10 @@ internal fun SettingsScreen(
                     subtitle = stringResource(R.string.settings_amoled_subtitle),
                     checked = state.theme.amoled,
                     onCheckedChange = { onAction(SettingsAction.SetAmoled(it)) },
-                    enabled = state.theme.mode != ThemeMode.LIGHT,
+                    // Pure black only reads on a dark canvas: explicit LIGHT
+                    // never allows it; SYSTEM follows the system theme.
+                    enabled = state.theme.mode == ThemeMode.DARK ||
+                        (state.theme.mode == ThemeMode.SYSTEM && isSystemInDarkTheme()),
                 )
                 Spacer(Modifier.height(8.dp))
                 OptionLabel(stringResource(R.string.settings_colors))
@@ -303,10 +325,15 @@ internal fun SettingsScreen(
             }
 
             IridiumSectionCard(title = stringResource(R.string.settings_card_storage)) {
+                val folderCount = state.linkedFolders.size
                 IridiumSettingRow(
                     title = stringResource(R.string.settings_storage_location_title),
-                    subtitle = stringResource(R.string.settings_storage_location_subtitle),
-                    onClick = {},
+                    subtitle = if (folderCount == 0) {
+                        stringResource(R.string.settings_storage_location_subtitle)
+                    } else {
+                        stringResource(R.string.settings_storage_linked, folderCount)
+                    },
+                    onClick = onAddFolder,
                 )
             }
 
@@ -629,7 +656,7 @@ private fun RowScope.ThemeChoice(
 ) {
     ToggleButton(
         checked = selected,
-        onCheckedChange = { onClick() },
+        onCheckedChange = { checked -> if (checked != selected) onClick() },
         modifier = Modifier.weight(1f),
     ) {
         Row(

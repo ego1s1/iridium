@@ -4,6 +4,7 @@ import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.testing.TestDispatcherRule
+import app.cash.turbine.test
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -112,5 +113,26 @@ class OnboardingViewModelTest {
     fun `finish marks onboarding complete`() = runTest {
         viewModel.onAction(OnboardingAction.Finish)
         assertTrue(preferences.onboardingCompleted.first())
+    }
+
+    @Test
+    fun `finish emits only after the flag commits`() = runTest {
+        // Subscribed first: the emission is observed however the
+        // ViewModel scope happens to dispatch (eager or posted).
+        viewModel.finished.test {
+            viewModel.onAction(OnboardingAction.Finish)
+            awaitItem()
+            assertTrue(preferences.onboardingCompleted.first())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `linked folders surface in the access step`() = runTest {
+        viewModel.onAction(OnboardingAction.GetStarted)
+        assertEquals(OnboardingUiState.Access(folderCount = 0), viewModel.uiState.first())
+
+        viewModel.onAction(OnboardingAction.AddLinkedFolder("content://tree/books"))
+        assertEquals(OnboardingUiState.Access(folderCount = 1), viewModel.uiState.first())
     }
 }

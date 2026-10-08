@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.LibraryDisplay
@@ -160,6 +161,17 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     override val crashReportingAsked: Flow<Boolean> =
         dataStore.data.map { it[CRASH_REPORTING_ASKED] ?: false }
 
+    override val linkedFolders: Flow<Set<String>> =
+        dataStore.data.map { it[LINKED_FOLDERS] ?: emptySet() }
+
+    override suspend fun addLinkedFolder(uri: String) {
+        dataStore.edit { it[LINKED_FOLDERS] = (it[LINKED_FOLDERS] ?: emptySet()) + uri }
+    }
+
+    override suspend fun removeLinkedFolder(uri: String) {
+        dataStore.edit { it[LINKED_FOLDERS] = (it[LINKED_FOLDERS] ?: emptySet()) - uri }
+    }
+
     override suspend fun setCrashReporting(enabled: Boolean) {
         dataStore.edit {
             it[CRASH_REPORTING_ENABLED] = enabled
@@ -189,6 +201,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
         val VOLUME_KEYS_INVERTED = booleanPreferencesKey("volume_keys_inverted")
         val TAP_INVERT = booleanPreferencesKey("tap_invert")
+        val LINKED_FOLDERS = stringSetPreferencesKey("linked_folders")
         // Legacy tap-zone keys (pre single-switch): read once for migration.
         val TAP_ZONE_MODE = stringPreferencesKey("tap_zone_mode")
         val TAP_ZONE_INVERT = stringPreferencesKey("tap_zone_invert")

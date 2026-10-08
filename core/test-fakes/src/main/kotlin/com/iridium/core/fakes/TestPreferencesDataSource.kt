@@ -19,6 +19,7 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     private val display = MutableStateFlow(LibraryDisplay())
     private val crashEnabled = MutableStateFlow(false)
     private val crashAsked = MutableStateFlow(false)
+    private val folders = MutableStateFlow(setOf<String>())
 
     override val onboardingCompleted: Flow<Boolean> = onboarding
     override val readerPreferences: Flow<ReaderPreferences> = reader
@@ -27,6 +28,7 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     override val libraryDisplay: Flow<LibraryDisplay> = display
     override val crashReportingEnabled: Flow<Boolean> = crashEnabled
     override val crashReportingAsked: Flow<Boolean> = crashAsked
+    override val linkedFolders: Flow<Set<String>> = folders
 
     override suspend fun setCrashReporting(enabled: Boolean) {
         crashEnabled.value = enabled
@@ -55,5 +57,13 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
 
     override suspend fun updateLibraryDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
         display.update(transform)
+    }
+
+    override suspend fun addLinkedFolder(uri: String) {
+        folders.update { it + uri }
+    }
+
+    override suspend fun removeLinkedFolder(uri: String) {
+        folders.update { it - uri }
     }
 }

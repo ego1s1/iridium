@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -369,6 +370,9 @@ private fun HistoryRangeSelector(
     }
 }
 
+/** Bars past this count aggregate into weekly maxima (YEAR view). */
+private const val MAX_CHART_BARS = 60
+
 /** Rounded-bar chart of per-day read books, normalised to the peak. */
 @Composable
 private fun HistoryActivityChart(
@@ -379,19 +383,34 @@ private fun HistoryActivityChart(
     val peakColor = MaterialTheme.colorScheme.tertiary
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
     if (buckets.isEmpty()) return
-    val maxActive = buckets.maxOf { it.booksActive }.coerceAtLeast(1)
-    val peak = buckets.maxOf { it.booksActive }
+    // A full year is 365 daily buckets in ~360dp: aggregate into weekly
+    // maxima past ~60 bars so bars stay legible instead of overdrawing.
+    val drawn = remember(buckets) {
+        if (buckets.size <= MAX_CHART_BARS) {
+            buckets
+        } else {
+            val size = (buckets.size + MAX_CHART_BARS - 1) / MAX_CHART_BARS
+            buckets.chunked(size) { chunk ->
+                chunk.first().copy(
+                    booksActive = chunk.maxOf { it.booksActive },
+                    booksFinished = chunk.sumOf { it.booksFinished },
+                )
+            }
+        }
+    }
+    val maxActive = drawn.maxOf { it.booksActive }.coerceAtLeast(1)
+    val peak = drawn.maxOf { it.booksActive }
     Canvas(
         modifier = modifier.semantics {
             this.contentDescription = "Bar chart of daily reading activity"
             this.role = Role.Image
         },
     ) {
-        val count = buckets.size
+        val count = drawn.size
         val slot = size.width / count
         val barWidth = (slot * 0.6f).coerceAtLeast(2f)
         val radius = CornerRadius(barWidth / 2f, barWidth / 2f)
-        buckets.forEachIndexed { index, bucket ->
+        drawn.forEachIndexed { index, bucket ->
             val ratio = bucket.booksActive.toFloat() / maxActive.toFloat()
             val barHeight = (size.height * ratio)
                 .coerceAtLeast(if (bucket.booksActive > 0) 4f else 2f)

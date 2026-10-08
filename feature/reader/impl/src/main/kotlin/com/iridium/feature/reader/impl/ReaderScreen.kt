@@ -128,6 +128,7 @@ internal fun ReaderRoute(
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
             sessionReady = sessionReady,
+            volumePagingActive = viewModel.volumePagingActive.collectAsStateWithLifecycle().value,
             dictionaryState = viewModel.dictionaryUi.collectAsStateWithLifecycle().value,
             onAction = viewModel::onAction,
             onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
@@ -146,6 +147,7 @@ internal fun ReaderRoute(
 internal fun ReaderScreen(
     state: ReaderUiState.Ready,
     sessionReady: Boolean,
+    volumePagingActive: Boolean,
     dictionaryState: DictionaryUiState?,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
@@ -193,7 +195,11 @@ internal fun ReaderScreen(
             controller?.systemBarsBehavior =
                 androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        onDispose { }
+        // Leaving the reader with hidden chrome must not leave the library
+        // with hidden system bars.
+        onDispose {
+            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     // Seamless system bars: tint status + navigation bars to the page
@@ -234,25 +240,15 @@ internal fun ReaderScreen(
     }
 
     /**
-     * Volume-key paging. The handler is installed only while paging is on and
-     * no sheet is open, so volume always works normally everywhere else; it
-     * consumes both the down and up events so the system volume panel never
-     * appears during a page turn.
+     * Volume-key paging. The handler is installed only while the gate holds
+     * (single source: [ReaderViewModel.volumePagingActive]), so volume always
+     * works normally everywhere else; it consumes both the down and up events
+     * so the system volume panel never appears during a page turn.
      */
-    DisposableEffect(
-        state.prefs.volumeKeys,
-        state.chromeVisible,
-        state.settingsOpen,
-        state.themeSheetOpen,
-        state.tocOpen,
-        state.highlightsOpen,
-    ) {
-        val active = state.prefs.volumeKeys && !state.chromeVisible &&
-            !state.settingsOpen && !state.themeSheetOpen &&
-            !state.tocOpen && !state.highlightsOpen
+    DisposableEffect(volumePagingActive) {
         // Mirrors the ViewModel gate (hidden-chrome + invert swap); installing
         // only while active keeps volume normal everywhere else.
-        ReaderKeyInterceptor.handler = if (active) onVolumeKeyEvent else null
+        ReaderKeyInterceptor.handler = if (volumePagingActive) onVolumeKeyEvent else null
         onDispose { ReaderKeyInterceptor.handler = null }
     }
 

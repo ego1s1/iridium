@@ -29,8 +29,9 @@ data class LibraryUiState(
     /** Persisted display options (card density, grid width). */
     val display: com.iridium.core.model.LibraryDisplay =
         com.iridium.core.model.LibraryDisplay(),
-    /** Book id for the open quick-actions sheet; null when closed. */
-    val menuBookId: String? = null,
+    /** Open quick-actions sheet's book (retained, not re-looked-up, so
+     * filtering while the sheet is open cannot dismiss it); null when closed. */
+    val menuBook: Book? = null,
     /** True while the menu's remove-confirm dialog is showing. */
     val menuDeleteConfirm: Boolean = false,
 ) {
@@ -51,6 +52,9 @@ sealed interface LibraryAction {
     data class DisplayModeSelected(val mode: com.iridium.core.model.LibraryDisplayMode) : LibraryAction
     data class GridColumnsSelected(val columns: Int) : LibraryAction
     data object Rescan : LibraryAction
+
+    /** Links one SAF folder for library scans. */
+    data class AddLinkedFolder(val uri: String) : LibraryAction
 
     /** Extracts chapter text for every book so content search has data. */
     data object IndexLibrary : LibraryAction

@@ -50,7 +50,7 @@ class LibraryMenuStateTest {
     }
 
     @Test
-    fun `open menu sets menuBookId and clears delete confirm`() = runTest {
+    fun `open menu sets menuBook and clears delete confirm`() = runTest {
         repository.setBooks(
             listOf(
                 TestData.book(id = "1"),
@@ -62,37 +62,37 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 2 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            val opened = awaitStateMatching { it.menuBookId == "1" }
+            val opened = awaitStateMatching { it.menuBook?.id == "1" }
             assertFalse(opened.menuDeleteConfirm)
 
             viewModel.onAction(LibraryAction.OpenMenuDelete)
             val confirming = awaitStateMatching { it.menuDeleteConfirm }
-            assertEquals("1", confirming.menuBookId)
+            assertEquals("1", confirming.menuBook?.id)
 
             // Opening another book's menu resets the confirm flag.
             viewModel.onAction(LibraryAction.OpenMenu("2"))
-            val switched = awaitStateMatching { it.menuBookId == "2" && !it.menuDeleteConfirm }
-            assertEquals("2", switched.menuBookId)
+            val switched = awaitStateMatching { it.menuBook?.id == "2" && !it.menuDeleteConfirm }
+            assertEquals("2", switched.menuBook?.id)
             assertFalse(switched.menuDeleteConfirm)
         }
     }
 
     @Test
-    fun `close menu clears menuBookId and delete confirm`() = runTest {
+    fun `close menu clears menuBook and delete confirm`() = runTest {
         repository.setBooks(listOf(TestData.book(id = "1")))
 
         viewModel.uiState.test {
             awaitStateMatching { it.books.size == 1 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.OpenMenuDelete)
             awaitStateMatching { it.menuDeleteConfirm }
 
             viewModel.onAction(LibraryAction.CloseMenu)
-            val closed = awaitStateMatching { it.menuBookId == null && !it.menuDeleteConfirm }
-            assertNull(closed.menuBookId)
+            val closed = awaitStateMatching { it.menuBook?.id == null && !it.menuDeleteConfirm }
+            assertNull(closed.menuBook?.id)
             assertFalse(closed.menuDeleteConfirm)
         }
     }
@@ -105,7 +105,7 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 1 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.ToggleMenuBookmark)
             val updated = awaitStateMatching {
@@ -113,7 +113,7 @@ class LibraryMenuStateTest {
             }
             assertTrue(updated.books.first { book -> book.id == "1" }.bookmarked)
             // The menu stays open across the toggle.
-            assertEquals("1", updated.menuBookId)
+            assertEquals("1", updated.menuBook?.id)
         }
 
         assertEquals(true, repository.observeBook("1").first()?.bookmarked)
@@ -127,14 +127,14 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 1 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.ToggleMenuBookmark)
             val updated = awaitStateMatching {
                 it.books.firstOrNull { book -> book.id == "1" }?.bookmarked == false
             }
             assertFalse(updated.books.first { book -> book.id == "1" }.bookmarked)
-            assertEquals("1", updated.menuBookId)
+            assertEquals("1", updated.menuBook?.id)
         }
 
         assertEquals(false, repository.observeBook("1").first()?.bookmarked)
@@ -148,12 +148,12 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 1 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.OpenMenuDelete)
             val confirming = awaitStateMatching { it.menuDeleteConfirm }
             assertTrue(confirming.menuDeleteConfirm)
-            assertEquals("1", confirming.menuBookId)
+            assertEquals("1", confirming.menuBook?.id)
             // The book is not removed until confirmed.
             assertEquals(listOf("1"), confirming.books.map { it.id })
         }
@@ -174,17 +174,17 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 2 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.OpenMenuDelete)
             awaitStateMatching { it.menuDeleteConfirm }
 
             viewModel.onAction(LibraryAction.ConfirmMenuDelete)
             val done = awaitStateMatching {
-                it.menuBookId == null && !it.menuDeleteConfirm &&
+                it.menuBook?.id == null && !it.menuDeleteConfirm &&
                     it.books.none { book -> book.id == "1" }
             }
-            assertNull(done.menuBookId)
+            assertNull(done.menuBook?.id)
             assertFalse(done.menuDeleteConfirm)
             assertEquals(listOf("2"), done.books.map { it.id })
         }
@@ -203,7 +203,7 @@ class LibraryMenuStateTest {
 
         viewModel.uiState.test {
             val state = awaitStateMatching { it.books.size == 1 }
-            assertNull(state.menuBookId)
+            assertNull(state.menuBook?.id)
             assertFalse(state.menuDeleteConfirm)
             assertFalse(state.books.first { it.id == "1" }.bookmarked)
         }
@@ -222,7 +222,7 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 2 }
 
             viewModel.onAction(LibraryAction.OpenMenu("1"))
-            awaitStateMatching { it.menuBookId == "1" }
+            awaitStateMatching { it.menuBook?.id == "1" }
 
             viewModel.onAction(LibraryAction.ToggleMenuBookmark)
             val updated = awaitStateMatching {
@@ -249,14 +249,14 @@ class LibraryMenuStateTest {
             awaitStateMatching { it.books.size == 2 }
 
             viewModel.onAction(LibraryAction.OpenMenu("2"))
-            awaitStateMatching { it.menuBookId == "2" }
+            awaitStateMatching { it.menuBook?.id == "2" }
 
             viewModel.onAction(LibraryAction.OpenMenuDelete)
             awaitStateMatching { it.menuDeleteConfirm }
 
             viewModel.onAction(LibraryAction.ConfirmMenuDelete)
             val done = awaitStateMatching {
-                it.menuBookId == null && it.books.map { book -> book.id } == listOf("1")
+                it.menuBook?.id == null && it.books.map { book -> book.id } == listOf("1")
             }
             assertEquals(listOf("1"), done.books.map { it.id })
             assertFalse(done.menuDeleteConfirm)

@@ -32,7 +32,7 @@ object HtmlText {
                 if (char == '&') {
                     val decoded = decodeEntity(html, index)
                     if (decoded != null) {
-                        out.append(decoded.first)
+                        out.appendCodePoint(decoded.first)
                         index += decoded.second
                         continue
                     }
@@ -45,6 +45,24 @@ object HtmlText {
             }
 
             // Tag: read its name.
+            // Comments, doctypes and processing instructions are not tags:
+            // skipping to their real terminator keeps an inner '>' from
+            // splitting early and leaking comment text into the prose.
+            if (html.startsWith("<!--", index)) {
+                val end = html.indexOf("-->", index + 4)
+                index = if (end < 0) length else end + 3
+                continue
+            }
+            if (html.startsWith("<?", index)) {
+                val end = html.indexOf("?>", index + 2)
+                index = if (end < 0) length else end + 2
+                continue
+            }
+            if (html.startsWith("<!", index)) {
+                val end = html.indexOf('>', index + 2)
+                index = if (end < 0) length else end + 1
+                continue
+            }
             val tagEnd = html.indexOf('>', index + 1)
             if (tagEnd < 0) {
                 // Unbalanced markup: drop the rest rather than emit noise.
@@ -101,18 +119,21 @@ object HtmlText {
         return out.toString().trim()
     }
 
-    /** Returns the decoded char and the number of source chars consumed. */
-    private fun decodeEntity(html: String, start: Int): Pair<Char, Int>? {
+    /** Returns the decoded code point and the number of source chars consumed. */
+    private fun decodeEntity(html: String, start: Int): Pair<Int, Int>? {
         val semicolon = html.indexOf(';', start + 1)
         if (semicolon < 0 || semicolon - start > 10) return null
         val body = html.substring(start + 1, semicolon)
+        // Code points, not Chars: values above U+FFFF (emoji, CJK-ext) do
+        // not fit in a Char and would corrupt into lone surrogates.
         val decoded = when {
             body.startsWith("#x") || body.startsWith("#X") ->
-                body.substring(2).toIntOrNull(16)?.let { it.toChar() }
+                body.substring(2).toIntOrNull(16)
             body.startsWith("#") ->
-                body.substring(1).toIntOrNull()?.let { it.toChar() }
-            else -> NAMED_ENTITIES[body]
+                body.substring(1).toIntOrNull()
+            else -> NAMED_ENTITIES[body]?.code
         } ?: return null
+        if (decoded < 0 || decoded > 0x10FFFF || decoded in 0xD800..0xDFFF) return null
         return decoded to (semicolon - start + 1)
     }
 
@@ -131,7 +152,16 @@ object HtmlText {
         "ldquo" to '“',
         "rdquo" to '”',
         "copy" to '©',
+        "reg" to '®',
+        "trade" to '™',
+        "sect" to '§',
+        "para" to '¶',
         "deg" to '°',
+        "plusmn" to '±',
+        "times" to '×',
+        "divide" to '÷',
+        "laquo" to '«',
+        "raquo" to '»',
         "middot" to '·',
         "eacute" to 'é',
         "egrave" to 'è',

@@ -82,7 +82,7 @@ class IridiumEpubEngine : EpubBackend {
         archive: ZipArchive,
         opf: OpfData,
         base: String,
-    ): Pair<ByteArray, String>? {
+    ): Pair<ByteArray, String?>? {
         val href = coverHref(opf, base) ?: return null
         val entry = archive.findEntry(href) ?: return null
         val bytes = archive.read(entry, maxBytes = MAX_COVER_BYTES) ?: return null
@@ -90,7 +90,6 @@ class IridiumEpubEngine : EpubBackend {
             .firstOrNull { resolve(base, it.href) == href }
             ?.mediaType
             ?.takeIf { it.isNotEmpty() }
-            ?: "image/jpeg"
         return bytes to mime
     }
 
@@ -121,7 +120,7 @@ class IridiumEpubEngine : EpubBackend {
             val ncxPath = resolve(base, ncx.href)
             val bytes = archive.read(ncxPath, maxBytes = MAX_NAV_BYTES)
             if (bytes != null) {
-                val ncxBase = ncxPath.substringBeforeLast('/')
+                val ncxBase = ncxPath.substringBeforeLast('/', "")
                 val chapters = NavSax.parseNcx(bytes).map { (href, title) ->
                     EpubChapter(href = resolve(ncxBase, href), title = title)
                 }
@@ -168,7 +167,7 @@ class EpubBook internal constructor(
 
     /** Chapter body by resolved href, or null when unreadable/oversized. */
     fun chapterBytes(href: String): ByteArray? =
-        archive.findEntry(href)?.let { archive.read(it) }
+        archive.findEntry(href.substringBefore('#'))?.let { archive.read(it) }
 
     /** Chapter hrefs in spine order. */
     fun chapterHrefs(): List<String> = spineEntries.map { it.name }

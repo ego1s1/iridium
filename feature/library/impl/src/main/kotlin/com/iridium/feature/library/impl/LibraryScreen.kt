@@ -1,5 +1,8 @@
 package com.iridium.feature.library.impl
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +36,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,21 +84,32 @@ internal fun LibraryRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var hasStorageAccess by remember { mutableStateOf(hasFullStorageAccess(context)) }
-    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    androidx.compose.runtime.DisposableEffect(lifecycle) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                val now = hasFullStorageAccess(context)
-                // Grant arrived while away (onboarding, Settings): scan once.
-                if (now && !hasStorageAccess) {
-                    viewModel.onAction(LibraryAction.Rescan)
-                }
-                hasStorageAccess = now
+    // Linked folders are the storage grant: empty means the grant UI shows.
+    // Persisted across restarts via DataStore (no local remember needed).
+    val folders by viewModel.linkedFolders.collectAsStateWithLifecycle()
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
             }
+            viewModel.onAction(LibraryAction.AddLinkedFolder(uri.toString()))
         }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+    }
+    // A newly linked folder triggers one scan; the launch scan in init covers
+    // returning users, so transitions out of empty are the only trigger.
+    var seenEmpty by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(folders) {
+        if (folders.isEmpty()) {
+            seenEmpty = true
+        } else if (seenEmpty) {
+            seenEmpty = false
+            viewModel.onAction(LibraryAction.Rescan)
+        }
     }
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
@@ -118,8 +133,8 @@ internal fun LibraryRoute(
     LaunchedEffect(resumeTarget) { onResumeAvailable(resumeTarget) }
     LibraryScreen(
         uiState = uiState,
-        hasStorageAccess = hasStorageAccess,
-        onGrantAccess = { openStorageAccessSettings(context) },
+        hasStorageAccess = folders.isNotEmpty(),
+        onGrantAccess = { picker.launch(null) },
         onAction = viewModel::onAction,
         onReadClick = { book ->
             if (book.error != null) onBookLongClick(book.id) else onBookClick(book.id)
@@ -191,9 +206,7 @@ internal fun LibraryScreen(
                     onAction = onAction,
                 )
             }
-            val menuBook = uiState.menuBookId?.let { id ->
-                uiState.books.firstOrNull { it.id == id }
-            }
+            val menuBook = uiState.menuBook
             if (menuBook != null) {
                 LibraryMenuSheet(
                     book = menuBook,

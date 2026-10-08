@@ -7,9 +7,12 @@ import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,6 +36,7 @@ internal class OnboardingViewModel @Inject constructor(
         step,
         preferences.themePreferences,
         preferences.readerPreferences,
+        preferences.linkedFolders,
         ::toUiState,
     ).stateIn(
         scope = viewModelScope,
@@ -44,9 +48,10 @@ internal class OnboardingViewModel @Inject constructor(
         step: Step,
         theme: ThemePreferences,
         reader: ReaderPreferences,
+        folders: Set<String>,
     ): OnboardingUiState = when (step) {
         Step.WELCOME -> OnboardingUiState.Welcome
-        Step.ACCESS -> OnboardingUiState.Access
+        Step.ACCESS -> OnboardingUiState.Access(folders.size)
         Step.READING -> OnboardingUiState.Reading(reader)
         Step.APPEARANCE -> OnboardingUiState.Appearance(theme)
     }
@@ -79,6 +84,9 @@ internal class OnboardingViewModel @Inject constructor(
                 it.copy(colorScheme = action.scheme, dynamicColor = false)
             }
             is OnboardingAction.SetAmoled -> updateTheme { it.copy(amoled = action.enabled) }
+            is OnboardingAction.AddLinkedFolder -> viewModelScope.launch {
+                preferences.addLinkedFolder(action.uri)
+            }
             OnboardingAction.Finish -> finish()
         }
     }
@@ -92,6 +100,16 @@ internal class OnboardingViewModel @Inject constructor(
     }
 
     private fun finish() {
-        viewModelScope.launch { preferences.setOnboardingCompleted(true) }
+        // Navigate only after the flag commits: relaunching before the
+        // DataStore write lands would replay onboarding.
+        viewModelScope.launch {
+            preferences.setOnboardingCompleted(true)
+            _finished.emit(Unit)
+        }
     }
+
+    private val _finished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Emitted once [finish] has committed; the host navigates on this. */
+    val finished: SharedFlow<Unit> = _finished.asSharedFlow()
 }

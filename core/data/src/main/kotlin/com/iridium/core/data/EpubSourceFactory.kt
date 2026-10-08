@@ -27,12 +27,25 @@ class EpubSourceFactory @Inject constructor(
                     "r",
                 )
                 if (descriptor != null) {
-                    val channel = java.io.FileInputStream(descriptor.fileDescriptor).channel
-                    if (channel.size() > 0L) {
-                        return EpubSource.ofChannel(channel) { runCatching { descriptor.close() } }
+                    // Anchor the stream: closing it releases the channel too.
+                    // The disposer below owns both once handed off.
+                    val stream = java.io.FileInputStream(descriptor.fileDescriptor)
+                    var handedOff = false
+                    try {
+                        val channel = stream.channel
+                        if (channel.size() > 0L) {
+                            handedOff = true
+                            return EpubSource.ofChannel(channel) {
+                                runCatching { stream.close() }
+                                runCatching { descriptor.close() }
+                            }
+                        }
+                    } finally {
+                        if (!handedOff) {
+                            runCatching { stream.close() }
+                            runCatching { descriptor.close() }
+                        }
                     }
-                    runCatching { channel.close() }
-                    runCatching { descriptor.close() }
                 }
             }
             return EpubSource.ofStream(

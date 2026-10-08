@@ -5,6 +5,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -101,10 +103,13 @@ class HttpDictionaryLookup(
     private val cache: MutableMap<String, WordDefinition> = synchronizedLruCache(),
 ) : DictionaryLookup {
 
+    /** Serializes check-then-act cache access across concurrent lookups. */
+    private val cacheMutex = Mutex()
+
     override suspend fun define(word: String): Result<WordDefinition> {
         val query = normalizeLookupWord(word)
             ?: return Result.failure(WordNotFoundException(word))
-        cache[query]?.let { return Result.success(it) }
+        cacheMutex.withLock { cache[query] }?.let { return Result.success(it) }
         return try {
             val response = withContext(Dispatchers.IO) {
                 val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
@@ -116,7 +121,7 @@ class HttpDictionaryLookup(
                     throw DictionaryNetworkException("Dictionary lookup failed (HTTP ${response.statusCode})")
                 else -> parseWordDefinition(response.body, query) ?: throw WordNotFoundException(query)
             }
-            cache[query] = definition
+            cacheMutex.withLock { cache[query] = definition }
             Result.success(definition)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e

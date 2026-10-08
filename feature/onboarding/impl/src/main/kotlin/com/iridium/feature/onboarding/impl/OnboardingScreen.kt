@@ -49,6 +49,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,6 +101,7 @@ internal fun OnboardingRoute(
     OnboardingScreen(
         uiState = uiState,
         onAction = viewModel::onAction,
+        finished = viewModel.finished,
         onOnboardingComplete = onOnboardingComplete,
         modifier = modifier,
     )
@@ -111,7 +114,13 @@ internal fun OnboardingScreen(
     onAction: (OnboardingAction) -> Unit,
     onOnboardingComplete: () -> Unit,
     modifier: Modifier = Modifier,
+    finished: Flow<Unit> = emptyFlow(),
 ) {
+    // Navigation fires only after the completion flag commits (the ViewModel
+    // emits finished post-write, so a relaunch can never replay onboarding).
+    LaunchedEffect(finished) {
+        finished.collect { onOnboardingComplete() }
+    }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         val stepEnter = IridiumEnter.enter(IridiumEnterKind.FADE_THROUGH)
         val stepExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
@@ -131,7 +140,6 @@ internal fun OnboardingScreen(
                     onGetStarted = { onAction(OnboardingAction.GetStarted) },
                     onSkip = {
                         onAction(OnboardingAction.Skip)
-                        onOnboardingComplete()
                     },
                 )
                 is OnboardingUiState.Access -> WizardStep(
@@ -142,13 +150,15 @@ internal fun OnboardingScreen(
                     onBack = { onAction(OnboardingAction.BackStep) },
                     onSkip = {
                         onAction(OnboardingAction.Skip)
-                        onOnboardingComplete()
                     },
                     onContinue = { onAction(OnboardingAction.Advance) },
                     continueLabel = stringResource(R.string.onboarding_continue),
                     continueCaption = "",
                 ) {
-                    AccessOptions()
+                    AccessOptions(
+                        folderCount = uiState.folderCount,
+                        onAddFolder = { onAction(OnboardingAction.AddLinkedFolder(it)) },
+                    )
                 }
                 is OnboardingUiState.Reading -> WizardStep(
                     stepIndex = 1,
@@ -158,7 +168,6 @@ internal fun OnboardingScreen(
                     onBack = { onAction(OnboardingAction.BackStep) },
                     onSkip = {
                         onAction(OnboardingAction.Skip)
-                        onOnboardingComplete()
                     },
                     onContinue = { onAction(OnboardingAction.Advance) },
                     continueLabel = stringResource(R.string.onboarding_continue),
@@ -174,11 +183,9 @@ internal fun OnboardingScreen(
                     onBack = { onAction(OnboardingAction.BackStep) },
                     onSkip = {
                         onAction(OnboardingAction.Skip)
-                        onOnboardingComplete()
                     },
                     onContinue = {
                         onAction(OnboardingAction.Finish)
-                        onOnboardingComplete()
                     },
                     continueLabel = stringResource(R.string.onboarding_continue),
                     continueCaption = stringResource(R.string.onboarding_appearance_caption),
@@ -331,40 +338,42 @@ private const val WELCOME_STEPS = 3
 
 @Composable
 private fun AccessOptions(
+    folderCount: Int,
+    onAddFolder: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var granted by remember { mutableStateOf(hasAllFilesAccess()) }
-    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    androidx.compose.runtime.DisposableEffect(lifecycle) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                granted = hasAllFilesAccess()
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
             }
+            onAddFolder(uri.toString())
         }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
     }
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Button(
-            onClick = { openAllFilesAccessSettings(context) },
+            onClick = { picker.launch(null) },
             modifier = Modifier.fillMaxWidth().height(56.dp).testTag(OnboardingTestTags.AccessGrant),
         ) {
             Text(stringResource(R.string.onboarding_access_grant))
         }
         Text(
-            text = stringResource(
-                if (granted) {
-                    R.string.onboarding_access_granted
-                } else {
-                    R.string.onboarding_access_hint
-                },
-            ),
+            text = if (folderCount > 0) {
+                stringResource(R.string.onboarding_access_granted, folderCount)
+            } else {
+                stringResource(R.string.onboarding_access_hint)
+            },
             style = MaterialTheme.typography.bodySmall,
-            color = if (granted) {
+            color = if (folderCount > 0) {
                 MaterialTheme.colorScheme.onSurfaceVariant
             } else {
                 MaterialTheme.colorScheme.error
@@ -380,32 +389,6 @@ private fun AccessOptions(
             modifier = Modifier.fillMaxWidth(),
         )
     }
-}
-
-private fun hasAllFilesAccess(): Boolean =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        // Robolectric shadows nothing here; treat unknown as denied.
-        runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
-    } else {
-        true
-    }
-
-private fun openAllFilesAccessSettings(context: android.content.Context) {
-    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        runCatching {
-            Intent(
-                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                Uri.parse("package:${context.packageName}"),
-            )
-        }.getOrDefault(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-    } else {
-        Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:${context.packageName}"),
-        )
-    }
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(intent) }
 }
 
 @Composable
