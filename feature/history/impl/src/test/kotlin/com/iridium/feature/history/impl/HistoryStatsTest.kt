@@ -60,7 +60,9 @@ class HistoryStatsTest {
     @Test
     fun `books land in their read-day bucket`() = runTest {
         val now = System.currentTimeMillis()
-        val yesterday = now - 26L * 60 * 60 * 1000
+        // One hour before today's midnight is always calendar-yesterday,
+        // unlike now-26h which crosses two midnights near 00:xx.
+        val yesterday = dayStartMillis(now) - 60L * 60 * 1000
         repository.setBooks(
             listOf(
                 TestData.book(id = "today", progress = 0.5f, updatedAt = now),
@@ -76,7 +78,7 @@ class HistoryStatsTest {
     @Test
     fun `consecutive read days form a streak`() {
         val now = System.currentTimeMillis()
-        val yesterday = now - 26L * 60 * 60 * 1000
+        val yesterday = dayStartMillis(now) - 60L * 60 * 1000
         val books = listOf(
             TestData.book(id = "a", progress = 0.5f, updatedAt = yesterday),
             TestData.book(id = "b", progress = 0.5f, updatedAt = now),

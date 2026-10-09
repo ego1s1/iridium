@@ -7,9 +7,6 @@ object LibraryTestTags {
     const val EmptyState = "libraryEmpty"
     const val Snackbar = "librarySnackbar"
 
-    const val NowReadingHero = "libraryNowReadingHero"
-    const val HeroResume = "libraryHeroResume"
-    const val HeroDetails = "libraryHeroDetails"
 
     const val QuickFilterCapsule = "libraryQuickFilterCapsule"
 

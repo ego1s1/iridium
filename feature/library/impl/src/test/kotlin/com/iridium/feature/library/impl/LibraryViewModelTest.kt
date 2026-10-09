@@ -167,12 +167,13 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `index library indexes every book`() = runTest {
+    fun `rescan action is still available after the index pill removal`() = runTest {
         repository.setBooks(
             listOf(TestData.book(id = "1"), TestData.book(id = "2")),
         )
-        viewModel.onAction(LibraryAction.IndexLibrary)
-
-        assertEquals(listOf("1", "2"), repository.indexedBooks)
+        viewModel.uiState.first { repository.filesystemScans > 0 }
+        val before = repository.filesystemScans
+        viewModel.onAction(LibraryAction.Rescan)
+        viewModel.uiState.first { repository.filesystemScans > before }
     }
 }

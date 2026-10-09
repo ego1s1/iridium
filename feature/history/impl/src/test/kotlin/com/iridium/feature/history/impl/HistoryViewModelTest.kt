@@ -47,7 +47,7 @@ class HistoryViewModelTest {
     @Test
     fun `books read yesterday are separated from today`() = runTest {
         val now = System.currentTimeMillis()
-        val yesterday = now - 26L * 60 * 60 * 1000
+        val yesterday = dayStartMillis(now) - 60L * 60 * 1000
         repository.setBooks(
             listOf(
                 TestData.book(id = "today", progress = 0.5f, updatedAt = now),

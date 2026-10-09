@@ -107,7 +107,13 @@ internal class SafLinkedTreeLister @Inject constructor(
         var walkFailed = false
         for (folder in folders) {
             val treeUri = runCatching { Uri.parse(folder) }.getOrNull() ?: continue
-            if (treeUri !in persisted) continue
+            // A revoked grant leaves the stored URI behind but yields no
+            // files: it must fail the walk, not read as an empty device, or
+            // pruning would wipe the books that lived under that folder.
+            if (treeUri !in persisted) {
+                walkFailed = true
+                continue
+            }
             val rootDoc = runCatching { DocumentFile.fromTreeUri(context, treeUri) }.getOrNull()
             if (rootDoc == null || !rootDoc.isDirectory) {
                 walkFailed = true

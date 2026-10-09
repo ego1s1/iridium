@@ -6,6 +6,7 @@ import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -114,12 +115,17 @@ internal class OnboardingViewModel @Inject constructor(
 
     private fun finish() {
         // Navigate only after the flag commits: relaunching before the
-        // DataStore write lands would replay onboarding.
+        // DataStore write lands would replay onboarding. Guarded: a double
+        // tap on Skip/Finish must not emit twice and navigate twice.
+        if (!finishSent.compareAndSet(false, true)) return
         viewModelScope.launch {
             preferences.setOnboardingCompleted(true)
             _finished.emit(Unit)
         }
     }
+
+    /** First-call-wins latch for [finish]. */
+    private val finishSent = AtomicBoolean(false)
 
     private val _finished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 

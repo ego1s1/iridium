@@ -42,7 +42,6 @@ class LibraryChromeParityTest2 {
         contentHits: List<ContentHit> = emptyList(),
         refreshing: Boolean = false,
         indexProgress: IndexProgress? = null,
-        indexing: Boolean = false,
     ) = LibraryUiState(
         books = books,
         query = LibraryQuery(text = text),
@@ -51,7 +50,6 @@ class LibraryChromeParityTest2 {
         continueReading = continueReading,
         indexProgress = indexProgress,
         contentHits = contentHits,
-        indexing = indexing,
     )
 
     private fun setScreen(
@@ -172,12 +170,12 @@ class LibraryChromeParityTest2 {
     }
 
     @Test
-    fun `now-reading hero shows without a query`() {
+    fun `no now-reading hero is shown (instant-open)`() {
         val book = TestData.book(id = "1", title = "Treasure Island", progress = 0.4f)
         setScreen(state(books = listOf(book), continueReading = listOf(book)))
-        composeTestRule.onNodeWithTag(LibraryTestTags.NowReadingHero).assertIsDisplayed()
-        composeTestRule.onNodeWithText("NOW READING").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Resume").assertIsDisplayed()
+        composeTestRule.onNodeWithText("NOW READING").assertDoesNotExist()
+        // The book itself still renders in the grid.
+        composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()
     }
 
     // --- Loading never hides content ---
@@ -196,9 +194,9 @@ class LibraryChromeParityTest2 {
     }
 
     @Test
-    fun `chapter indexing never hides the grid`() {
+    fun `refreshing scan never hides the grid`() {
         val book = TestData.book(id = "1", title = "Treasure Island")
-        setScreen(state(books = listOf(book), indexing = true))
+        setScreen(state(books = listOf(book), refreshing = true))
         composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()
     }
 

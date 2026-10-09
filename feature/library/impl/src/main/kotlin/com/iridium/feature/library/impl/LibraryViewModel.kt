@@ -119,6 +119,12 @@ class LibraryViewModel @Inject constructor(
         val hits = args[4] as List<ContentHit>
         val display = args[5] as com.iridium.core.model.LibraryDisplay
         val menu = args[6] as MenuChrome
+        // Refresh the retained snapshot against the live list so the sheet
+        // never shows stale progress/bookmarks; fall back to the snapshot so
+        // the menu survives filtering the book out of the grid.
+        val menuBook = menu.book?.let { retained ->
+            books.firstOrNull { it.id == retained.id } ?: retained
+        }
         LibraryUiState(
             books = books,
             query = query,
@@ -128,7 +134,7 @@ class LibraryViewModel @Inject constructor(
             indexProgress = progress,
             contentHits = hits,
             display = display,
-            menuBook = menu.book,
+            menuBook = menuBook,
             menuDeleteConfirm = menu.deleteConfirm,
         )
     }.stateIn(
