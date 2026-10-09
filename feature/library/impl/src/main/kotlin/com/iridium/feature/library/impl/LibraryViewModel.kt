@@ -72,13 +72,10 @@ class LibraryViewModel @Inject constructor(
      */
     private val scanMutex = Mutex()
 
-    /** Guards full-text indexing: double-taps share one pass. */
-    private val indexMutex = Mutex()
     private val scanPending = AtomicInteger(0)
     private val scanQueued = AtomicBoolean(false)
     private val indexProgress = MutableStateFlow<IndexProgress?>(null)
     private val contentHits = MutableStateFlow<List<ContentHit>>(emptyList())
-    private val indexing = MutableStateFlow(false)
 
     /**
      * Database subscription query: the text field echoes instantly through
@@ -111,7 +108,6 @@ class LibraryViewModel @Inject constructor(
         combine(refreshing, filterOpen, ::Chrome),
         indexProgress,
         contentHits,
-        indexing,
         preferences.libraryDisplay,
         combine(menuBook, menuDeleteConfirm, ::MenuChrome),
     ) { args ->
@@ -121,9 +117,8 @@ class LibraryViewModel @Inject constructor(
         val chrome = args[2] as Chrome
         val progress = args[3] as IndexProgress?
         val hits = args[4] as List<ContentHit>
-        val isIndexing = args[5] as Boolean
-        val display = args[6] as com.iridium.core.model.LibraryDisplay
-        val menu = args[7] as MenuChrome
+        val display = args[5] as com.iridium.core.model.LibraryDisplay
+        val menu = args[6] as MenuChrome
         LibraryUiState(
             books = books,
             query = query,
@@ -132,7 +127,6 @@ class LibraryViewModel @Inject constructor(
             continueReading = books.continueShelf(),
             indexProgress = progress,
             contentHits = hits,
-            indexing = isIndexing,
             display = display,
             menuBook = menu.book,
             menuDeleteConfirm = menu.deleteConfirm,
@@ -209,7 +203,6 @@ class LibraryViewModel @Inject constructor(
             is LibraryAction.AddLinkedFolder -> viewModelScope.launch {
                 preferences.addLinkedFolder(action.uri)
             }
-            LibraryAction.IndexLibrary -> indexLibrary()
             is LibraryAction.RemoveBook -> remove(action.bookId)
             is LibraryAction.OpenMenu -> {
                 menuBook.value = books.value.firstOrNull { it.id == action.bookId }
@@ -297,28 +290,6 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    /** Extracts chapter text for every book; progress shows on the bar. */
-    private fun indexLibrary() {
-        // A second tap while indexing is already running is a no-op: the
-        // in-flight pass covers the same books.
-        if (!indexMutex.tryLock()) return
-        viewModelScope.launch {
-            indexing.value = true
-            try {
-                // Read from the repository, not the UI-facing flow: `books` is
-                // WhileSubscribed, so its value is empty when nothing collects.
-                val all = repository.observeLibrary(LibraryQuery()).first()
-                var chapters = 0
-                all.forEach { book ->
-                    chapters += runCatching { repository.indexBookContent(book.id) }.getOrDefault(0)
-                }
-                messageChannel.send(LibraryMessage.IndexedForSearch(chapters))
-            } finally {
-                indexing.value = false
-                indexMutex.unlock()
-            }
-        }
-    }
 
     private companion object {
         const val KEY_QUERY_TEXT = "iridium_query_text"

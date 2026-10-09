@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -58,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumLoading
@@ -115,17 +117,22 @@ internal fun ReaderRoute(
 
     when (val state = uiState) {
         ReaderUiState.Loading -> IridiumLoading(modifier)
-        ReaderUiState.Gone, ReaderUiState.OpenFailed -> {
-            LaunchedEffect(Unit) {
-                snackbarHost.showSnackbar(
-                    if (state == ReaderUiState.OpenFailed) {
-                        "Couldn't open this book"
-                    } else {
-                        "Book no longer in library"
-                    },
-                )
-                onBackClick()
-            }
+        ReaderUiState.Gone -> {
+            // Gone books pop straight back: nothing to show and nothing
+            // to retry.
+            LaunchedEffect(Unit) { onBackClick() }
+        }
+        is ReaderUiState.OpenFailed -> {
+            // A visible dead-end, never a void: the old snackbar+autopop
+            // composed no host, so the message suspended forever and Back
+            // never fired (permanent black screen). The user reads the
+            // reason and leaves explicitly.
+            val missing = state.fileMissing
+            ReaderOpenFailed(
+                fileMissing = missing,
+                onBackClick = onBackClick,
+                modifier = modifier,
+            )
         }
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
@@ -432,6 +439,31 @@ internal fun ReaderScreen(
     }
 }
 
+/**
+ * Dead-end for books that cannot be opened: the reason plus an explicit way
+ * back. Never auto-pops — the user reads the failure first.
+ */
+@Composable
+private fun ReaderOpenFailed(
+    fileMissing: Boolean,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IridiumEmptyState(
+        icon = IridiumIcons.MenuBook,
+        title = stringResource(R.string.reader_open_failed_title),
+        body = stringResource(
+            if (fileMissing) {
+                R.string.reader_open_failed_body_missing
+            } else {
+                R.string.reader_open_failed_body_corrupt
+            },
+        ),
+        actionLabel = stringResource(R.string.reader_open_failed_back),
+        onAction = onBackClick,
+        modifier = modifier,
+    )
+}
 
 private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
     com.iridium.core.model.ReadingFlow.entries[

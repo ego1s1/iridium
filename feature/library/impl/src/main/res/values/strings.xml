@@ -3,8 +3,6 @@
     <string name="library_action_search">Search</string>
     <string name="library_action_sort_filter">Sort and filter</string>
     <string name="library_search_label">Search title or author</string>
-    <string name="library_rescan">Rescan library</string>
-    <string name="library_index_for_search">Index for search</string>
     <string name="library_content_hits">In books (%1$d)</string>
     <string name="library_continue_title">Continue reading</string>
     <string name="library_empty_title">No books yet</string>
@@ -50,6 +48,5 @@
     <string name="library_menu_progress">%1$d%% read</string>
     <string name="library_snack_index_failed">%1$d book(s) couldn\'t be read</string>
     <string name="library_snack_scan_failed">Couldn\'t scan that folder</string>
-    <string name="library_snack_indexed">Indexed %1$d chapters for search</string>
-    <string name="library_snack_index_empty">Nothing to index yet</string>
+    <string name="library_rescan">Rescan library</string>
 </resources>

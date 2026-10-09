@@ -65,6 +65,7 @@ class ReaderViewModel @Inject constructor(
     private val focusedHighlightId = MutableStateFlow<String?>(null)
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
+    private val openFileMissing = MutableStateFlow(false)
     private var chromeJob: Job? = null
     private var dictionaryJob: Job? = null
 
@@ -109,7 +110,7 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = combine(
         book, toc, highlights, preferences.readerPreferences, chromeVisible, settingsOpen, tocOpen,
         highlightsOpen, focusedHighlightId, navigatorAttached, openFailed, progression,
-        themeSheetOpen,
+        themeSheetOpen, openFileMissing,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val b = args[0] as Book?
@@ -125,10 +126,11 @@ class ReaderViewModel @Inject constructor(
         val failed = args[10] as Boolean
         val prog = args[11] as Float
         val themeSheet = args[12] as Boolean
+        val fileMissing = args[13] as Boolean
         when {
-            b == null && failed -> ReaderUiState.OpenFailed
+            b == null && failed -> ReaderUiState.OpenFailed(fileMissing)
             b == null -> ReaderUiState.Gone
-            failed -> ReaderUiState.OpenFailed
+            failed -> ReaderUiState.OpenFailed(fileMissing)
             else -> {
                 val (positionIndex, positionCount) = positionIndexAndCount()
                 ReaderUiState.Ready(
@@ -331,6 +333,7 @@ class ReaderViewModel @Inject constructor(
             OpenResult.FileMissing, OpenResult.ParseFailed -> {
                 store.failOpen()
                 openFailed.value = true
+                openFileMissing.value = result == OpenResult.FileMissing
             }
         }
     }

@@ -33,8 +33,6 @@ import com.iridium.core.designsystem.screenPopExit
 import com.iridium.core.designsystem.wizardEnter
 import com.iridium.core.designsystem.wizardExit
 import com.iridium.core.model.ThemeMode
-import com.iridium.feature.detail.api.navigateToDetail
-import com.iridium.feature.detail.impl.detailScreen
 import com.iridium.feature.onboarding.api.OnboardingRoute
 import com.iridium.feature.onboarding.impl.onboardingScreen
 import com.iridium.feature.reader.api.navigateToReader
@@ -103,20 +101,14 @@ fun IridiumApp(
                                 onOnboardingComplete = { navController.navigateToMain() },
                             )
                             mainScreen(
-                                onReadClick = { navController.navigateToDetail(it) },
-                                onOpenChapter = { bookId, href ->
-                                    navController.navigateToReader(bookId, href)
-                                },
-                                onBookLongClick = { navController.navigateToDetail(it) },
-                                appVersion = BuildConfig.VERSION_NAME,
-                                onLicensesClick = { navController.navigateToLicenses() },
-                            )
-                            detailScreen(
-                                onBackClick = { navController.popBackStack() },
+                                // Library taps open the book instantly: no
+                                // intermediate details page.
                                 onReadClick = { navController.navigateToReader(it) },
                                 onOpenChapter = { bookId, href ->
                                     navController.navigateToReader(bookId, href)
                                 },
+                                appVersion = BuildConfig.VERSION_NAME,
+                                onLicensesClick = { navController.navigateToLicenses() },
                             )
                             readerScreen(
                                 onBackClick = { navController.popBackStack() },

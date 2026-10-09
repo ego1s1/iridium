@@ -57,14 +57,12 @@ import com.iridium.core.model.LibraryDisplayMode
 @Composable
 fun LibraryTabContent(
     onReadClick: (String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     onResumeAvailable: (Book?) -> Unit = {},
 ) {
     LibraryRoute(
         onBookClick = onReadClick,
-        onBookLongClick = onBookLongClick,
         modifier = modifier,
         onOpenChapter = onOpenChapter,
         onResumeAvailable = onResumeAvailable,
@@ -74,7 +72,6 @@ fun LibraryTabContent(
 @Composable
 internal fun LibraryRoute(
     onBookClick: (String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     onResumeAvailable: (Book?) -> Unit = {},
@@ -107,12 +104,6 @@ internal fun LibraryRoute(
                     context.getString(R.string.library_snack_index_failed, message.failed)
                 LibraryMessage.ScanFailed ->
                     context.getString(R.string.library_snack_scan_failed)
-                is LibraryMessage.IndexedForSearch ->
-                    if (message.chapters > 0) {
-                        context.getString(R.string.library_snack_indexed, message.chapters)
-                    } else {
-                        context.getString(R.string.library_snack_index_empty)
-                    }
             }
             snackbarHost.showSnackbar(text)
         }
@@ -126,7 +117,7 @@ internal fun LibraryRoute(
         onGrantAccess = launchPicker,
         onAction = viewModel::onAction,
         onReadClick = { book ->
-            if (book.error != null) onBookLongClick(book.id) else onBookClick(book.id)
+            onBookClick(book.id)
         },
         // Long-press opens the quick-actions sheet; details live inside it.
         onDetailsClick = { viewModel.onAction(LibraryAction.OpenMenu(it.id)) },
@@ -230,9 +221,7 @@ private fun LibraryContent(
     val query = state.query
     val refreshing = state.refreshing
     val indexProgress = state.indexProgress
-    val shelf = state.continueReading
     val contentHits = state.contentHits
-    val indexing = state.indexing
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     // Reset to top when the filter or text changes: switching Unread -> All
     // with a half-scrolled hero underneath reads as a layout glitch.
@@ -264,17 +253,13 @@ private fun LibraryContent(
             // Thin determinate bar: scanning never hides the books already on
             // screen, and large rescans never read as a stuck spinner.
             val progress = indexProgress
-            when {
-                refreshing && progress != null && progress.total > 0 ->
-                    LinearProgressIndicator(
-                        progress = {
-                            progress.done.coerceAtMost(progress.total).toFloat() / progress.total
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                // Chapter indexing is indeterminate: the work is per-book, and a
-                // fake percentage would be less honest than a sweeping bar.
-                indexing -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            if (refreshing && progress != null && progress.total > 0) {
+                LinearProgressIndicator(
+                    progress = {
+                        progress.done.coerceAtMost(progress.total).toFloat() / progress.total
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             PullToRefreshBox(
                 isRefreshing = refreshing,
@@ -331,19 +316,6 @@ private fun LibraryContent(
                                 selected = query.filter,
                                 onSelect = { onAction(LibraryAction.FilterSelected(it)) },
                             )
-                        }
-                        if (shelf.isNotEmpty() && query.text.isBlank()) {
-                            val hero = shelf.first()
-                            item(
-                                span = { GridItemSpan(maxLineSpan) },
-                                key = "hero_now_reading_${hero.id}",
-                                contentType = "nowReadingHero",
-                            ) {
-                                NowReadingHeroCard(
-                                    book = hero,
-                                    onResume = onReadClick,
-                                    onDetails = onDetailsClick,
-                                )                            }
                         }
                         // Full-text matches sit above the shelf results: when the
                         // user typed a word they are usually looking inside books.
@@ -426,24 +398,6 @@ private fun LibraryContent(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
             )
-        }
-        // Action island rides above the main navigator pill (which owns the
-        // bottom ~92dp), so library mutations stay one tap away. Hidden on
-        // empty screens: the empty state owns the CTA there, and a duplicate
-        // "Link folder" would split the action.
-        if (books.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 104.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                LibraryActionIsland(
-                    onRescan = { onAction(LibraryAction.Rescan) },
-                    onIndex = { onAction(LibraryAction.IndexLibrary) },
-                )
-            }
         }
     }
 }

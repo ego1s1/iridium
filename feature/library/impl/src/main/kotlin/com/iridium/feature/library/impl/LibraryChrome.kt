@@ -79,10 +79,7 @@ object LibraryChromeTestTags {
     const val SearchClear = "libraryChromeSearchClear"
     const val QuickFilters = "libraryChromeQuickFilters"
     const val ShelvesCarousel = "libraryChromeShelves"
-    const val ActionIsland = "libraryChromeActionIsland"
     const val ActionLink = "libraryChromeActionLink"
-    const val ActionRescan = "libraryChromeActionRescan"
-    const val ActionIndex = "libraryChromeActionIndex"
 
     fun quickFilterChip(filter: LibraryFilter): String =
         "libraryChromeQuickFilter:${filter.name}"
@@ -433,59 +430,3 @@ fun LibraryShelvesCarousel(
     }
 }
 
-/**
- * Floating action island: persistent bottom dock with the library's primary
- * mutations. Link-folder is always present; rescan and index-for-search join
- * once a source folder is linked.
- */
-@Composable
-fun LibraryActionIsland(
-    onRescan: () -> Unit,
-    onIndex: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = rememberIridiumHaptics()
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        shape = MaterialTheme.shapes.extraLarge,
-        modifier = modifier.testTag(LibraryChromeTestTags.ActionIsland),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            TextButton(
-                onClick = {
-                    haptics(IridiumHaptic.PrimaryAction)
-                    onRescan()
-                },
-                modifier = Modifier.testTag(LibraryChromeTestTags.ActionRescan),
-            ) {
-                Icon(
-                    imageVector = IridiumIcons.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.library_rescan))
-            }
-            TextButton(
-                onClick = {
-                    haptics(IridiumHaptic.PrimaryAction)
-                    onIndex()
-                },
-                modifier = Modifier.testTag(LibraryChromeTestTags.ActionIndex),
-            ) {
-                Icon(
-                    imageVector = IridiumIcons.List,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.library_index_for_search))
-            }
-        }
-    }
-}

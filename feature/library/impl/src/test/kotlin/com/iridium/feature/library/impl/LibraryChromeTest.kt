@@ -183,25 +183,4 @@ class LibraryChromeTest {
             .performClick()
         assertEquals(LibraryFilter.FINISHED, picked?.filter)
     }
-
-    // --- Action island ---
-
-    @Test
-    fun `action island fires rescan and index`() {
-        var rescan = 0
-        var index = 0
-        composeTestRule.setContent {
-            IridiumTheme(expressiveMotion = false) {
-                LibraryActionIsland(
-                    onRescan = { rescan++ },
-                    onIndex = { index++ },
-                )
-            }
-        }
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionIsland).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionRescan).performClick()
-        composeTestRule.onNodeWithTag(LibraryChromeTestTags.ActionIndex).performClick()
-        assertEquals(1, rescan)
-        assertEquals(1, index)
-    }
 }

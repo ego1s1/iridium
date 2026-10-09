@@ -87,7 +87,6 @@ fun NavController.navigateToMain() {
 fun NavGraphBuilder.mainScreen(
     onReadClick: (String) -> Unit,
     onOpenChapter: (bookId: String, href: String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     appVersion: String,
     onLicensesClick: () -> Unit = {},
 ) {
@@ -96,7 +95,6 @@ fun NavGraphBuilder.mainScreen(
             MainScreen(
                 onReadClick = onReadClick,
                 onOpenChapter = onOpenChapter,
-                onBookLongClick = onBookLongClick,
                 appVersion = appVersion,
                 onLicensesClick = onLicensesClick,
             )
@@ -113,7 +111,6 @@ fun NavGraphBuilder.mainScreen(
 internal fun MainScreen(
     onReadClick: (String) -> Unit,
     onOpenChapter: (bookId: String, href: String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     appVersion: String,
     onLicensesClick: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -185,13 +182,11 @@ internal fun MainScreen(
                     when (tab) {
                         LIBRARY_TAB -> LibraryTabContent(
                             onReadClick = onReadClick,
-                            onBookLongClick = onBookLongClick,
                             onOpenChapter = onOpenChapter,
                             onResumeAvailable = { resume = it },
                         )
                         HISTORY_TAB -> HistoryTabContent(
                             onReadClick = onReadClick,
-                            onBookLongClick = onBookLongClick,
                         )
                         SETTINGS_TAB -> SettingsTabContent(
                             appVersion = appVersion,

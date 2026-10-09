@@ -104,12 +104,10 @@ private fun List<Book>.groupByDay(now: Long = System.currentTimeMillis()): List<
 @Composable
 fun HistoryTabContent(
     onReadClick: (String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HistoryRoute(
         onReadClick = onReadClick,
-        onBookLongClick = onBookLongClick,
         modifier = modifier,
     )
 }
@@ -118,7 +116,6 @@ fun HistoryTabContent(
 @Composable
 internal fun HistoryRoute(
     onReadClick: (String) -> Unit,
-    onBookLongClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
@@ -171,9 +168,7 @@ internal fun HistoryRoute(
                         items(group.books, key = { it.id }, contentType = { "row" }) { book ->
                             HistoryRow(
                                 book = book,
-                                onClick = {
-                                    if (book.error != null) onBookLongClick(book.id) else onReadClick(book.id)
-                                },
+                                onClick = { onReadClick(book.id) },
                             )
                         }
                     }

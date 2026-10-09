@@ -23,8 +23,6 @@ data class LibraryUiState(
     val indexProgress: IndexProgress? = null,
     /** Full-text matches for the current query, newest-first. */
     val contentHits: List<ContentHit> = emptyList(),
-    /** True while chapter text is being indexed for search. */
-    val indexing: Boolean = false,
     /** Persisted display options (card density, grid width). */
     val display: com.iridium.core.model.LibraryDisplay =
         com.iridium.core.model.LibraryDisplay(),
@@ -54,8 +52,6 @@ sealed interface LibraryAction {
     /** Links one SAF folder for library scans. */
     data class AddLinkedFolder(val uri: String) : LibraryAction
 
-    /** Extracts chapter text for every book so content search has data. */
-    data object IndexLibrary : LibraryAction
 
     /** Unlinks a book (the user's original file is never touched). */
     data class RemoveBook(val bookId: String) : LibraryAction
@@ -80,5 +76,4 @@ sealed interface LibraryAction {
 sealed interface LibraryMessage {
     data class IndexFailed(val failed: Int) : LibraryMessage
     data object ScanFailed : LibraryMessage
-    data class IndexedForSearch(val chapters: Int) : LibraryMessage
 }

@@ -36,8 +36,9 @@ sealed interface ReaderUiState {
     /** Book row vanished (removed elsewhere). */
     data object Gone : ReaderUiState
 
-    /** Publication failed to open. */
-    data object OpenFailed : ReaderUiState
+    /** Publication failed to open. [fileMissing] distinguishes a gone or
+     * unreadable file (re-link its folder) from a corrupt one. */
+    data class OpenFailed(val fileMissing: Boolean = false) : ReaderUiState
 }
 
 sealed interface ReaderAction {
