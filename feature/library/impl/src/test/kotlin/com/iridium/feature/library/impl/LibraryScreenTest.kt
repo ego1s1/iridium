@@ -29,7 +29,6 @@ class LibraryScreenTest {
         query = LibraryQuery(text = text),
         refreshing = false,
         filterOpen = false,
-        searchOpen = false,
         continueReading = emptyList(),
     )
 

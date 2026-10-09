@@ -1,10 +1,7 @@
 package com.iridium.feature.reader.impl
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -39,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSettingSwitch
 import com.iridium.core.designsystem.IridiumSheet
+import com.iridium.core.designsystem.IridiumThemeSwatch
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.pageBackgroundArgb
+import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
@@ -139,10 +138,12 @@ internal fun ReaderSettingsContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ColorSchemeChoice.entries.forEach { theme ->
-                    ThemeSwatch(
-                        theme = theme,
+                    IridiumThemeSwatch(
+                        background = Color(theme.pageBackgroundArgb()),
+                        contentColor = if (theme.isLightScheme()) Color.Black else Color.White,
                         selected = prefs.theme == theme,
-                        onClick = { onAction(ReaderAction.SetTheme(theme)) },
+                        onSelect = { onAction(ReaderAction.SetTheme(theme)) },
+                        contentDescription = stringResource(R.string.reader_settings_swatch_selected),
                     )
                 }
             }
@@ -294,44 +295,3 @@ internal fun ReaderSettingsContent(
         }
     }
 
-@Composable
-private fun ThemeSwatch(
-    theme: ColorSchemeChoice,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val (bg, onSwatch) = when (theme) {
-        ColorSchemeChoice.LIGHT -> 0xFFFFFFFF.toInt() to Color.Black
-        ColorSchemeChoice.SEPIA -> 0xFFF5E6C8.toInt() to Color.Black
-        ColorSchemeChoice.GREY -> 0xFF444444.toInt() to Color.White
-        ColorSchemeChoice.DARK -> 0xFF121212.toInt() to Color.White
-        ColorSchemeChoice.BLACK -> 0xFF000000.toInt() to Color.White
-    }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(Color(bg))
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline
-                },
-                shape = CircleShape,
-            )
-            .clickable(onClick = onClick),
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = IridiumIcons.Check,
-                contentDescription = stringResource(R.string.reader_settings_swatch_selected),
-                tint = onSwatch,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}

@@ -64,6 +64,8 @@ import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumScrimPill
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.pageBackgroundArgb
+import com.iridium.core.model.isLightScheme
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
@@ -441,17 +443,10 @@ private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
  * Page background per reader theme (mirrors the settings swatches): system
  * bars tint to this so they read as a seamless frame around the page.
  */
-internal fun ColorSchemeChoice.pageBackground(): Color = when (this) {
-    ColorSchemeChoice.LIGHT -> Color(0xFFFFFFFF)
-    ColorSchemeChoice.SEPIA -> Color(0xFFF5E6C8)
-    ColorSchemeChoice.GREY -> Color(0xFF444444)
-    ColorSchemeChoice.DARK -> Color(0xFF121212)
-    ColorSchemeChoice.BLACK -> Color(0xFF000000)
-}
+internal fun ColorSchemeChoice.pageBackground(): Color = Color(pageBackgroundArgb())
 
 /** Dark status/nav icons on the light page themes, light icons otherwise. */
-internal fun ColorSchemeChoice.lightSystemBars(): Boolean =
-    this == ColorSchemeChoice.LIGHT || this == ColorSchemeChoice.SEPIA
+internal fun ColorSchemeChoice.lightSystemBars(): Boolean = isLightScheme()
 
 /** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
 @Composable

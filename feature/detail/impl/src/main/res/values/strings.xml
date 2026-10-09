@@ -19,11 +19,4 @@
     <string name="detail_remove_cancel">Cancel</string>
     <string name="detail_meta_format">Format</string>
     <string name="detail_meta_file">File</string>
-    <string name="detail_back_to_library">Back to library</string>
-    <string name="detail_action_more">More actions</string>
-    <string name="detail_action_remove_book">Remove book</string>
-    <string name="detail_removed_title">This book was removed.</string>
-    <string name="detail_removed_body">It is no longer in your library.</string>
-    <string name="detail_error_retry">Retry</string>
-    <string name="detail_snack_remove_failed">Couldn\'t remove this book. Try again.</string>
 </resources>

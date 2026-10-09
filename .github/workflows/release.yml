@@ -176,9 +176,13 @@ jobs:
 
       - name: Assemble release APK and bundle (unsigned)
         run: |
+          # versionCode tracks the commit count (same as dev builds): it is
+          # monotonic across tags and rebuilds, unlike run_number which
+          # resets and collides across re-runs.
+          CODE="$(git rev-list --count HEAD)"
           ./gradlew :app:assembleRelease :app:bundleRelease \
             -PappVersionName="${{ steps.resolve.outputs.tag }}" \
-            -PappVersionCode="${{ github.run_number }}"
+            -PappVersionCode="$CODE"
 
       - name: Sign APK
         id: sign

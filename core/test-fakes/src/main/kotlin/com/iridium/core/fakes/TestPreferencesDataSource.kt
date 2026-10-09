@@ -66,4 +66,17 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
     override suspend fun removeLinkedFolder(uri: String) {
         folders.update { it - uri }
     }
+
+    /** Seed hooks so tests start from non-default state without transforms. */
+    fun setReader(prefs: ReaderPreferences) {
+        reader.value = prefs
+    }
+
+    fun setTheme(prefs: ThemePreferences) {
+        theme.value = prefs
+    }
+
+    fun setDisplay(display: LibraryDisplay) {
+        this.display.value = display
+    }
 }

@@ -48,7 +48,6 @@ class LibraryChromeParityTest2 {
         query = LibraryQuery(text = text),
         refreshing = refreshing,
         filterOpen = false,
-        searchOpen = false,
         continueReading = continueReading,
         indexProgress = indexProgress,
         contentHits = contentHits,

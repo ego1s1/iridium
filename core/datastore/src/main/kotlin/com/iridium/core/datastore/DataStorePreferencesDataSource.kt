@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,21 +22,29 @@ import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * A corrupt/unreadable preferences file must never crash every collector:
+ * emit defaults for IO failures and rethrow anything else.
+ */
+private fun Flow<Preferences>.catchOnCorruption(): Flow<Preferences> =
+    catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
 
 @Singleton
 internal class DataStorePreferencesDataSource @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : IridiumPreferencesDataSource {
-
     override val onboardingCompleted: Flow<Boolean> =
-        dataStore.data.map { it[ONBOARDING_COMPLETED] ?: false }
+        dataStore.data.catchOnCorruption().map { it[ONBOARDING_COMPLETED] ?: false }
 
     override val readerPreferences: Flow<ReaderPreferences> =
-        dataStore.data.map { prefs ->
+        dataStore.data.catchOnCorruption().map { prefs ->
             ReaderPreferences(
                 flow = prefs[READING_FLOW]?.let {
                     runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
@@ -88,7 +97,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     }
 
     override val themePreferences: Flow<ThemePreferences> =
-        dataStore.data.map { prefs ->
+        dataStore.data.catchOnCorruption().map { prefs ->
             ThemePreferences(
                 mode = prefs[THEME_MODE]?.let {
                     runCatching { ThemeMode.valueOf(it) }.getOrDefault(ThemeMode.SYSTEM)
@@ -115,7 +124,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     }
 
     override val motionStyle: Flow<MotionStyle> =
-        dataStore.data.map { prefs ->
+        dataStore.data.catchOnCorruption().map { prefs ->
             prefs[MOTION_STYLE]?.let {
                 runCatching { MotionStyle.valueOf(it) }.getOrDefault(MotionStyle.EXPRESSIVE)
             } ?: MotionStyle.EXPRESSIVE
@@ -126,7 +135,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     }
 
     override val libraryDisplay: Flow<LibraryDisplay> =
-        dataStore.data.map { prefs ->
+        dataStore.data.catchOnCorruption().map { prefs ->
             LibraryDisplay(
                 sortOrder = prefs[LIBRARY_SORT]?.let {
                     runCatching { LibrarySortOrder.valueOf(it) }
@@ -156,13 +165,13 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     }
 
     override val crashReportingEnabled: Flow<Boolean> =
-        dataStore.data.map { it[CRASH_REPORTING_ENABLED] ?: false }
+        dataStore.data.catchOnCorruption().map { it[CRASH_REPORTING_ENABLED] ?: false }
 
     override val crashReportingAsked: Flow<Boolean> =
-        dataStore.data.map { it[CRASH_REPORTING_ASKED] ?: false }
+        dataStore.data.catchOnCorruption().map { it[CRASH_REPORTING_ASKED] ?: false }
 
     override val linkedFolders: Flow<Set<String>> =
-        dataStore.data.map { it[LINKED_FOLDERS] ?: emptySet() }
+        dataStore.data.catchOnCorruption().map { it[LINKED_FOLDERS] ?: emptySet() }
 
     override suspend fun addLinkedFolder(uri: String) {
         dataStore.edit { it[LINKED_FOLDERS] = (it[LINKED_FOLDERS] ?: emptySet()) + uri }

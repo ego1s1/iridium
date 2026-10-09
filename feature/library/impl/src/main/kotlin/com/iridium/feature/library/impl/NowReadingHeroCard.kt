@@ -85,6 +85,7 @@ internal fun NowReadingHeroCard(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                onClickLabel = "Resume ${book.title}",
                 onClick = {
                     haptics(IridiumHaptic.PrimaryAction)
                     onResume(book)

@@ -1,12 +1,6 @@
 package com.iridium.feature.onboarding.impl
 
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Environment
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -63,7 +57,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -76,16 +69,21 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.rememberLinkedFolderPicker
+import kotlin.math.roundToInt
 import com.iridium.core.designsystem.IridiumEnter
 import com.iridium.core.designsystem.IridiumEnterKind
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumSectionCard
 import com.iridium.core.designsystem.IridiumSettingSwitch
+import com.iridium.core.designsystem.IridiumThemeSwatch
 import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
 import com.iridium.core.designsystem.SchemePickerRow
 import com.iridium.core.designsystem.topSheet
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.pageBackgroundArgb
+import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
@@ -342,26 +340,13 @@ private fun AccessOptions(
     onAddFolder: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            onAddFolder(uri.toString())
-        }
-    }
+    val launchPicker = rememberLinkedFolderPicker(onFolderPicked = onAddFolder)
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Button(
-            onClick = { picker.launch(null) },
+            onClick = launchPicker,
             modifier = Modifier.fillMaxWidth().height(56.dp).testTag(OnboardingTestTags.AccessGrant),
         ) {
             Text(stringResource(R.string.onboarding_access_grant))
@@ -404,21 +389,35 @@ private fun ReadingOptions(
         Text(stringResource(R.string.onboarding_reading_text_size), style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "${(prefs.fontScale * 100).toInt()}%",
+                text = "${(prefs.fontScale * 100).roundToInt()}%",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = { onAction(OnboardingAction.SetFontScale(prefs.fontScale - 0.1f)) }) {
+            // Quantized tenths: repeated float +/-0.1f accumulates error,
+            // and the buttons park at the clamps instead of overshooting.
+            IconButton(
+                onClick = {
+                    val stepped = ((prefs.fontScale * 10).roundToInt() - 1) / 10f
+                    onAction(OnboardingAction.SetFontScale(stepped))
+                },
+                enabled = prefs.fontScale > 0.5f,
+            ) {
                 Icon(IridiumIcons.Remove, contentDescription = stringResource(R.string.onboarding_text_smaller))
             }
-            IconButton(onClick = { onAction(OnboardingAction.SetFontScale(prefs.fontScale + 0.1f)) }) {
+            IconButton(
+                onClick = {
+                    val stepped = ((prefs.fontScale * 10).roundToInt() + 1) / 10f
+                    onAction(OnboardingAction.SetFontScale(stepped))
+                },
+                enabled = prefs.fontScale < 3f,
+            ) {
                 Icon(IridiumIcons.Add, contentDescription = stringResource(R.string.onboarding_text_larger))
             }
         }
         Text(stringResource(R.string.onboarding_reading_line_spacing), style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "${(prefs.lineHeight * 100).toInt()}%",
+                text = "${(prefs.lineHeight * 100).roundToInt()}%",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
@@ -449,39 +448,12 @@ private fun ReaderThemeSwatches(
         modifier = modifier.fillMaxWidth(),
     ) {
         ColorSchemeChoice.entries.forEach { theme ->
-            val (bg, onSwatch) = when (theme) {
-                ColorSchemeChoice.LIGHT -> 0xFFFFFFFF.toInt() to Color.Black
-                ColorSchemeChoice.SEPIA -> 0xFFF5E6C8.toInt() to Color.Black
-                ColorSchemeChoice.GREY -> 0xFF444444.toInt() to Color.White
-                ColorSchemeChoice.DARK -> 0xFF121212.toInt() to Color.White
-                ColorSchemeChoice.BLACK -> 0xFF000000.toInt() to Color.White
-            }
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(bg))
-                    .border(
-                        width = if (selected == theme) 2.dp else 1.dp,
-                        color = if (selected == theme) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
-                        shape = CircleShape,
-                    )
-                    .clickable(onClick = { onSelect(theme) }),
-            ) {
-                if (selected == theme) {
-                    Icon(
-                        imageVector = IridiumIcons.Check,
-                        contentDescription = null,
-                        tint = onSwatch,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
+            IridiumThemeSwatch(
+                background = Color(theme.pageBackgroundArgb()),
+                contentColor = if (theme.isLightScheme()) Color.Black else Color.White,
+                selected = selected == theme,
+                onSelect = { onSelect(theme) },
+            )
         }
     }
 }

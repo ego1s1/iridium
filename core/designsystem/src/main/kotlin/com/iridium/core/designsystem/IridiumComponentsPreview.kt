@@ -258,19 +258,6 @@ private fun CoverArtPlaceholderPreview() {
 
 @ThemePreviews
 @Composable
-private fun MorphingShapePreview() {
-    IridiumPreview {
-        Box(modifier = Modifier.padding(16.dp)) {
-            IridiumMorphingShape(
-                active = false,
-                modifier = Modifier.size(96.dp),
-            )
-        }
-    }
-}
-
-@ThemePreviews
-@Composable
 private fun SchemePickerRowPreview() {
     IridiumPreview {
         Column(modifier = Modifier.padding(16.dp)) {

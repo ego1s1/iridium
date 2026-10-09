@@ -18,7 +18,7 @@ sealed interface DetailUiState {
 }
 
 sealed interface DetailAction {
-    data class ToggleBookmark(val bookmarked: Boolean) : DetailAction
+    data object ToggleBookmark : DetailAction
     data object AskRemove : DetailAction
     data object DismissRemove : DetailAction
     data object ConfirmRemove : DetailAction

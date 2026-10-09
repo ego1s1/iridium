@@ -72,9 +72,17 @@ class TestBooksRepository : BooksRepository {
     }
 
     override suspend fun updateProgress(id: String, progress: Float, locator: String?) {
-        progressWrites += id to progress
+        // Mirrors the real repository: clamped progress + refreshed recency.
+        val safe = progress.coerceIn(0f, 1f)
+        progressWrites += id to safe
         booksFlow.update { list ->
-            list.map { if (it.id == id) it.copy(progress = progress, lastLocator = locator) else it }
+            list.map {
+                if (it.id == id) {
+                    it.copy(progress = safe, lastLocator = locator, updatedAt = System.currentTimeMillis())
+                } else {
+                    it
+                }
+            }
         }
     }
 
@@ -85,7 +93,8 @@ class TestBooksRepository : BooksRepository {
     }
 
     override suspend fun upsertHighlight(highlight: Highlight) {
-        highlightsFlow.update { it + highlight }
+        // REPLACE semantics like Room: re-saving an id updates, not duplicates.
+        highlightsFlow.update { list -> list.filterNot { it.id == highlight.id } + highlight }
     }
 
     override suspend fun deleteHighlight(id: String) {
@@ -93,7 +102,7 @@ class TestBooksRepository : BooksRepository {
     }
 
     override suspend fun upsertBookmark(bookmark: Bookmark) {
-        bookmarksFlow.update { it + bookmark }
+        bookmarksFlow.update { list -> list.filterNot { it.id == bookmark.id } + bookmark }
     }
 
     override suspend fun deleteBookmark(id: String) {
@@ -102,6 +111,10 @@ class TestBooksRepository : BooksRepository {
 
     override suspend fun removeBook(id: String) {
         booksFlow.update { list -> list.filterNot { it.id == id } }
+        // Cascade like the real repository (FK + FTS): no orphan rows.
+        highlightsFlow.update { list -> list.filterNot { it.bookId == id } }
+        bookmarksFlow.update { list -> list.filterNot { it.bookId == id } }
+        indexedBooks.remove(id)
     }
 
     // Full-text search hooks.

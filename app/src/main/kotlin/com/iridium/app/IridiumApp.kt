@@ -114,6 +114,9 @@ fun IridiumApp(
                             detailScreen(
                                 onBackClick = { navController.popBackStack() },
                                 onReadClick = { navController.navigateToReader(it) },
+                                onOpenChapter = { bookId, href ->
+                                    navController.navigateToReader(bookId, href)
+                                },
                             )
                             readerScreen(
                                 onBackClick = { navController.popBackStack() },

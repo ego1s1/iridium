@@ -64,7 +64,6 @@ class LibraryViewModel @Inject constructor(
 
     private val refreshing = MutableStateFlow(false)
     private val filterOpen = MutableStateFlow(false)
-    private val searchOpen = MutableStateFlow(false)
 
     /**
      * Serializes scans: a folder pick is never dropped behind a running scan,
@@ -72,6 +71,9 @@ class LibraryViewModel @Inject constructor(
      * counter keeps the progress bar up across queued runs.
      */
     private val scanMutex = Mutex()
+
+    /** Guards full-text indexing: double-taps share one pass. */
+    private val indexMutex = Mutex()
     private val scanPending = AtomicInteger(0)
     private val scanQueued = AtomicBoolean(false)
     private val indexProgress = MutableStateFlow<IndexProgress?>(null)
@@ -106,7 +108,7 @@ class LibraryViewModel @Inject constructor(
     val uiState: StateFlow<LibraryUiState> = combine(
         books,
         query,
-        combine(refreshing, filterOpen, searchOpen, ::Chrome),
+        combine(refreshing, filterOpen, ::Chrome),
         indexProgress,
         contentHits,
         indexing,
@@ -127,7 +129,6 @@ class LibraryViewModel @Inject constructor(
             query = query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
-            searchOpen = chrome.searchOpen,
             continueReading = books.continueShelf(),
             indexProgress = progress,
             contentHits = hits,
@@ -144,7 +145,6 @@ class LibraryViewModel @Inject constructor(
             query = LibraryQuery(),
             refreshing = false,
             filterOpen = false,
-            searchOpen = false,
             continueReading = emptyList(),
         ),
     )
@@ -205,7 +205,6 @@ class LibraryViewModel @Inject constructor(
             }
             LibraryAction.OpenFilter -> filterOpen.value = true
             LibraryAction.CloseFilter -> filterOpen.value = false
-            LibraryAction.ToggleSearch -> searchOpen.update { !it }
             LibraryAction.Rescan -> scan()
             is LibraryAction.AddLinkedFolder -> viewModelScope.launch {
                 preferences.addLinkedFolder(action.uri)
@@ -240,7 +239,6 @@ class LibraryViewModel @Inject constructor(
     private data class Chrome(
         val refreshing: Boolean,
         val filterOpen: Boolean,
-        val searchOpen: Boolean,
     )
 
     /** Ephemeral menu chrome kept out of the query/data flows. */
@@ -301,6 +299,9 @@ class LibraryViewModel @Inject constructor(
 
     /** Extracts chapter text for every book; progress shows on the bar. */
     private fun indexLibrary() {
+        // A second tap while indexing is already running is a no-op: the
+        // in-flight pass covers the same books.
+        if (!indexMutex.tryLock()) return
         viewModelScope.launch {
             indexing.value = true
             try {
@@ -314,6 +315,7 @@ class LibraryViewModel @Inject constructor(
                 messageChannel.send(LibraryMessage.IndexedForSearch(chapters))
             } finally {
                 indexing.value = false
+                indexMutex.unlock()
             }
         }
     }

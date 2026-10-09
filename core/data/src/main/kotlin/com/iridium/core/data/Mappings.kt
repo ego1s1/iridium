@@ -28,10 +28,12 @@ internal fun BookEntity.toModel(): Book = Book(
     title = title,
     author = author,
     format = runCatching { BookFormat.valueOf(format) }.getOrDefault(BookFormat.EPUB),
-    spineCount = spineCount,
+    spineCount = spineCount.coerceAtLeast(0),
     sourcePath = sourcePath,
     coverPath = coverPath,
-    progress = progress,
+    // Legacy rows predate write-time clamping: coerce on read so one bad
+    // value cannot poison progress UI (require() here would crash reads).
+    progress = progress.coerceIn(0f, 1f),
     lastLocator = lastLocator,
     sourceDisplayName = sourceDisplayName,
     sourceModified = sourceModified,

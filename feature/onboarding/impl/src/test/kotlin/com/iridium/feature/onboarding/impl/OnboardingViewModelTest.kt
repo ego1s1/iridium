@@ -60,7 +60,10 @@ class OnboardingViewModelTest {
         viewModel.onAction(OnboardingAction.SetLineHeight(2f))
         viewModel.onAction(OnboardingAction.SetReaderTheme(com.iridium.core.model.ColorSchemeChoice.DARK))
 
-        val reader = preferences.readerPreferences.first()
+        // Slider writes coalesce (300ms settle); theme applies immediately.
+        val reader = preferences.readerPreferences.first {
+            it.fontScale == 1.5f && it.lineHeight == 2f
+        }
         assertEquals(1.5f, reader.fontScale)
         assertEquals(2f, reader.lineHeight)
         assertEquals(com.iridium.core.model.ColorSchemeChoice.DARK, reader.theme)
@@ -69,9 +72,9 @@ class OnboardingViewModelTest {
     @Test
     fun `font scale clamps to the readable range`() = runTest {
         viewModel.onAction(OnboardingAction.SetFontScale(99f))
-        assertEquals(3f, preferences.readerPreferences.first().fontScale)
+        assertEquals(3f, preferences.readerPreferences.first { it.fontScale == 3f }.fontScale)
         viewModel.onAction(OnboardingAction.SetLineHeight(99f))
-        assertEquals(2.5f, preferences.readerPreferences.first().lineHeight)
+        assertEquals(2.5f, preferences.readerPreferences.first { it.lineHeight == 2.5f }.lineHeight)
     }
 
     @Test

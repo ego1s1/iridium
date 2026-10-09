@@ -46,13 +46,13 @@ class SettingsViewModel @Inject constructor(
         initialValue = SettingsUiState(),
     )
 
-    /** Latest pending slider write; cancelled-and-replaced per drag tick so
+    /** Latest pending slider write per field; cancelled-and-replaced per drag tick so
      * scrubbing persists once, on settle, instead of hammering DataStore. */
-    private var sliderJob: Job? = null
+    private val sliderJobs = mutableMapOf<String, Job>()
 
-    private fun coalesceSliderWrite(transform: (ReaderPreferences) -> ReaderPreferences) {
-        sliderJob?.cancel()
-        sliderJob = viewModelScope.launch {
+    private fun coalesceSliderWrite(key: String, transform: (ReaderPreferences) -> ReaderPreferences) {
+        sliderJobs[key]?.cancel()
+        sliderJobs[key] = viewModelScope.launch {
             delay(SLIDER_WRITE_DEBOUNCE_MS)
             preferences.updateReaderPreferences(transform)
         }
@@ -84,9 +84,9 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetKeepScreenOn -> updateReader { it.copy(keepScreenOn = action.enabled) }
             is SettingsAction.SetShowPageCounter -> updateReader { it.copy(showPageCounter = action.enabled) }
             is SettingsAction.SetVolumeKeys -> updateReader { it.copy(volumeKeys = action.enabled) }
-            is SettingsAction.SetFontSize -> coalesceSliderWrite { it.copy(fontScale = action.scale) }
-            is SettingsAction.SetMargins -> coalesceSliderWrite { it.copy(pageMargins = action.margins) }
-            is SettingsAction.SetLineHeight -> coalesceSliderWrite { it.copy(lineHeight = action.lineHeight) }
+            is SettingsAction.SetFontSize -> coalesceSliderWrite("fontScale") { it.copy(fontScale = action.scale) }
+            is SettingsAction.SetMargins -> coalesceSliderWrite("margins") { it.copy(pageMargins = action.margins) }
+            is SettingsAction.SetLineHeight -> coalesceSliderWrite("lineHeight") { it.copy(lineHeight = action.lineHeight) }
             is SettingsAction.AddLinkedFolder -> viewModelScope.launch {
                 preferences.addLinkedFolder(action.uri)
             }
@@ -110,6 +110,6 @@ class SettingsViewModel @Inject constructor(
 
     private companion object {
         /** Settles slider drags before the single DataStore write. */
-        const val SLIDER_WRITE_DEBOUNCE_MS = 300L
+        const val SLIDER_WRITE_DEBOUNCE_MS = 150L
     }
 }

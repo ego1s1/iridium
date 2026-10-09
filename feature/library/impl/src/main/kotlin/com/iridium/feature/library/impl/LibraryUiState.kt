@@ -17,7 +17,6 @@ data class LibraryUiState(
     val query: LibraryQuery,
     val refreshing: Boolean,
     val filterOpen: Boolean,
-    val searchOpen: Boolean,
     /** In-progress books by recency, backing the continue shelf. */
     val continueReading: List<Book>,
     /** Determinate scan progress (done/total); null when idle. */
@@ -48,7 +47,6 @@ sealed interface LibraryAction {
     data class ToggleHideErrors(val hide: Boolean) : LibraryAction
     data object OpenFilter : LibraryAction
     data object CloseFilter : LibraryAction
-    data object ToggleSearch : LibraryAction
     data class DisplayModeSelected(val mode: com.iridium.core.model.LibraryDisplayMode) : LibraryAction
     data class GridColumnsSelected(val columns: Int) : LibraryAction
     data object Rescan : LibraryAction

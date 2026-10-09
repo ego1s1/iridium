@@ -53,12 +53,19 @@ class DetailViewModelTest {
         repository.setBooks(listOf(TestData.book(id = "book-1")))
         viewModel.uiState.first { it is DetailUiState.Success }
 
-        viewModel.onAction(DetailAction.ToggleBookmark(true))
+        viewModel.onAction(DetailAction.ToggleBookmark)
 
         val state = viewModel.uiState.first {
             it is DetailUiState.Success && it.book.bookmarked
         } as DetailUiState.Success
         assertTrue(state.book.bookmarked)
+
+        viewModel.onAction(DetailAction.ToggleBookmark)
+
+        val flipped = viewModel.uiState.first {
+            it is DetailUiState.Success && !it.book.bookmarked
+        } as DetailUiState.Success
+        assertFalse(flipped.book.bookmarked)
     }
 
     @Test

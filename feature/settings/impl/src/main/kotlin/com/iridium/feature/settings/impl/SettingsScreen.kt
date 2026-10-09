@@ -3,8 +3,6 @@ package com.iridium.feature.settings.impl
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumAlertDialog
+import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
@@ -88,26 +87,15 @@ internal fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val folderPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            viewModel.onAction(SettingsAction.AddLinkedFolder(uri.toString()))
-        }
+    val launchPicker = rememberLinkedFolderPicker {
+        viewModel.onAction(SettingsAction.AddLinkedFolder(it))
     }
     SettingsScreen(
         state = state,
         appVersion = appVersion,
         onAction = viewModel::onAction,
         onLicensesClick = onLicensesClick,
-        onAddFolder = { folderPicker.launch(null) },
+        onAddFolder = launchPicker,
         modifier = modifier,
     )
 }

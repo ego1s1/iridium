@@ -1,8 +1,6 @@
 package com.iridium.feature.library.impl
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumEmptyState
+import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.data.ContentHit
 import com.iridium.core.model.Book
@@ -87,18 +86,8 @@ internal fun LibraryRoute(
     // Linked folders are the storage grant: empty means the grant UI shows.
     // Persisted across restarts via DataStore (no local remember needed).
     val folders by viewModel.linkedFolders.collectAsStateWithLifecycle()
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            viewModel.onAction(LibraryAction.AddLinkedFolder(uri.toString()))
-        }
+    val launchPicker = rememberLinkedFolderPicker {
+        viewModel.onAction(LibraryAction.AddLinkedFolder(it))
     }
     // A newly linked folder triggers one scan; the launch scan in init covers
     // returning users, so transitions out of empty are the only trigger.
@@ -134,7 +123,7 @@ internal fun LibraryRoute(
     LibraryScreen(
         uiState = uiState,
         hasStorageAccess = folders.isNotEmpty(),
-        onGrantAccess = { picker.launch(null) },
+        onGrantAccess = launchPicker,
         onAction = viewModel::onAction,
         onReadClick = { book ->
             if (book.error != null) onBookLongClick(book.id) else onBookClick(book.id)

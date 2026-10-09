@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,7 +54,9 @@ class DetailViewModel @Inject constructor(
 
     fun onAction(action: DetailAction) {
         when (action) {
-            is DetailAction.ToggleBookmark -> setBookmarked(action.bookmarked)
+            // Parameterless: the ViewModel inverts the latest flow value, so
+            // rapid double-taps cannot act on a stale composition snapshot.
+            DetailAction.ToggleBookmark -> setBookmarkedToggled()
             DetailAction.AskRemove -> confirmRemove.value = true
             DetailAction.DismissRemove -> confirmRemove.value = false
             DetailAction.ConfirmRemove -> remove()
@@ -62,9 +65,10 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    private fun setBookmarked(bookmarked: Boolean) {
+    private fun setBookmarkedToggled() {
         viewModelScope.launch {
-            repository.setBookmarked(route.bookId, bookmarked)
+            val current = repository.observeBook(route.bookId).first()?.bookmarked ?: return@launch
+            repository.setBookmarked(route.bookId, !current)
         }
     }
 

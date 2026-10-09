@@ -1,5 +1,6 @@
 package com.iridium.feature.detail.impl
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,13 +45,13 @@ import com.iridium.core.designsystem.BookCoverArt
 import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.designsystem.IridiumConfirmDialog
 import com.iridium.core.designsystem.IridiumContentWell
+import com.iridium.core.designsystem.IridiumErrorCard
 import com.iridium.core.designsystem.IridiumFilledTonalIconButton
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIconButton
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumPrimaryButton
-import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.screenEnter
 import com.iridium.core.designsystem.screenExit
@@ -64,6 +65,7 @@ fun NavGraphBuilder.detailScreen(
     onBackClick: () -> Unit,
     onReadClick: (String) -> Unit,
     onRemoved: () -> Unit = onBackClick,
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
 ) {
     composable<DetailRoute>(
         enterTransition = { screenEnter() },
@@ -76,6 +78,7 @@ fun NavGraphBuilder.detailScreen(
                 onBackClick = onBackClick,
                 onReadClick = onReadClick,
                 onRemoved = onRemoved,
+                onOpenChapter = onOpenChapter,
             )
         }
     }
@@ -87,6 +90,7 @@ internal fun DetailRoute(
     onReadClick: (String) -> Unit,
     onRemoved: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -101,6 +105,7 @@ internal fun DetailRoute(
             onAction = viewModel::onAction,
             onBackClick = onBackClick,
             onReadClick = { onReadClick(state.book.id) },
+            onOpenChapter = onOpenChapter,
             modifier = modifier,
         )
     }
@@ -114,9 +119,9 @@ internal fun DetailScreen(
     onBackClick: () -> Unit,
     onReadClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenChapter: (bookId: String, href: String) -> Unit = { _, _ -> },
 ) {
     val book = state.book
-    val haptics = rememberIridiumHaptics()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         topBar = {
@@ -130,15 +135,11 @@ internal fun DetailScreen(
                 },
                 actions = {
                     IridiumIconButton(
-                        onClick = {
-                            haptics(
-                                if (book.bookmarked) {
-                                    IridiumHaptic.ToggleOff
-                                } else {
-                                    IridiumHaptic.ToggleOn
-                                },
-                            )
-                            onAction(DetailAction.ToggleBookmark(!book.bookmarked))
+                        onClick = { onAction(DetailAction.ToggleBookmark) },
+                        haptic = if (book.bookmarked) {
+                            IridiumHaptic.ToggleOff
+                        } else {
+                            IridiumHaptic.ToggleOn
                         },
                     ) {
                         Icon(
@@ -210,28 +211,15 @@ internal fun DetailScreen(
             }
             if (book.error != null) {
                 item(contentType = "error") {
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(
-                                text = stringResource(R.string.detail_unreadable_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(
-                                    R.string.detail_unreadable_body,
-                                    book.sourceDisplayName,
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                        }
-                    }
+                    IridiumErrorCard(
+                        title = stringResource(R.string.detail_unreadable_title),
+                        body = stringResource(
+                            R.string.detail_unreadable_body,
+                            book.sourceDisplayName,
+                        ),
+                        primaryLabel = null,
+                        onPrimary = null,
+                    )
                 }
             }
             if (state.toc.isNotEmpty()) {
@@ -247,7 +235,16 @@ internal fun DetailScreen(
                 // (fragment hrefs resolve to the same path), and href alone
                 // is not unique — it crashed LazyColumn on real books.
                 itemsIndexed(state.toc, key = { index, entry -> "$index:${entry.href}" }) { index, entry ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.large)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = entry.title,
+                            ) { onOpenChapter(book.id, entry.href) }
+                            .padding(vertical = 6.dp),
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = entry.title,

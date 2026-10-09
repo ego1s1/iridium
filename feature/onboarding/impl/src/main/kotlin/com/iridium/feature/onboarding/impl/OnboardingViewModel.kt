@@ -7,6 +7,8 @@ import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -73,9 +75,9 @@ internal class OnboardingViewModel @Inject constructor(
                 Step.APPEARANCE -> Step.APPEARANCE
             }
             is OnboardingAction.SetFontScale ->
-                updateReader { it.copy(fontScale = action.scale.coerceIn(0.5f, 3f)) }
+                coalesceReaderWrite("fontScale") { it.copy(fontScale = action.scale.coerceIn(0.5f, 3f)) }
             is OnboardingAction.SetLineHeight ->
-                updateReader { it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f)) }
+                coalesceReaderWrite("lineHeight") { it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f)) }
             is OnboardingAction.SetReaderTheme ->
                 updateReader { it.copy(theme = action.theme) }
             is OnboardingAction.SetThemeMode -> updateTheme { it.copy(mode = action.mode) }
@@ -99,6 +101,17 @@ internal class OnboardingViewModel @Inject constructor(
         viewModelScope.launch { preferences.updateReaderPreferences(transform) }
     }
 
+    /** Latest pending slider write per field; slider drags persist once, on settle. */
+    private val sliderJobs = mutableMapOf<String, Job>()
+
+    private fun coalesceReaderWrite(key: String, transform: (ReaderPreferences) -> ReaderPreferences) {
+        sliderJobs[key]?.cancel()
+        sliderJobs[key] = viewModelScope.launch {
+            delay(SLIDER_WRITE_DEBOUNCE_MS)
+            preferences.updateReaderPreferences(transform)
+        }
+    }
+
     private fun finish() {
         // Navigate only after the flag commits: relaunching before the
         // DataStore write lands would replay onboarding.
@@ -112,4 +125,9 @@ internal class OnboardingViewModel @Inject constructor(
 
     /** Emitted once [finish] has committed; the host navigates on this. */
     val finished: SharedFlow<Unit> = _finished.asSharedFlow()
+
+    /** Slider writes settle before the single DataStore write. */
+    private companion object {
+        const val SLIDER_WRITE_DEBOUNCE_MS = 150L
+    }
 }

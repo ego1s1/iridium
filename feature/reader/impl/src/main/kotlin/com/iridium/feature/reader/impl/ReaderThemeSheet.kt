@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.pageForegroundArgb
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.sizeIn
 
@@ -159,11 +160,5 @@ private fun ColorSchemeChoice.displayName(): String = when (this) {
     ColorSchemeChoice.BLACK -> stringResource(R.string.reader_theme_black)
 }
 
-/** Page foreground (body text) paired with [pageBackground]. */
-internal fun ColorSchemeChoice.pageForeground(): Color = when (this) {
-    ColorSchemeChoice.LIGHT -> Color(0xFF1A1C1E)
-    ColorSchemeChoice.SEPIA -> Color(0xFF3E2F1C)
-    ColorSchemeChoice.GREY -> Color(0xFFF2F2F2)
-    ColorSchemeChoice.DARK -> Color(0xFFE3E1E5)
-    ColorSchemeChoice.BLACK -> Color(0xFFFFFFFF)
-}
+/** Page foreground (body text) paired with [pageBackgroundArgb]. */
+internal fun ColorSchemeChoice.pageForeground(): Color = Color(pageForegroundArgb())

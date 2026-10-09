@@ -25,6 +25,7 @@ fun IridiumErrorCard(
     primaryLabel: String?,
     onPrimary: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    title: String? = null,
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
     loading: Boolean = false,
@@ -38,6 +39,13 @@ fun IridiumErrorCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(16.dp),
         ) {
+            if (title != null) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodyMedium,
