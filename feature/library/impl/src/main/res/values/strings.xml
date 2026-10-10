@@ -1,6 +1,5 @@
 <resources>
     <string name="library_title">My books</string>
-    <string name="library_action_search">Search</string>
     <string name="library_action_sort_filter">Sort and filter</string>
     <string name="library_search_label">Search title or author</string>
     <plurals name="library_content_hits">
@@ -44,7 +43,6 @@
     <string name="library_menu_delete_body">%1$s will be removed from your library. Files on disk are kept.</string>
     <string name="library_menu_delete_confirm">Remove</string>
     <string name="library_dialog_cancel">Cancel</string>
-    <string name="library_sheet_filter">Filter</string>
     <string name="library_menu_progress">%1$d%% read</string>
     <plurals name="library_snack_index_failed">
         <item quantity="one">%1$d book couldn\'t be read</item>

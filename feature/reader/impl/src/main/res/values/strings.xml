@@ -27,12 +27,6 @@
     <string name="reader_settings_align_auto">Auto</string>
     <string name="reader_settings_align_justified">Justified</string>
     <string name="reader_settings_swatch_selected">Selected</string>
-    <string name="reader_settings_direction_ltr">Left to right</string>
-    <string name="reader_settings_direction_rtl">Right to left</string>
-    <string name="reader_settings_fit_width">Width</string>
-    <string name="reader_settings_fit_height">Height</string>
-    <string name="reader_settings_fit_original">Original</string>
-    <string name="reader_settings_crop_subtitle">Trim empty margins around the content</string>
     <string name="reader_settings_volume_invert_subtitle">Volume up goes back a page</string>
     <string name="reader_settings_keep_screen_on">Keep screen on</string>
     <string name="reader_settings_volume_keys">Volume keys turn pages</string>
