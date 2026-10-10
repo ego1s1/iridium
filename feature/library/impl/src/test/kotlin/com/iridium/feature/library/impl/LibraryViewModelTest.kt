@@ -176,4 +176,23 @@ class LibraryViewModelTest {
         viewModel.onAction(LibraryAction.Rescan)
         viewModel.uiState.first { repository.filesystemScans > before }
     }
+
+    @Test
+    fun `a rescan during a running scan folds in without dropping the folder`() = runTest {
+        // The launch scan already ran in setup (filesystemScans == 1).
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        repository.scanGate = gate
+        // Manual scan A starts and is held open mid-flight at the repository gate.
+        viewModel.onAction(LibraryAction.Rescan)
+        viewModel.uiState.first { repository.filesystemScans == 2 }
+        // A second rescan lands while A holds the scan lock: it must queue,
+        // never overlap the active pass.
+        viewModel.onAction(LibraryAction.Rescan)
+        runCurrent()
+        assertEquals(2, repository.filesystemScans)
+        // Release: the running loop drains the queued request (exactly one
+        // extra pass), so the folder pick is never dropped.
+        gate.complete(Unit)
+        viewModel.uiState.first { repository.filesystemScans == 3 }
+    }
 }

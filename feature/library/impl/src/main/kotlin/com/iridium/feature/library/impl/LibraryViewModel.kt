@@ -276,16 +276,7 @@ class LibraryViewModel @Inject constructor(
                 try {
                     do {
                         scanQueued.set(false)
-                        try {
-                            val report = repository.indexFilesystem { done, total ->
-                                indexProgress.value = IndexProgress(done, total)
-                            }
-                            if (report.failed > 0) {
-                                messageChannel.send(LibraryMessage.IndexFailed(report.failed))
-                            }
-                        } catch (_: Exception) {
-                            messageChannel.send(LibraryMessage.ScanFailed)
-                        }
+                        runScan()
                     } while (scanQueued.getAndSet(false))
                 } finally {
                     if (scanPending.decrementAndGet() == 0) {
@@ -296,6 +287,25 @@ class LibraryViewModel @Inject constructor(
             } finally {
                 scanMutex.unlock()
             }
+            // A request that folded in after the loop's final scanQueued check
+            // but before the unlock would otherwise be lost. Drain it now the
+            // lock is free: tryLock succeeds (re-runs) or a fresh holder owns
+            // the run (idempotent queued flag).
+            if (scanQueued.getAndSet(false)) scan()
+        }
+    }
+
+    /** One filesystem pass, reporting failures to the UI. */
+    private suspend fun runScan() {
+        try {
+            val report = repository.indexFilesystem { done, total ->
+                indexProgress.value = IndexProgress(done, total)
+            }
+            if (report.failed > 0) {
+                messageChannel.send(LibraryMessage.IndexFailed(report.failed))
+            }
+        } catch (_: Exception) {
+            messageChannel.send(LibraryMessage.ScanFailed)
         }
     }
 

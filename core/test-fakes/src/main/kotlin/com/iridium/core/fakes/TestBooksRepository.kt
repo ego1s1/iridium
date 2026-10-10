@@ -28,6 +28,10 @@ class TestBooksRepository : BooksRepository {
 
     var indexResult: IndexReport = IndexReport(total = 0, failed = 0)
     var filesystemScans: Int = 0
+
+    /** When set, [indexFilesystem] suspends until completed: lets tests hold a
+     * scan open and drive a second, concurrent rescan. */
+    var scanGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     private val progressWrites = mutableListOf<Pair<String, Float>>()
 
     // Test hooks.
@@ -68,6 +72,7 @@ class TestBooksRepository : BooksRepository {
         onProgress: (done: Int, total: Int) -> Unit,
     ): IndexReport {
         filesystemScans += 1
+        scanGate?.await()
         return indexResult
     }
 
