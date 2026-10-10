@@ -73,10 +73,15 @@ object HtmlText {
             val closing = rawTag.startsWith("/")
 
             if (!closing && name in SKIPPED_TAGS) {
-                // Skip the element body entirely.
+                // Skip the element body entirely. An unclosed element ends
+                // the skip at the tag itself (not the chapter): breaking
+                // here would discard the rest of the book's text.
                 val closeTag = "</$name"
                 val bodyEnd = html.indexOf(closeTag, tagEnd, ignoreCase = true)
-                if (bodyEnd < 0) break
+                if (bodyEnd < 0) {
+                    index = tagEnd + 1
+                    continue
+                }
                 val gt = html.indexOf('>', bodyEnd)
                 index = if (gt < 0) bodyEnd + closeTag.length else gt + 1
                 continue

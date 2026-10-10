@@ -51,6 +51,36 @@ class HtmlTextTest {
     }
 
     @Test
+    fun `comments and doctypes never leak into prose`() {
+        assertEquals("Hello world.", HtmlText.toPlainText("Hello <!-- a > b -->world."))
+        assertEquals("Hi.", HtmlText.toPlainText("<!DOCTYPE html><p>Hi.</p>"))
+        assertEquals("Hi.", HtmlText.toPlainText("<?xml version=\"1.0\"?><p>Hi.</p>"))
+    }
+
+    @Test
+    fun `unclosed script keeps the rest of the chapter`() {
+        val text = HtmlText.toPlainText("<p>First</p><script>var x = 1;<p>Second</p>")
+        assertTrue(text.contains("First"))
+        assertTrue(text.contains("Second"))
+    }
+
+    @Test
+    fun `non-bmp entities decode to real characters`() {
+        // U+1F600 grinning face: must survive as one code point, not surrogates.
+        val text = HtmlText.toPlainText("A&#128512;B")
+        assertEquals("A\uD83D\uDE00B", text)
+        assertEquals(4, text.length)
+    }
+
+    @Test
+    fun `invalid code points are left literal, never mojibake`() {
+        // Out-of-range numerics are not valid entities: keep the raw text
+        // (browser behavior) rather than emitting lone surrogates.
+        assertEquals("A&#x110000;B", HtmlText.toPlainText("A&#x110000;B"))
+        assertEquals("A&#-1;B", HtmlText.toPlainText("A&#-1;B"))
+    }
+
+    @Test
     fun `chapter text is searchable prose`() {
         val chapter = """
             <?xml version="1.0"?>

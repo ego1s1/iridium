@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -265,16 +264,18 @@ class LibraryViewModel @Inject constructor(
             // empty folder set would read as an empty device and prune the
             // whole library.
             if (preferences.linkedFolders.first().isEmpty()) return@launch
-            if (scanMutex.isLocked) {
+            // Atomic gate (not isLocked-check-then-act): exactly one holder
+            // scans; latecomers fold into at most one follow-up run.
+            if (!scanMutex.tryLock()) {
                 scanQueued.set(true)
                 return@launch
             }
-            scanPending.incrementAndGet()
-            refreshing.value = true
             try {
-                do {
-                    scanQueued.set(false)
-                    scanMutex.withLock {
+                scanPending.incrementAndGet()
+                refreshing.value = true
+                try {
+                    do {
+                        scanQueued.set(false)
                         try {
                             val report = repository.indexFilesystem { done, total ->
                                 indexProgress.value = IndexProgress(done, total)
@@ -285,13 +286,15 @@ class LibraryViewModel @Inject constructor(
                         } catch (_: Exception) {
                             messageChannel.send(LibraryMessage.ScanFailed)
                         }
+                    } while (scanQueued.getAndSet(false))
+                } finally {
+                    if (scanPending.decrementAndGet() == 0) {
+                        refreshing.value = false
+                        indexProgress.value = null
                     }
-                } while (scanQueued.getAndSet(false))
-            } finally {
-                if (scanPending.decrementAndGet() == 0) {
-                    refreshing.value = false
-                    indexProgress.value = null
                 }
+            } finally {
+                scanMutex.unlock()
             }
         }
     }

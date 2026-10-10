@@ -127,7 +127,8 @@ internal object OpfSax {
                 }
                 "meta" -> {
                     if (attrs.value("name").equals("cover", ignoreCase = true)) {
-                        coverId = attrs.value("content")
+                        // An empty content must not clobber a valid earlier id.
+                        attrs.value("content")?.let { coverId = it }
                     }
                 }
                 "reference" -> {

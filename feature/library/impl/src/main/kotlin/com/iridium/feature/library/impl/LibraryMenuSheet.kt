@@ -11,7 +11,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -20,14 +19,12 @@ import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
-import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumPrimaryButton
 import com.iridium.core.designsystem.IridiumSettingRow
 import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.designsystem.IridiumTonalButton
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.Book
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -72,7 +69,6 @@ internal fun LibraryMenuContent(
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()
-    val scope = rememberCoroutineScope()
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier
@@ -103,22 +99,6 @@ internal fun LibraryMenuContent(
                 onReadClick(book.id)
             },
             modifier = Modifier.testTag(LibraryTestTags.MenuRead),
-        )
-        IridiumSettingRow(
-            title = stringResource(R.string.library_menu_details),
-            subtitle = stringResource(R.string.library_card_details),
-            icon = IridiumIcons.MenuBook,
-            onClick = {
-                haptics(IridiumHaptic.Select)
-                onAction(LibraryAction.CloseMenu)
-                // Let the sheet exit before pushing: the shared-element
-                // cover morph needs a clean stage, not an overlap.
-                scope.launch {
-                    delay(IridiumMotion.ExitScreenMs.toLong())
-                    onDetailsClick(book.id)
-                }
-            },
-            modifier = Modifier.testTag(LibraryTestTags.MenuDetails),
         )
         IridiumSettingRow(
             title = stringResource(

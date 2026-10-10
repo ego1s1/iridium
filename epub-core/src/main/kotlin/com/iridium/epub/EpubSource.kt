@@ -20,6 +20,10 @@ interface EpubSource : Closeable {
     fun read(offset: Long, length: Int): ByteArray
 
     companion object {
+        /** Pipe-spool buffer and total cap (protects cache storage). */
+        private const val SPOOL_BUFFER = 32 * 1024
+        private const val MAX_SPOOL_BYTES = 256L * 1024 * 1024
+
         fun ofBytes(bytes: ByteArray): EpubSource = ByteArrayEpubSource(bytes)
 
         fun ofFile(file: File): EpubSource =
@@ -51,7 +55,19 @@ interface EpubSource : Closeable {
             val temp = File.createTempFile("epub-src-", ".tmp", cacheDir)
             try {
                 openStream().use { input ->
-                    temp.outputStream().use { output -> input.copyTo(output) }
+                    temp.outputStream().use { output ->
+                        // Capped, cancellable copy: a hostile pipe must
+                        // neither fill storage nor ignore cancellation.
+                        val buffer = ByteArray(SPOOL_BUFFER)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            check(total <= MAX_SPOOL_BYTES) { "EPUB spool exceeds cap" }
+                            output.write(buffer, 0, count)
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 temp.delete()

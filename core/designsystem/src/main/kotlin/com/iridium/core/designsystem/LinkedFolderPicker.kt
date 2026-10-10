@@ -25,21 +25,25 @@ fun rememberLinkedFolderPicker(onFolderPicked: (String) -> Unit): () -> Unit {
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri: Uri? ->
-        if (uri != null) {
-            context.persistSafReadPermission(uri)
+        // Only record trees we actually hold: a failed take would otherwise
+        // guarantee failing scans for a folder that was never granted.
+        if (uri != null && context.persistSafReadPermission(uri)) {
             onFolderPicked(uri.toString())
         }
     }
     return { launcher.launch(null) }
 }
 
-/** Persists SAF read permission on a picked tree; failures are swallowed
- * (the lister independently skips trees without persisted permission). */
-fun android.content.Context.persistSafReadPermission(uri: Uri) {
+/**
+ * Persists SAF read permission on a picked tree. Returns whether the grant
+ * holds (failures are swallowed: the lister independently skips trees
+ * without persisted permission).
+ */
+fun android.content.Context.persistSafReadPermission(uri: Uri): Boolean =
     runCatching {
         contentResolver.takePersistableUriPermission(
             uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION,
         )
-    }
-}
+        true
+    }.getOrDefault(false)

@@ -5,9 +5,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.iridium.core.data.BookOpener
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.data.OpenResult
-import com.iridium.core.data.ReadiumOpener
+import com.iridium.core.datastore.ApplicationScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Book
 import com.iridium.core.model.Bookmark
@@ -18,8 +19,8 @@ import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import android.os.SystemClock
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -50,8 +51,10 @@ class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: BooksRepository,
     private val preferences: IridiumPreferencesDataSource,
-    private val opener: ReadiumOpener,
+    private val opener: BookOpener,
+    private val dictionaryLookup: DictionaryLookup,
     private val store: ReaderSessionStore,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
     private val route: ReaderRoute = savedStateHandle.toRoute()
@@ -86,6 +89,13 @@ class ReaderViewModel @Inject constructor(
     /** Publication positions for the slider/position text (no fixed pages). */
     private var positionsCache: List<Locator> = emptyList()
 
+    /**
+     * Bumped whenever [positionsCache] is (re)filled: the cache is a plain
+     * var outside every combine key, so without this the scrubber/counter
+     * would sit at zero until the next debounced progression tick.
+     */
+    private val positionsVersion = MutableStateFlow(0)
+
     private val messageChannel = Channel<ReaderMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
 
@@ -110,7 +120,7 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = combine(
         book, toc, highlights, preferences.readerPreferences, chromeVisible, settingsOpen, tocOpen,
         highlightsOpen, focusedHighlightId, navigatorAttached, openFailed, progression,
-        themeSheetOpen, openFileMissing,
+        themeSheetOpen, openFileMissing, positionsVersion,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val b = args[0] as Book?
@@ -127,6 +137,8 @@ class ReaderViewModel @Inject constructor(
         val prog = args[11] as Float
         val themeSheet = args[12] as Boolean
         val fileMissing = args[13] as Boolean
+        // positionsVersion (args[14]) is a recombine trigger only: reading it
+        // here keeps the scrubber/counter in sync when positions land.
         when {
             b == null && failed -> ReaderUiState.OpenFailed(fileMissing)
             b == null -> ReaderUiState.Gone
@@ -328,6 +340,7 @@ class ReaderViewModel @Inject constructor(
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
                 positionsCache = runCatching { result.publication.positions() }
                     .getOrDefault(emptyList())
+                positionsVersion.value += 1
                 indexContentIfNeeded()
             }
             OpenResult.FileMissing, OpenResult.ParseFailed -> {
@@ -366,7 +379,10 @@ class ReaderViewModel @Inject constructor(
 
     private suspend fun handleSessionEvent(event: ReaderSessionEvent) {
         when (event) {
-            ReaderSessionEvent.SessionLost -> messageChannel.send(ReaderMessage.Pop)
+            // No SessionLost branch: nothing emits it, and session death
+            // surfaces as Gone/OpenFailed, which own the exit UI. (The else
+            // satisfies exhaustiveness; a future emitter must route through
+            // those states, never a second Pop.)
             ReaderSessionEvent.ContentTapped -> {
                 // A content tap with the dictionary open dismisses the popup
                 // instead of toggling chrome; taps behind any sheet are the
@@ -400,6 +416,7 @@ class ReaderViewModel @Inject constructor(
             ReaderSessionEvent.ResourceFailed ->
                 messageChannel.send(ReaderMessage.Text("Couldn't load part of this book"))
             is ReaderSessionEvent.SelectionChanged -> onSelectionChanged(event.text)
+            else -> Unit
         }
     }
 
@@ -461,14 +478,8 @@ class ReaderViewModel @Inject constructor(
     /**
      * Volume-key paging gate (Mori parity): volume keys turn pages only while
      * paging is enabled, the chrome is hidden, and no sheet is open — so
-     * volume always works normally everywhere else.
+     * volume always works normally everywhere else. Single source of truth.
      */
-    fun isVolumePagingActive(): Boolean {
-        val state = uiState.value as? ReaderUiState.Ready ?: return false
-        return isVolumePagingActive(state)
-    }
-
-    /** Single source of truth for the volume-key paging gate. */
     val volumePagingActive: StateFlow<Boolean> = uiState
         .map { state -> (state as? ReaderUiState.Ready)?.let { ready -> isVolumePagingActive(ready) } ?: false }
         .distinctUntilChanged()
@@ -509,7 +520,6 @@ class ReaderViewModel @Inject constructor(
         return true
     }
 
-    private val dictionaryLookup = HttpDictionaryLookup()
     private val _dictionaryUi = MutableStateFlow<DictionaryUiState?>(null)
     val dictionaryUi: StateFlow<DictionaryUiState?> = _dictionaryUi.asStateFlow()
 
@@ -597,7 +607,7 @@ class ReaderViewModel @Inject constructor(
                 href = selection.locator.href.toString(),
                 startLocator = locatorJson,
                 endLocator = locatorJson,
-                selectedText = "",
+                selectedText = selection.locator.text.highlight.orEmpty(),
                 color = color,
                 note = note?.ifBlank { null },
                 createdAt = System.currentTimeMillis(),
@@ -661,12 +671,13 @@ class ReaderViewModel @Inject constructor(
 
     override fun onCleared() {
         if (store.bookId == bookId) {
-            // Flush the latest locator before closing. NonCancellable: the
-            // scope is already tearing down, and a cancelled tail write
-            // silently loses the last page turn on process death.
+            // Flush the latest locator before closing in the application
+            // scope: viewModelScope is already cancelled here (even
+            // NonCancellable children never run), so the tail write needs
+            // a scope that outlives the ViewModel.
             store.latestLocator.value?.let { locator ->
                 val prog = locator.locations.totalProgression?.toFloat() ?: 0f
-                viewModelScope.launch(NonCancellable) {
+                appScope.launch {
                     runCatching {
                         repository.updateProgress(bookId, prog, locator.toJSON().toString())
                     }

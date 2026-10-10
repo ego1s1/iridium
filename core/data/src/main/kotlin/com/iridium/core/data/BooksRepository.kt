@@ -1,11 +1,13 @@
 package com.iridium.core.data
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.BookEntity
 import com.iridium.core.database.BookmarkDao
 import com.iridium.core.database.ChapterTextDao
 import com.iridium.core.database.HighlightDao
+import com.iridium.core.database.IridiumDatabase
 import com.iridium.core.model.Book
 import com.iridium.core.model.BookError
 import com.iridium.core.model.Bookmark
@@ -93,6 +95,7 @@ interface BooksRepository {
  */
 @Singleton
 internal class OfflineFirstBooksRepository @Inject constructor(
+    private val database: IridiumDatabase,
     private val bookDao: BookDao,
     private val highlightDao: HighlightDao,
     private val bookmarkDao: BookmarkDao,
@@ -169,44 +172,36 @@ internal class OfflineFirstBooksRepository @Inject constructor(
             }
             onProgress(index + 1, docs.size)
         }
-        if (rows.isNotEmpty()) {
-            // Re-read: a reader progress write may have landed after the
-            // snapshot above; last-writer-wins with stale rows would eat it.
-            val fresh = bookDao.getAll().associateBy { it.id }
-            val merged = rows.map { row ->
-                val live = fresh[row.id]
-                val snap = knownById[row.id]
-                if (live != null && (live.updatedAt > (snap?.updatedAt ?: 0L))) {
-                    row.copy(
-                        progress = live.progress,
-                        lastLocator = live.lastLocator,
-                        updatedAt = live.updatedAt,
-                        bookmarked = live.bookmarked,
-                    )
-                } else {
-                    row
-                }
+        // Re-read before writing: a reader progress write may have landed
+        // after the snapshot above; last-writer-wins with stale rows would
+        // eat it.
+        val fresh = bookDao.getAll().associateBy { it.id }
+        val merged = rows.map { row ->
+            val live = fresh[row.id]
+            val snap = knownById[row.id]
+            if (live != null && (live.updatedAt > (snap?.updatedAt ?: 0L))) {
+                row.copy(
+                    progress = live.progress,
+                    lastLocator = live.lastLocator,
+                    updatedAt = live.updatedAt,
+                    bookmarked = live.bookmarked,
+                )
+            } else {
+                row
             }
-            bookDao.upsertAll(merged)
         }
-        // Prune rows deleted from the tree out from under us — never on a
-        // failed walk, which would read as an empty folder and wipe rows the
-        // user still owns. Pruned covers and FTS rows go with their books.
-        if (!walkFailed) {
-            // Anything not found is gone, whatever scheme its row used
-            // (legacy rows included) — except on a failed walk, which must
-            // never read as an empty device.
-            val foundIds = rows.map { it.id }.toSet()
-            val pruned = knownById.values.filter { it.id !in foundIds }
-            if (rows.isEmpty() && pruned.isNotEmpty()) {
-                bookDao.deleteAllLinked()
-                chapterTextDao.clear()
-            } else if (pruned.isNotEmpty()) {
-                bookDao.deleteMissingLinked(foundIds.toList())
-                chapterTextDao.deleteForBooks(pruned.map { it.id })
-            }
-            pruned.forEach { deleteCover(it.coverPath) }
+        // One transaction: crash/interleave can never leave book rows
+        // without FTS or FTS without books. Cover files delete after
+        // commit (file I/O must stay out of the DB transaction).
+        val prunedLinked: List<BookEntity> = database.withTransaction {
+            if (merged.isNotEmpty()) bookDao.upsertAll(merged)
+            pruneLocked(
+                foundIdsOf = merged,
+                knownById = knownById,
+                walkFailed = walkFailed,
+            )
         }
+        prunedLinked.forEach { deleteCover(it.coverPath) }
         IndexReport(total = docs.size, failed = failed)
     }
 
@@ -232,6 +227,37 @@ internal class OfflineFirstBooksRepository @Inject constructor(
 
     override suspend fun deleteBookmark(id: String) {
         bookmarkDao.deleteById(id)
+    }
+
+    /**
+     * Prunes rows deleted from the tree out from under us — never on a
+     * failed walk, which would read as an empty folder and wipe rows the
+     * user still owns. Anything not found is gone, whatever scheme its row
+     * used (legacy rows included). FTS follows only linked books: legacy
+     * file rows survive in the table (the DAO deletes content:// rows
+     * only), so wiping their index would orphan live rows.
+     *
+     * Must run inside [IridiumDatabase.withTransaction]; returns the pruned
+     * linked rows so cover files delete after commit.
+     */
+    private suspend fun pruneLocked(
+        foundIdsOf: List<BookEntity>,
+        knownById: Map<String, BookEntity>,
+        walkFailed: Boolean,
+    ): List<BookEntity> {
+        if (walkFailed) return emptyList()
+        val foundIds = foundIdsOf.map { it.id }.toSet()
+        val pruned = knownById.values.filter { it.id !in foundIds }
+        val prunedLinked = pruned.filter { isLinkedSourcePath(it.id) }
+        if (foundIdsOf.isEmpty() && pruned.isNotEmpty()) {
+            bookDao.deleteAllLinked()
+        } else if (pruned.isNotEmpty()) {
+            bookDao.deleteMissingLinked(foundIds.toList())
+        }
+        if (prunedLinked.isNotEmpty()) {
+            chapterTextDao.deleteForBooks(prunedLinked.map { it.id })
+        }
+        return prunedLinked
     }
 
     override suspend fun indexBookContent(bookId: String): Int = withContext(Dispatchers.IO) {
@@ -275,12 +301,15 @@ internal class OfflineFirstBooksRepository @Inject constructor(
 
     override suspend fun removeBook(id: String) = withContext(Dispatchers.IO) {
         // Unlink only: the user's original file must survive removal.
+        // Atomic: a crash can never leave annotations/FTS without their book.
         val row = bookDao.getById(id)
         if (row != null) {
-            highlightDao.deleteForBook(id)
-            bookmarkDao.deleteForBook(id)
-            chapterTextDao.deleteForBook(id)
-            bookDao.deleteById(id)
+            database.withTransaction {
+                highlightDao.deleteForBook(id)
+                bookmarkDao.deleteForBook(id)
+                chapterTextDao.deleteForBook(id)
+                bookDao.deleteById(id)
+            }
             deleteCover(row.coverPath)
         }
         Unit
@@ -381,6 +410,11 @@ internal abstract class DataModule {
     abstract fun bindBooksRepository(
         impl: OfflineFirstBooksRepository,
     ): BooksRepository
+
+    @Binds
+    abstract fun bindBookOpener(
+        impl: ReadiumOpener,
+    ): BookOpener
 }
 
 @Module

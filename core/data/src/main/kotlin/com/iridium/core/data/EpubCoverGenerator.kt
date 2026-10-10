@@ -29,16 +29,34 @@ internal class EpubCoverGenerator @Inject constructor(
             try {
                 val coversDir = File(context.filesDir, COVERS_DIR).apply { mkdirs() }
                 val dest = File(coversDir, "$coverId.jpg")
-                FileOutputStream(dest).use { out ->
+                // Atomic write: a crash mid-compress must not leave a
+                // truncated cover that the fast path then trusts forever.
+                val tmp = File(coversDir, "$coverId.tmp")
+                FileOutputStream(tmp).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.JPEG, COVER_QUALITY, out)
                 }
                 bitmap.recycle()
+                if (!tmp.renameTo(dest)) {
+                    tmp.delete()
+                    return@withContext null
+                }
+                // Validate the winner: a corrupt encode must not persist.
+                if (!isDecodable(dest)) {
+                    dest.delete()
+                    return@withContext null
+                }
                 dest.absolutePath
             } catch (_: Exception) {
                 runCatching { bitmap.recycle() }
                 null
             }
         }
+
+    private fun isDecodable(file: File): Boolean {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        return options.outWidth > 0 && options.outHeight > 0
+    }
 
     private fun decodeDownsampled(bytes: ByteArray, maxDimension: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }

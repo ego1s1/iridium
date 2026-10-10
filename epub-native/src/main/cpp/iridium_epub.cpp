@@ -263,6 +263,66 @@ bool iequals(const std::string& a, const std::string& b) {
     return true;
 }
 
+/** Drops any `#fragment` suffix (TOC hrefs legitimately carry them). */
+std::string stripFragment(const std::string& href) {
+    const size_t hash = href.find('#');
+    return hash == std::string::npos ? href : href.substr(0, hash);
+}
+
+/** Percent-decodes `%XX` sequences; malformed input passes through. */
+std::string decodePercent(const std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '%' && i + 2 < value.size() &&
+            std::isxdigit(static_cast<unsigned char>(value[i + 1])) &&
+            std::isxdigit(static_cast<unsigned char>(value[i + 2]))) {
+            const int byte = std::stoi(value.substr(i + 1, 2), nullptr, 16);
+            out.push_back(static_cast<char>(byte));
+            i += 2;
+        } else {
+            out.push_back(value[i]);
+        }
+    }
+    return out;
+}
+
+/** Whitespace-token match (manifest `properties` are space-separated). */
+bool hasToken(const std::string& properties, const std::string& token) {
+    size_t pos = 0;
+    while (pos < properties.size()) {
+        while (pos < properties.size() &&
+               std::isspace(static_cast<unsigned char>(properties[pos]))) {
+            ++pos;
+        }
+        size_t end = pos;
+        while (end < properties.size() &&
+               !std::isspace(static_cast<unsigned char>(properties[end]))) {
+            ++end;
+        }
+        if (end > pos && properties.compare(pos, end - pos, token) == 0) return true;
+        pos = end;
+    }
+    return false;
+}
+
+/** Strips `<...>` markup, keeping text (nav link labels with inner spans). */
+std::string stripTags(const std::string& html) {
+    std::string out;
+    out.reserve(html.size());
+    bool inTag = false;
+    for (char c : html) {
+        if (c == '<') {
+            inTag = true;
+        } else if (c == '>') {
+            inTag = false;
+        } else if (!inTag) {
+            out.push_back(c);
+        }
+    }
+    return out;
+}
+
 /** Finds `name="value"` (or single quotes) with an attribute boundary before it. */
 std::string attr(const std::string& tag, const std::string& name) {
     size_t pos = 0;
@@ -397,8 +457,8 @@ bool parseOpf(const std::string& xml, OpfData& out) {
             item.href = attr(tag.full, "href");
             item.mediaType = attr(tag.full, "media-type");
             const std::string properties = attr(tag.full, "properties");
-            item.nav = properties.find("nav") != std::string::npos;
-            item.coverImage = properties.find("cover-image") != std::string::npos;
+            item.nav = hasToken(properties, "nav");
+            item.coverImage = hasToken(properties, "cover-image");
             if (!item.id.empty() && !item.href.empty()) {
                 out.items.push_back(std::move(item));
             }
@@ -466,9 +526,10 @@ void parseNav(const std::string& xml, std::vector<Chapter>& out) {
             anchorHref = attr(tag.full, "href");
             anchorTextStart = pos;
         } else if (tag.closing && local == "a" && inAnchor) {
-            // The link label is the text between the opening and closing tags.
-            const std::string text = collapseWhitespace(trim(
-                xml.substr(anchorTextStart, tag.start - anchorTextStart)));
+            // The link label is the text between the opening and closing
+            // tags, with any inner markup (spans) stripped like the JVM SAX.
+            const std::string text = collapseWhitespace(trim(stripTags(
+                xml.substr(anchorTextStart, tag.start - anchorTextStart))));
             if (!anchorHref.empty() && !text.empty() && out.size() < kMaxTocEntries) {
                 out.emplace_back(anchorHref, text);
             }
@@ -491,8 +552,6 @@ void parseNcx(const std::string& xml, std::vector<Chapter>& out) {
             capturing = true;
             captureStart = pos;
         } else if (tag.closing && local == "text" && capturing) {
-            label = collapseWhitespace(trim(xml.substr(captureStart, tag.full.size())));
-            // Recompute from the opening tag boundary: take text before "</text".
             const size_t close = xml.find("</", captureStart);
             if (close != std::string::npos) {
                 label = collapseWhitespace(trim(xml.substr(captureStart, close - captureStart)));
@@ -547,6 +606,26 @@ bool findEntry(const std::vector<Entry>& entries, const std::string& name, Entry
         if (entry.name == name) {
             out = entry;
             return true;
+        }
+    }
+    // TOC hrefs carry #fragments and archives percent-encode names: retry
+    // stripped, then decoded, matching the JVM engine's lookup order.
+    const std::string stripped = stripFragment(name);
+    if (stripped != name) {
+        for (const Entry& entry : entries) {
+            if (entry.name == stripped) {
+                out = entry;
+                return true;
+            }
+        }
+    }
+    const std::string decoded = decodePercent(stripped);
+    if (decoded != stripped) {
+        for (const Entry& entry : entries) {
+            if (entry.name == decoded) {
+                out = entry;
+                return true;
+            }
         }
     }
     return false;

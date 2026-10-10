@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -25,9 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -201,18 +200,16 @@ internal fun MainScreen(
             // reader while hidden system bars animate back in. navigationBars
             // (never safeDrawing): safeDrawing includes the IME, which would
             // park the pill mid-screen when search opens the keyboard.
+            // Animated (not latched): glides with inset animation instead of
+            // jumping, and can never stick high after rotation/fold.
             val liveNavBottom = WindowInsets.navigationBars
                 .only(WindowInsetsSides.Bottom)
                 .asPaddingValues()
                 .calculateBottomPadding()
-            val latchedNavBottom = rememberSaveable { mutableFloatStateOf(liveNavBottom.value) }
-            SideEffect {
-                if (liveNavBottom.value > latchedNavBottom.floatValue) {
-                    latchedNavBottom.floatValue = liveNavBottom.value
-                }
-            }
-            val navBottom = maxOf(liveNavBottom.value, latchedNavBottom.floatValue).dp
-                .coerceAtMost(MaxChromeBottomInset)
+            val navBottom by animateDpAsState(
+                targetValue = liveNavBottom.coerceAtMost(MaxChromeBottomInset),
+                label = "navBottom",
+            )
             AnimatedVisibility(
                 visible = true,
                 enter = IridiumEnter.enter(IridiumEnterKind.TOOLBAR),

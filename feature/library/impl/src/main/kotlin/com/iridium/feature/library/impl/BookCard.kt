@@ -246,12 +246,15 @@ internal fun CoverOnlyBookCard(
     sharedCover: Boolean = true,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(book) } }
+    // Latest-book reads at click time: metadata/bookmark updates must
+    // reach taps without rebuilding handlers on every re-emission.
+    val latestBook by rememberUpdatedState(book)
+    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
     val haptics = rememberIridiumHaptics()
     val longClick = remember(book.id, onDetails, haptics) {
         {
             haptics(IridiumHaptic.LongPress)
-            onDetails(book)
+            onDetails(latestBook)
         }
     }
     val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
@@ -366,12 +369,15 @@ internal fun BookListRow(
     modifier: Modifier = Modifier,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(book) } }
+    // Latest-book reads at click time: metadata/bookmark updates must
+    // reach taps without rebuilding handlers on every re-emission.
+    val latestBook by rememberUpdatedState(book)
+    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
     val haptics = rememberIridiumHaptics()
     val longClick = remember(book.id, onDetails, haptics) {
         {
             haptics(IridiumHaptic.LongPress)
-            onDetails(book)
+            onDetails(latestBook)
         }
     }
     val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
@@ -472,12 +478,15 @@ private fun BookCardChrome(
     titleMinLines: Int = 2,
     barTopPadding: androidx.compose.ui.unit.Dp = 6.dp,
 ) {
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(book) } }
+    // Latest-book reads at click time: metadata/bookmark updates must
+    // reach taps without rebuilding handlers on every re-emission.
+    val latestBook by rememberUpdatedState(book)
+    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
     val haptics = rememberIridiumHaptics()
     val longClick = remember(book.id, onDetails, haptics) {
         {
             haptics(IridiumHaptic.LongPress)
-            onDetails(book)
+            onDetails(latestBook)
         }
     }
     val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)

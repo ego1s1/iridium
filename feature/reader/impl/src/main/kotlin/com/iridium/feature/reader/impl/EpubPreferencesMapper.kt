@@ -15,6 +15,9 @@ import org.readium.r2.navigator.preferences.Theme as ReadiumTheme
 object EpubPreferencesMapper {
 
     fun map(prefs: ReaderPreferences): EpubPreferences = EpubPreferences(
+        // AUTO is intentionally paged (scroll=false): it means "follow the
+        // book" rather than a third layout mode, and Readium renders paged
+        // unless explicitly told to scroll.
         scroll = when (prefs.flow) {
             ReadingFlow.SCROLLED -> true
             ReadingFlow.AUTO, ReadingFlow.PAGED -> false

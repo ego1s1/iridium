@@ -28,7 +28,7 @@ internal class ChapterIndexer @Inject constructor(
         sourcePath: String,
         displayName: String,
         toc: List<TocEntry>,
-    ): List<ChapterTextEntity> = withContext(Dispatchers.IO) {
+    ): List<ChapterTextEntity> = withContext(Dispatchers.Default) {
         val source = runCatching { sourceFactory.open(sourcePath, displayName) }.getOrNull()
             ?: return@withContext emptyList()
 
@@ -38,10 +38,14 @@ internal class ChapterIndexer @Inject constructor(
             try {
                 val titlesByHref = toc.associate { it.href.substringBefore('#') to it.title }
                 val rows = ArrayList<ChapterTextEntity>()
+                var totalChars = 0
                 val hrefs = book.chapterHrefs().take(MAX_CHAPTERS)
 
                 hrefs.forEachIndexed { index, href ->
                     ensureActive()
+                    // Total budget: a 1000-chapter omnibus at 200k chars each
+                    // would otherwise stage ~200MB in one Room transaction.
+                    if (totalChars >= MAX_TOTAL_CHARS) return@forEachIndexed
                     // One bad chapter must not abort the whole book's index.
                     val bytes = runCatching { book.chapterBytes(href) }.getOrNull()
                         ?: return@forEachIndexed
@@ -55,11 +59,13 @@ internal class ChapterIndexer @Inject constructor(
                     // better in search results than a raw file name.
                     val title = titlesByHref[href.substringBefore('#')] ?: "Chapter ${index + 1}"
 
+                    val clipped = text.take(MAX_BODY_CHARS)
+                    totalChars += clipped.length
                     rows += ChapterTextEntity(
                         bookId = sourcePath,
                         href = href,
                         title = title,
-                        body = text.take(MAX_BODY_CHARS),
+                        body = clipped,
                     )
                 }
                 rows
@@ -74,6 +80,9 @@ internal class ChapterIndexer @Inject constructor(
         const val MAX_CHAPTERS = 1000
         const val MAX_CHAPTER_BYTES = 4 * 1024 * 1024
         const val MAX_BODY_CHARS = 200_000
+
+        /** Total staged text per book: bounds the Room transaction. */
+        const val MAX_TOTAL_CHARS = 2_000_000
 
         /** Chapters shorter than this are covers/blank pages, not prose. */
         const val MIN_CHAPTER_CHARS = 24

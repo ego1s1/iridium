@@ -50,6 +50,7 @@ class OfflineFirstBooksRepositoryTest {
         lister = FakeLister()
         tempDir = File(context.cacheDir, "repo-test").apply { mkdirs() }
         repository = OfflineFirstBooksRepository(
+            database = database,
             bookDao = database.bookDao(),
             highlightDao = database.highlightDao(),
             bookmarkDao = database.bookmarkDao(),

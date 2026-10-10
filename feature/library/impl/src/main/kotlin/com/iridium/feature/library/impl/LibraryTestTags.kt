@@ -20,7 +20,6 @@ object LibraryTestTags {
     const val MenuSheet = "libraryMenuSheet"
     const val MenuTitle = "libraryMenuTitle"
     const val MenuRead = "libraryMenuRead"
-    const val MenuDetails = "libraryMenuDetails"
     const val MenuBookmark = "libraryMenuBookmark"
     const val MenuDelete = "libraryMenuDelete"
     const val MenuDeleteDialog = "libraryMenuDeleteDialog"

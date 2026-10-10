@@ -107,8 +107,11 @@ internal object NavSax {
                 // here preserves document order for nested points.
                 "content" -> {
                     val src = attrs.value("src")
-                    if (src != null && chapters.size < MAX_ENTRIES) {
-                        chapters += src to (label ?: "")
+                    // Blank titles carry no navigation value and would pass
+                    // the non-empty gate, suppressing the spine fallback.
+                    val title = label?.takeIf { it.isNotBlank() }
+                    if (src != null && title != null && chapters.size < MAX_ENTRIES) {
+                        chapters += src to title
                     }
                     label = null
                 }

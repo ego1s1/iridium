@@ -95,6 +95,8 @@ internal fun ReaderRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionReady by viewModel.sessionReady.collectAsStateWithLifecycle()
+    val volumePagingActive by viewModel.volumePagingActive.collectAsStateWithLifecycle()
+    val dictionaryState by viewModel.dictionaryUi.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -137,8 +139,8 @@ internal fun ReaderRoute(
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
             sessionReady = sessionReady,
-            volumePagingActive = viewModel.volumePagingActive.collectAsStateWithLifecycle().value,
-            dictionaryState = viewModel.dictionaryUi.collectAsStateWithLifecycle().value,
+            volumePagingActive = volumePagingActive,
+            dictionaryState = dictionaryState,
             onAction = viewModel::onAction,
             onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
             onBackClick = onBackClick,

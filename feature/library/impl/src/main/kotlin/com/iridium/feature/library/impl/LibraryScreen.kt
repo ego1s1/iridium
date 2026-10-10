@@ -142,15 +142,20 @@ internal fun LibraryScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     // Only the launching card registers a shared cover: tracking every card
-    // costs a shared-transition overlay per scroll frame.
+    // costs a shared-transition overlay per scroll frame. Launchers are
+    // remembered so grid item lambdas survive recomposition memoization.
     var launchingId by remember { mutableStateOf<String?>(null) }
-    val launchRead: (Book) -> Unit = { book ->
-        launchingId = book.id
-        onReadClick(book)
+    val launchRead: (Book) -> Unit = remember(onReadClick) {
+        { book ->
+            launchingId = book.id
+            onReadClick(book)
+        }
     }
-    val launchDetails: (Book) -> Unit = { book ->
-        launchingId = book.id
-        onDetailsClick(book)
+    val launchDetails: (Book) -> Unit = remember(onDetailsClick) {
+        { book ->
+            launchingId = book.id
+            onDetailsClick(book)
+        }
     }
     Scaffold(
         topBar = {
@@ -223,9 +228,9 @@ private fun LibraryContent(
     val indexProgress = state.indexProgress
     val contentHits = state.contentHits
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
-    // Reset to top when the filter or text changes: switching Unread -> All
-    // with a half-scrolled hero underneath reads as a layout glitch.
-    LaunchedEffect(query.filter, query.text) {
+    // Reset to top when the filter changes (not per keystroke: typing must
+    // not yank a half-scrolled grid back to the top).
+    LaunchedEffect(query.filter) {
         gridState.scrollToItem(0)
     }
     // The island floats once the grid moves: color + elevation animate so

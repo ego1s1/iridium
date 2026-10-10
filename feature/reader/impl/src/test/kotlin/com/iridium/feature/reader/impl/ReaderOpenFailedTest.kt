@@ -7,13 +7,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
-import com.iridium.core.data.ReadiumOpener
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumTheme
+import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.testing.TestDispatcherRule
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -110,13 +113,14 @@ class ReaderOpenFailedTest {
 
     @Test
     fun `Back action dispatches pop`() = runTest {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         val viewModel = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
             repository = TestBooksRepository(),
             preferences = TestPreferencesDataSource(),
-            opener = ReadiumOpener(context),
+            opener = FakeOpener(),
+            dictionaryLookup = FakeDictionaryLookup(),
             store = ReaderSessionStore(),
+            appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
         )
 
         viewModel.onAction(ReaderAction.Back)

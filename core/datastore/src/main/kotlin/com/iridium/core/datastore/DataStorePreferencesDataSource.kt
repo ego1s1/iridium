@@ -44,82 +44,89 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         dataStore.data.catchOnCorruption().map { it[ONBOARDING_COMPLETED] ?: false }
 
     override val readerPreferences: Flow<ReaderPreferences> =
-        dataStore.data.catchOnCorruption().map { prefs ->
-            ReaderPreferences(
-                flow = prefs[READING_FLOW]?.let {
-                    runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
-                } ?: ReadingFlow.AUTO,
-                fontScale = prefs[FONT_SCALE] ?: 1f,
-                textAlign = prefs[TEXT_ALIGN]?.let {
-                    runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.ORIGINAL)
-                } ?: TextAlign.ORIGINAL,
-                theme = prefs[READER_THEME]?.let {
-                    runCatching { ColorSchemeChoice.valueOf(it) }.getOrDefault(ColorSchemeChoice.SEPIA)
-                } ?: ColorSchemeChoice.SEPIA,
-                brightness = prefs[BRIGHTNESS] ?: -1f,
-                keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
-                showPageCounter = prefs[SHOW_PAGE_COUNTER] ?: true,
-                volumeKeys = prefs[VOLUME_KEYS] ?: false,
-                volumeKeysInverted = prefs[VOLUME_KEYS_INVERTED] ?: false,
-                // Single-switch era: legacy four-way invert maps to mirrored
-                // taps when it flipped the horizontal axis; legacy keys are
-                // dropped on the next write below.
-                invertTaps = prefs[TAP_INVERT] ?: prefs[TAP_ZONE_INVERT].let { legacy ->
-                    legacy == LEGACY_INVERT_HORIZONTAL || legacy == LEGACY_INVERT_BOTH
-                },
-                nightLight = prefs[NIGHT_LIGHT] ?: false,
-                nightLightIntensity = prefs[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
-                pageMargins = prefs[PAGE_MARGINS] ?: 1f,
-                lineHeight = prefs[LINE_HEIGHT] ?: 1.4f,
-            )
-        }
+        dataStore.data.catchOnCorruption().map { prefs -> prefs.toReaderPreferences() }
 
+    private fun Preferences.toReaderPreferences(): ReaderPreferences =
+        ReaderPreferences(
+            flow = this[READING_FLOW]?.let {
+                runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
+            } ?: ReadingFlow.AUTO,
+            fontScale = this[FONT_SCALE] ?: 1f,
+            textAlign = this[TEXT_ALIGN]?.let {
+                runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.ORIGINAL)
+            } ?: TextAlign.ORIGINAL,
+            theme = this[READER_THEME]?.let {
+                runCatching { ColorSchemeChoice.valueOf(it) }.getOrDefault(ColorSchemeChoice.SEPIA)
+            } ?: ColorSchemeChoice.SEPIA,
+            brightness = this[BRIGHTNESS] ?: -1f,
+            keepScreenOn = this[KEEP_SCREEN_ON] ?: true,
+            showPageCounter = this[SHOW_PAGE_COUNTER] ?: true,
+            volumeKeys = this[VOLUME_KEYS] ?: false,
+            volumeKeysInverted = this[VOLUME_KEYS_INVERTED] ?: false,
+            // Single-switch era: legacy four-way invert maps to mirrored
+            // taps when it flipped the horizontal axis; legacy keys are
+            // dropped on the next write below.
+            invertTaps = this[TAP_INVERT] ?: this[TAP_ZONE_INVERT].let { legacy ->
+                legacy == LEGACY_INVERT_HORIZONTAL || legacy == LEGACY_INVERT_BOTH
+            },
+            nightLight = this[NIGHT_LIGHT] ?: false,
+            nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
+            pageMargins = this[PAGE_MARGINS] ?: 1f,
+            lineHeight = this[LINE_HEIGHT] ?: 1.4f,
+        )
+
+    /**
+     * Read-modify-write inside a single `edit`: the transform observes the
+     * committed snapshot, so concurrent writers cannot interleave a stale
+     * read between `first()` and the write and lose updates.
+     */
     override suspend fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences) {
-        val updated = transform(readerPreferences.first())
-        dataStore.edit {
-            it[READING_FLOW] = updated.flow.name
-            it[FONT_SCALE] = updated.fontScale
-            it[TEXT_ALIGN] = updated.textAlign.name
-            it[READER_THEME] = updated.theme.name
-            it[BRIGHTNESS] = updated.brightness
-            it[KEEP_SCREEN_ON] = updated.keepScreenOn
-            it[SHOW_PAGE_COUNTER] = updated.showPageCounter
-            it[VOLUME_KEYS] = updated.volumeKeys
-            it[VOLUME_KEYS_INVERTED] = updated.volumeKeysInverted
-            it[TAP_INVERT] = updated.invertTaps
-            it.remove(TAP_ZONE_MODE)
-            it.remove(TAP_ZONE_INVERT)
-            it[NIGHT_LIGHT] = updated.nightLight
-            it[NIGHT_LIGHT_INTENSITY] = updated.nightLightIntensity
-            it[PAGE_MARGINS] = updated.pageMargins
-            it[LINE_HEIGHT] = updated.lineHeight
+        dataStore.edit { prefs ->
+            val updated = transform(prefs.toReaderPreferences())
+            prefs[READING_FLOW] = updated.flow.name
+            prefs[FONT_SCALE] = updated.fontScale
+            prefs[TEXT_ALIGN] = updated.textAlign.name
+            prefs[READER_THEME] = updated.theme.name
+            prefs[BRIGHTNESS] = updated.brightness
+            prefs[KEEP_SCREEN_ON] = updated.keepScreenOn
+            prefs[SHOW_PAGE_COUNTER] = updated.showPageCounter
+            prefs[VOLUME_KEYS] = updated.volumeKeys
+            prefs[VOLUME_KEYS_INVERTED] = updated.volumeKeysInverted
+            prefs[TAP_INVERT] = updated.invertTaps
+            prefs.remove(TAP_ZONE_MODE)
+            prefs.remove(TAP_ZONE_INVERT)
+            prefs[NIGHT_LIGHT] = updated.nightLight
+            prefs[NIGHT_LIGHT_INTENSITY] = updated.nightLightIntensity
+            prefs[PAGE_MARGINS] = updated.pageMargins
+            prefs[LINE_HEIGHT] = updated.lineHeight
         }
     }
 
     override val themePreferences: Flow<ThemePreferences> =
-        dataStore.data.catchOnCorruption().map { prefs ->
-            ThemePreferences(
-                mode = prefs[THEME_MODE]?.let {
-                    runCatching { ThemeMode.valueOf(it) }.getOrDefault(ThemeMode.SYSTEM)
-                } ?: ThemeMode.SYSTEM,
-                dynamicColor = prefs[DYNAMIC_COLOR] ?: true,
-                colorScheme = prefs[APP_COLOR_SCHEME]?.let {
-                    runCatching { AppColorScheme.valueOf(it) }
-                        .getOrDefault(AppColorScheme.IRIDIUM)
-                } ?: AppColorScheme.IRIDIUM,
-                amoled = prefs[AMOLED] ?: false,
-                hapticsEnabled = prefs[HAPTICS_ENABLED] ?: true,
-            )
-        }
+        dataStore.data.catchOnCorruption().map { prefs -> prefs.toThemePreferences() }
+
+    private fun Preferences.toThemePreferences(): ThemePreferences =
+        ThemePreferences(
+            mode = this[THEME_MODE]?.let {
+                runCatching { ThemeMode.valueOf(it) }.getOrDefault(ThemeMode.SYSTEM)
+            } ?: ThemeMode.SYSTEM,
+            dynamicColor = this[DYNAMIC_COLOR] ?: true,
+            colorScheme = this[APP_COLOR_SCHEME]?.let {
+                runCatching { AppColorScheme.valueOf(it) }
+                    .getOrDefault(AppColorScheme.IRIDIUM)
+            } ?: AppColorScheme.IRIDIUM,
+            amoled = this[AMOLED] ?: false,
+            hapticsEnabled = this[HAPTICS_ENABLED] ?: true,
+        )
 
     override suspend fun updateThemePreferences(transform: (ThemePreferences) -> ThemePreferences) {
-        val updated = transform(themePreferences.first())
-        dataStore.edit {
-            it[THEME_MODE] = updated.mode.name
-            it[DYNAMIC_COLOR] = updated.dynamicColor
-            it[APP_COLOR_SCHEME] = updated.colorScheme.name
-            it[AMOLED] = updated.amoled
-            it[HAPTICS_ENABLED] = updated.hapticsEnabled
+        dataStore.edit { prefs ->
+            val updated = transform(prefs.toThemePreferences())
+            prefs[THEME_MODE] = updated.mode.name
+            prefs[DYNAMIC_COLOR] = updated.dynamicColor
+            prefs[APP_COLOR_SCHEME] = updated.colorScheme.name
+            prefs[AMOLED] = updated.amoled
+            prefs[HAPTICS_ENABLED] = updated.hapticsEnabled
         }
     }
 
@@ -135,32 +142,33 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     }
 
     override val libraryDisplay: Flow<LibraryDisplay> =
-        dataStore.data.catchOnCorruption().map { prefs ->
-            LibraryDisplay(
-                sortOrder = prefs[LIBRARY_SORT]?.let {
-                    runCatching { LibrarySortOrder.valueOf(it) }
-                        .getOrDefault(LibrarySortOrder.RECENTLY_ADDED)
-                } ?: LibrarySortOrder.RECENTLY_ADDED,
-                filter = prefs[LIBRARY_FILTER]?.let {
-                    runCatching { LibraryFilter.valueOf(it) }.getOrDefault(LibraryFilter.ALL)
-                } ?: LibraryFilter.ALL,
-                hideErrors = prefs[LIBRARY_HIDE_ERRORS] ?: false,
-                displayMode = prefs[LIBRARY_DISPLAY_MODE]?.let {
-                    runCatching { LibraryDisplayMode.valueOf(it) }
-                        .getOrDefault(LibraryDisplayMode.COMPACT)
-                } ?: LibraryDisplayMode.COMPACT,
-                gridColumns = prefs[LIBRARY_GRID_COLUMNS] ?: 0,
-            )
-        }
+        dataStore.data.catchOnCorruption().map { prefs -> prefs.toLibraryDisplay() }
+
+    private fun Preferences.toLibraryDisplay(): LibraryDisplay =
+        LibraryDisplay(
+            sortOrder = this[LIBRARY_SORT]?.let {
+                runCatching { LibrarySortOrder.valueOf(it) }
+                    .getOrDefault(LibrarySortOrder.RECENTLY_ADDED)
+            } ?: LibrarySortOrder.RECENTLY_ADDED,
+            filter = this[LIBRARY_FILTER]?.let {
+                runCatching { LibraryFilter.valueOf(it) }.getOrDefault(LibraryFilter.ALL)
+            } ?: LibraryFilter.ALL,
+            hideErrors = this[LIBRARY_HIDE_ERRORS] ?: false,
+            displayMode = this[LIBRARY_DISPLAY_MODE]?.let {
+                runCatching { LibraryDisplayMode.valueOf(it) }
+                    .getOrDefault(LibraryDisplayMode.COMPACT)
+            } ?: LibraryDisplayMode.COMPACT,
+            gridColumns = this[LIBRARY_GRID_COLUMNS] ?: 0,
+        )
 
     override suspend fun updateLibraryDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
-        val updated = transform(libraryDisplay.first())
-        dataStore.edit {
-            it[LIBRARY_SORT] = updated.sortOrder.name
-            it[LIBRARY_FILTER] = updated.filter.name
-            it[LIBRARY_HIDE_ERRORS] = updated.hideErrors
-            it[LIBRARY_DISPLAY_MODE] = updated.displayMode.name
-            it[LIBRARY_GRID_COLUMNS] = updated.gridColumns
+        dataStore.edit { prefs ->
+            val updated = transform(prefs.toLibraryDisplay())
+            prefs[LIBRARY_SORT] = updated.sortOrder.name
+            prefs[LIBRARY_FILTER] = updated.filter.name
+            prefs[LIBRARY_HIDE_ERRORS] = updated.hideErrors
+            prefs[LIBRARY_DISPLAY_MODE] = updated.displayMode.name
+            prefs[LIBRARY_GRID_COLUMNS] = updated.gridColumns
         }
     }
 

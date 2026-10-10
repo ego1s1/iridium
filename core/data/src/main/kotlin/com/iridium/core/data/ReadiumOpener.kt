@@ -7,6 +7,8 @@ import java.io.Closeable
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.asset.Asset
@@ -16,6 +18,11 @@ import org.readium.r2.shared.util.toAbsoluteUrl
 import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
+
+/** Opens a book source. Interface seam so ViewModel tests fake the streamer. */
+fun interface BookOpener {
+    suspend fun open(sourcePath: String): OpenResult
+}
 
 /** Failure opening a book with Readium. */
 sealed interface OpenResult {
@@ -32,14 +39,14 @@ sealed interface OpenResult {
 @Singleton
 class ReadiumOpener @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : BookOpener {
     private val httpClient = DefaultHttpClient()
     private val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
     private val parser = DefaultPublicationParser(context, httpClient, assetRetriever, null)
     private val opener = PublicationOpener(parser, emptyList())
 
-    suspend fun open(sourcePath: String): OpenResult {
-        return when (val retrieved = retrieveAsset(sourcePath)) {
+    override suspend fun open(sourcePath: String): OpenResult = withContext(Dispatchers.IO) {
+        when (val retrieved = retrieveAsset(sourcePath)) {
             Retrieved.Gone -> OpenResult.FileMissing
             Retrieved.Unreadable -> OpenResult.ParseFailed
             is Retrieved.Found -> {

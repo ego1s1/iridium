@@ -169,11 +169,12 @@ class EpubBook internal constructor(
     fun chapterBytes(href: String): ByteArray? =
         archive.findEntry(href.substringBefore('#'))?.let { archive.read(it) }
 
+    /** Any resource by resolved href (fragments stripped like chapters). */
+    fun readResource(href: String, maxBytes: Long = MAX_RESOURCE_BYTES): ByteArray? =
+        archive.findEntry(href.substringBefore('#'))?.let { archive.read(it, maxBytes) }
+
     /** Chapter hrefs in spine order. */
     fun chapterHrefs(): List<String> = spineEntries.map { it.name }
-
-    fun readResource(href: String, maxBytes: Long = MAX_RESOURCE_BYTES): ByteArray? =
-        archive.findEntry(href)?.let { archive.read(it, maxBytes) }
 
     override fun close() {
         source.close()
