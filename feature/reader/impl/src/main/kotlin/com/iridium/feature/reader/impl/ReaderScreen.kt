@@ -103,15 +103,16 @@ internal fun ReaderRoute(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
             when (message) {
-                is ReaderMessage.Text -> snackbarHost.showSnackbar(message.text)
+                ReaderMessage.ContentUnavailable ->
+                    snackbarHost.showSnackbar(context.getString(R.string.reader_content_unavailable))
                 is ReaderMessage.OpenUrl ->
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, message.url.toUri()))
                     }
                 ReaderMessage.SelectTextFirst ->
-                    snackbarHost.showSnackbar("Long-press text to select it first")
+                    snackbarHost.showSnackbar(context.getString(R.string.reader_select_text_first))
                 ReaderMessage.HighlightSaved ->
-                    snackbarHost.showSnackbar("Highlight saved")
+                    snackbarHost.showSnackbar(context.getString(R.string.reader_highlight_saved))
                 ReaderMessage.Pop -> onBackClick()
             }
         }
@@ -326,26 +327,32 @@ internal fun ReaderScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
-                            Icon(IridiumIcons.Back, contentDescription = "Back")
+                            Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.reader_action_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = { onAction(ReaderAction.OpenToc) }) {
-                            Icon(IridiumIcons.List, contentDescription = "Contents")
+                            Icon(IridiumIcons.List, contentDescription = stringResource(R.string.reader_toc_title))
                         }
                         IconButton(onClick = { onAction(ReaderAction.OpenHighlights) }) {
-                            Icon(IridiumIcons.Highlight, contentDescription = "Highlights")
+                            Icon(
+                                IridiumIcons.Highlight,
+                                contentDescription = stringResource(R.string.reader_action_highlights),
+                            )
                         }
                         IconButton(onClick = { onAction(ReaderAction.OpenSettings) }) {
-                            Icon(IridiumIcons.Settings, contentDescription = "Reading settings")
+                            Icon(
+                                IridiumIcons.Settings,
+                                contentDescription = stringResource(R.string.reader_action_settings),
+                            )
                         }
                         var menuOpen by remember { mutableStateOf(false) }
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(IridiumIcons.More, contentDescription = "More")
+                            Icon(IridiumIcons.More, contentDescription = stringResource(R.string.reader_action_more))
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Highlight selection") },
+                                text = { Text(stringResource(R.string.reader_action_highlight_selection)) },
                                 onClick = {
                                     menuOpen = false
                                     showAddDialog = true
@@ -489,7 +496,7 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
     val activity = context as? FragmentActivity
     if (activity == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Reader unavailable")
+            Text(stringResource(R.string.reader_unavailable))
         }
         return
     }

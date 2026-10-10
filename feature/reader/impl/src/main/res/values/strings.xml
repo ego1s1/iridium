@@ -53,4 +53,21 @@
     <string name="reader_open_failed_body_missing">The file is gone or unreadable. If you moved it, link its folder again from the library.</string>
     <string name="reader_open_failed_body_corrupt">This file looks corrupt or incomplete.</string>
     <string name="reader_open_failed_back">Back to library</string>
+    <string name="reader_action_back">Back</string>
+    <string name="reader_action_highlights">Highlights</string>
+    <string name="reader_action_settings">Reading settings</string>
+    <string name="reader_action_more">More</string>
+    <string name="reader_action_highlight_selection">Highlight selection</string>
+    <string name="reader_content_unavailable">Couldn\'t load part of this book</string>
+    <string name="reader_unavailable">Reader unavailable</string>
+    <string name="reader_dictionary_copy">Copy</string>
+    <string name="reader_dictionary_close">Close</string>
+    <string name="reader_scrub_previous">Previous position</string>
+    <string name="reader_scrub_next">Next position</string>
+    <string name="reader_flow_label">Reading flow</string>
+    <string name="reader_theme_label">Reading theme</string>
+    <string name="reader_toc_label">Table of contents</string>
+    <string name="reader_settings_label">Reader settings</string>
+    <string name="reader_select_text_first">Long-press text to select it first</string>
+    <string name="reader_highlight_saved">Highlight saved</string>
 </resources>

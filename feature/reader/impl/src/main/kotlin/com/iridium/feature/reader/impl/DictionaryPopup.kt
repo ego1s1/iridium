@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -100,7 +101,7 @@ fun DictionaryPopup(
                 onClick = { clipboard.setText(AnnotatedString(state.word)) },
                 modifier = Modifier.testTag(DictionaryTestTags.CopyButton),
             ) {
-                Text("Copy")
+                Text(stringResource(R.string.reader_dictionary_copy))
             }
         },
         dismissButton = {
@@ -108,7 +109,7 @@ fun DictionaryPopup(
                 onClick = onDismiss,
                 modifier = Modifier.testTag(DictionaryTestTags.CloseButton),
             ) {
-                Text("Close")
+                Text(stringResource(R.string.reader_dictionary_close))
             }
         },
         modifier = modifier

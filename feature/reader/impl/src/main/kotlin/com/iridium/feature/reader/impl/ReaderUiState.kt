@@ -79,8 +79,8 @@ sealed interface ReaderAction {
 
 /** One-shot UI messages. */
 sealed interface ReaderMessage {
-    data class Text(val text: String) : ReaderMessage
     data class OpenUrl(val url: String) : ReaderMessage
+    data object ContentUnavailable : ReaderMessage
     data object SelectTextFirst : ReaderMessage
     data object HighlightSaved : ReaderMessage
     data object Pop : ReaderMessage

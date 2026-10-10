@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -176,6 +177,8 @@ fun ReaderScrubberIsland(
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()
+    val prevLabel = stringResource(R.string.reader_scrub_previous)
+    val nextLabel = stringResource(R.string.reader_scrub_next)
     val rowDirection = if (direction == ChromeReadingDirection.RIGHT_TO_LEFT) {
         LayoutDirection.Rtl
     } else {
@@ -252,7 +255,7 @@ fun ReaderScrubberIsland(
                     ) {
                         Icon(
                             imageVector = prevIcon,
-                            contentDescription = "Previous position",
+                            contentDescription = prevLabel,
                         )
                     }
 
@@ -332,7 +335,7 @@ fun ReaderScrubberIsland(
                     ) {
                         Icon(
                             imageVector = nextIcon,
-                            contentDescription = "Next position",
+                            contentDescription = nextLabel,
                         )
                     }
                 }
@@ -366,6 +369,11 @@ fun ReaderEpubDock(
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()
+    val flowLabel = stringResource(R.string.reader_flow_label)
+    val themeLabel = stringResource(R.string.reader_theme_label)
+    val tocLabel = stringResource(R.string.reader_toc_label)
+    val highlightsLabel = stringResource(R.string.reader_action_highlights)
+    val settingsLabel = stringResource(R.string.reader_settings_label)
     val segmentShape = RoundedCornerShape(14.dp)
 
     Surface(
@@ -404,11 +412,11 @@ fun ReaderEpubDock(
                     .size(44.dp)
                     .testTag(ReaderChromeTestTags.EpubFlowButton)
                     .semantics {
-                        onClick(label = "Reading flow", action = null)
-                        stateDescription = "Reading flow"
+                        onClick(label = flowLabel, action = null)
+                        stateDescription = flowLabel
                     },
             ) {
-                Icon(IridiumIcons.ViewAgenda, contentDescription = "Cycle reading flow")
+                Icon(IridiumIcons.ViewAgenda, contentDescription = flowLabel)
             }
 
             DockDivider()
@@ -427,11 +435,11 @@ fun ReaderEpubDock(
                     .size(44.dp)
                     .testTag(ReaderChromeTestTags.EpubThemeButton)
                     .semantics {
-                        onClick(label = "Reading theme", action = null)
-                        stateDescription = "Reading theme"
+                        onClick(label = themeLabel, action = null)
+                        stateDescription = themeLabel
                     },
             ) {
-                Icon(IridiumIcons.Contrast, contentDescription = "Choose reading theme")
+                Icon(IridiumIcons.Contrast, contentDescription = themeLabel)
             }
 
             DockDivider()
@@ -450,11 +458,11 @@ fun ReaderEpubDock(
                     .size(44.dp)
                     .testTag(ReaderChromeTestTags.EpubTocButton)
                     .semantics {
-                        onClick(label = "Table of contents", action = null)
-                        stateDescription = "Table of contents"
+                        onClick(label = tocLabel, action = null)
+                        stateDescription = tocLabel
                     },
             ) {
-                Icon(IridiumIcons.MenuBook, contentDescription = "Table of contents")
+                Icon(IridiumIcons.MenuBook, contentDescription = tocLabel)
             }
 
             DockDivider()
@@ -473,11 +481,11 @@ fun ReaderEpubDock(
                     .size(44.dp)
                     .testTag(ReaderChromeTestTags.EpubHighlightsButton)
                     .semantics {
-                        onClick(label = "Highlights", action = null)
-                        stateDescription = "Highlights"
+                        onClick(label = highlightsLabel, action = null)
+                        stateDescription = highlightsLabel
                     },
             ) {
-                Icon(IridiumIcons.Highlight, contentDescription = "Highlights")
+                Icon(IridiumIcons.Highlight, contentDescription = highlightsLabel)
             }
 
             DockDivider()
@@ -496,11 +504,11 @@ fun ReaderEpubDock(
                     .size(44.dp)
                     .testTag(ReaderChromeTestTags.EpubSettingsButton)
                     .semantics {
-                        onClick(label = "Reader settings", action = null)
-                        stateDescription = "Reader settings"
+                        onClick(label = settingsLabel, action = null)
+                        stateDescription = settingsLabel
                     },
             ) {
-                Icon(IridiumIcons.Settings, contentDescription = "Reader settings")
+                Icon(IridiumIcons.Settings, contentDescription = settingsLabel)
             }
         }
     }

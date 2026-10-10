@@ -414,7 +414,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderSessionEvent.ExternalLink ->
                 messageChannel.send(ReaderMessage.OpenUrl(event.url))
             ReaderSessionEvent.ResourceFailed ->
-                messageChannel.send(ReaderMessage.Text("Couldn't load part of this book"))
+                messageChannel.send(ReaderMessage.ContentUnavailable)
             is ReaderSessionEvent.SelectionChanged -> onSelectionChanged(event.text)
             else -> Unit
         }
