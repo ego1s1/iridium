@@ -10,4 +10,14 @@
     <string name="licenses_retry">Retry</string>
     <string name="licenses_empty_title">No licenses listed</string>
     <string name="licenses_empty_body">This build shipped without license metadata.</string>
+    <string name="crash_consent_title">Send crash reports?</string>
+    <string name="crash_consent_body">If Iridium crashes, a report is saved on this device. Sharing it is optional and always your choice — nothing is ever sent automatically, and your books are never included.</string>
+    <string name="crash_consent_enable">Enable</string>
+    <string name="crash_consent_not_now">Not now</string>
+    <string name="crash_pending_title">Iridium closed unexpectedly</string>
+    <string name="crash_pending_body">A crash report is available. Share it to help fix the problem?</string>
+    <string name="crash_share">Share</string>
+    <string name="crash_discard">Discard</string>
+    <string name="crash_share_subject">Iridium crash report</string>
+    <string name="crash_share_chooser">Share crash report</string>
 </resources>

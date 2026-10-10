@@ -40,7 +40,7 @@ class HistoryViewModelTest {
             ),
         )
         val state = viewModel.uiState.first { it.groups.isNotEmpty() }
-        assertEquals("Today", state.groups.first().label)
+        assertEquals(HistoryGroupKey.Today, state.groups.first().key)
         assertEquals(listOf("1", "2"), state.groups.first().books.map { it.id })
     }
 
@@ -55,7 +55,10 @@ class HistoryViewModelTest {
             ),
         )
         val state = viewModel.uiState.first { it.groups.size == 2 }
-        assertEquals(listOf("Today", "Yesterday"), state.groups.map { it.label })
+        assertEquals(
+            listOf(HistoryGroupKey.Today, HistoryGroupKey.Yesterday),
+            state.groups.map { it.key },
+        )
         assertEquals(listOf("today"), state.groups[0].books.map { it.id })
         assertEquals(listOf("yesterday"), state.groups[1].books.map { it.id })
     }

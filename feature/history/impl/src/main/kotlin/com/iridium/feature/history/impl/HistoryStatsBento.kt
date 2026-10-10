@@ -33,6 +33,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -145,7 +147,7 @@ fun HistoryStatsBentoContent(
                 .testTag(HistoryStatsTestTags.EmptyState),
         ) {
             Text(
-                text = "Books you read will build your stats here.",
+                text = stringResource(R.string.history_stats_empty),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -168,7 +170,7 @@ fun HistoryStatsBentoContent(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CompanionStatCard(
-                label = "Segments read",
+                label = stringResource(R.string.history_stats_segments),
                 value = snapshot.totals.segmentsRead.toString(),
                 icon = IridiumIcons.MenuBook,
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -178,7 +180,7 @@ fun HistoryStatsBentoContent(
                     .testTag(HistoryStatsTestTags.Segments),
             )
             CompanionStatCard(
-                label = "Books finished",
+                label = stringResource(R.string.history_stats_finished),
                 value = snapshot.totals.booksFinished.toString(),
                 icon = IridiumIcons.Check,
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -188,7 +190,7 @@ fun HistoryStatsBentoContent(
                     .testTag(HistoryStatsTestTags.Finished),
             )
         }
-        IridiumSectionCard(title = "Activity") {
+        IridiumSectionCard(title = stringResource(R.string.history_stats_activity)) {
             HistoryRangeSelector(
                 range = snapshot.range,
                 onSelect = onRangeSelect,
@@ -210,7 +212,7 @@ fun HistoryStatsBentoContent(
         )
         if (snapshot.topBooks.isNotEmpty()) {
             Text(
-                text = "Most read",
+                text = stringResource(R.string.history_stats_most_read),
                 style = IridiumEmphasized.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
@@ -259,7 +261,7 @@ private fun ReadingTimeHeroCard(
                 )
             }
             Text(
-                text = "Time reading · estimated",
+                text = stringResource(R.string.history_stats_time_estimated),
                 style = IridiumEmphasized.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
@@ -357,9 +359,9 @@ private fun HistoryRangeSelector(
                 label = {
                     Text(
                         text = when (option) {
-                            HistoryStatsRange.WEEK -> "7D"
-                            HistoryStatsRange.MONTH -> "30D"
-                            HistoryStatsRange.YEAR -> "1Y"
+                            HistoryStatsRange.WEEK -> stringResource(R.string.history_range_week)
+                            HistoryStatsRange.MONTH -> stringResource(R.string.history_range_month)
+                            HistoryStatsRange.YEAR -> stringResource(R.string.history_range_year)
                         },
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -383,6 +385,7 @@ private fun HistoryActivityChart(
     val peakColor = MaterialTheme.colorScheme.tertiary
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
     if (buckets.isEmpty()) return
+    val chartDescription = stringResource(R.string.history_stats_chart_desc)
     // A full year is 365 daily buckets in ~360dp: aggregate into weekly
     // maxima past ~60 bars so bars stay legible instead of overdrawing.
     val drawn = remember(buckets) {
@@ -402,7 +405,7 @@ private fun HistoryActivityChart(
     val peak = drawn.maxOf { it.booksActive }
     Canvas(
         modifier = modifier.semantics {
-            this.contentDescription = "Bar chart of daily reading activity"
+            this.contentDescription = chartDescription
             this.role = Role.Image
         },
     ) {
@@ -457,7 +460,7 @@ private fun HistoryStreakCard(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = "Streak",
+                    text = stringResource(R.string.history_stats_streak),
                     style = IridiumEmphasized.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -479,13 +482,21 @@ private fun HistoryStreakCard(
                 }
             }
             Text(
-                text = "${streak.current} days",
+                text = pluralStringResource(
+                    R.plurals.history_stats_streak_days,
+                    streak.current,
+                    streak.current,
+                ),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
             )
             Text(
-                text = "Longest: ${streak.longest} days",
+                text = pluralStringResource(
+                    R.plurals.history_stats_streak_longest,
+                    streak.longest,
+                    streak.longest,
+                ),
                 style = IridiumEmphasized.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -528,7 +539,7 @@ private fun HistoryTopBookRow(
                 maxLines = 2,
             )
             Text(
-                text = "${top.percentRead}% read",
+                text = stringResource(R.string.history_progress, top.percentRead),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -537,14 +548,15 @@ private fun HistoryTopBookRow(
 }
 
 /** Compact hero duration: 2h 15m / 45m / 30s. */
+@Composable
 private fun formatHistoryDuration(durationMs: Long): String {
     val totalSeconds = (durationMs.coerceAtLeast(0L) / 1000L)
     val hours = totalSeconds / 3600L
     val minutes = (totalSeconds % 3600L) / 60L
     val seconds = totalSeconds % 60L
     return when {
-        hours > 0 -> "${hours}h ${minutes}m"
-        minutes > 0 -> "${minutes}m"
-        else -> "${seconds}s"
+        hours > 0 -> stringResource(R.string.history_duration_hours_minutes, hours, minutes)
+        minutes > 0 -> stringResource(R.string.history_duration_minutes, minutes)
+        else -> stringResource(R.string.history_duration_seconds, seconds)
     }
 }

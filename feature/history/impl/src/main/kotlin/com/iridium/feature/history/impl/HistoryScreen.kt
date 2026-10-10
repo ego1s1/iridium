@@ -24,10 +24,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,8 +53,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
+/** Bucket a history entry falls into; the label is resolved in the UI layer
+ * so grouping stays locale-free and unit-testable. */
+sealed interface HistoryGroupKey {
+    data object Today : HistoryGroupKey
+    data object Yesterday : HistoryGroupKey
+    data class Dated(val startOfDayMillis: Long) : HistoryGroupKey
+}
+
 /** A day's worth of recently read books, newest first. */
-data class HistoryGroup(val label: String, val books: List<Book>)
+data class HistoryGroup(val key: HistoryGroupKey, val books: List<Book>)
 
 data class HistoryUiState(val groups: List<HistoryGroup> = emptyList())
 
@@ -87,15 +97,36 @@ private fun List<Book>.groupByDay(now: Long = System.currentTimeMillis()): List<
     calendar.add(Calendar.DAY_OF_YEAR, -1)
     val startOfYesterday = calendar.timeInMillis
 
-    val formatter = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
     return groupBy { book ->
         when {
-            book.updatedAt >= startOfToday -> "Today"
-            book.updatedAt >= startOfYesterday -> "Yesterday"
-            else -> formatter.format(Date(book.updatedAt))
+            book.updatedAt >= startOfToday -> HistoryGroupKey.Today
+            book.updatedAt >= startOfYesterday -> HistoryGroupKey.Yesterday
+            else -> HistoryGroupKey.Dated(startOfDay(book.updatedAt))
         }
-    }.map { (label, books) ->
-        HistoryGroup(label, books.sortedByDescending { it.updatedAt })
+    }.map { (key, books) ->
+        HistoryGroup(key, books.sortedByDescending { it.updatedAt })
+    }
+}
+
+/** Midnight in the device's zone for [millis], used to bucket dated groups. */
+private fun startOfDay(millis: Long): Long {
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = millis
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    return calendar.timeInMillis
+}
+
+/** Localised header for a history bucket. */
+@Composable
+private fun historyGroupLabel(key: HistoryGroupKey): String = when (key) {
+    HistoryGroupKey.Today -> stringResource(R.string.history_today)
+    HistoryGroupKey.Yesterday -> stringResource(R.string.history_yesterday)
+    is HistoryGroupKey.Dated -> remember(key.startOfDayMillis) {
+        SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+            .format(Date(key.startOfDayMillis))
     }
 }
 
@@ -124,7 +155,7 @@ internal fun HistoryRoute(
     Scaffold(
         topBar = {
             IridiumCollapsingTopBar(
-                title = "History",
+                title = stringResource(R.string.history_title),
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -148,7 +179,7 @@ internal fun HistoryRoute(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = "Books you read will show up here.",
+                                text = stringResource(R.string.history_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(32.dp),
@@ -157,9 +188,9 @@ internal fun HistoryRoute(
                     }
                 } else {
                     state.groups.forEach { group ->
-                        item(key = "header-${group.label}", contentType = "header") {
+                        item(key = "header-${group.key}", contentType = "header") {
                             Text(
-                                text = group.label,
+                                text = historyGroupLabel(group.key),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
@@ -226,7 +257,7 @@ private fun HistoryRow(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${(progress * 100).toInt()}% read",
+                    text = stringResource(R.string.history_progress, (progress * 100).toInt()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

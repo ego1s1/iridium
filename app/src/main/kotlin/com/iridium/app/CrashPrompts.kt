@@ -7,6 +7,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 /**
@@ -26,30 +27,28 @@ internal fun CrashPrompts(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val shareSubject = stringResource(R.string.crash_share_subject)
+    val shareChooser = stringResource(R.string.crash_share_chooser)
 
     if (!asked) {
         AlertDialog(
             onDismissRequest = onDecline,
-            title = { Text("Send crash reports?") },
+            title = { Text(stringResource(R.string.crash_consent_title)) },
             text = {
-                Text(
-                    "If Iridium crashes, a report is saved on this device. Sharing it " +
-                        "is optional and always your choice — nothing is ever sent " +
-                        "automatically, and your books are never included.",
-                )
+                Text(stringResource(R.string.crash_consent_body))
             },
             confirmButton = {
-                TextButton(onClick = onEnable) { Text("Enable") }
+                TextButton(onClick = onEnable) { Text(stringResource(R.string.crash_consent_enable)) }
             },
             dismissButton = {
-                TextButton(onClick = onDecline) { Text("Not now") }
+                TextButton(onClick = onDecline) { Text(stringResource(R.string.crash_consent_not_now)) }
             },
         )
     } else if (enabled && hasPendingReport) {
         AlertDialog(
             onDismissRequest = onDiscard,
-            title = { Text("Iridium closed unexpectedly") },
-            text = { Text("A crash report is available. Share it to help fix the problem?") },
+            title = { Text(stringResource(R.string.crash_pending_title)) },
+            text = { Text(stringResource(R.string.crash_pending_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -57,21 +56,21 @@ internal fun CrashPrompts(
                         if (text != null) {
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "Iridium crash report")
+                                putExtra(Intent.EXTRA_SUBJECT, shareSubject)
                                 putExtra(Intent.EXTRA_TEXT, text)
                             }
                             runCatching {
                                 context.startActivity(
-                                    Intent.createChooser(intent, "Share crash report"),
+                                    Intent.createChooser(intent, shareChooser),
                                 )
                             }
                         }
                         onShared()
                     }
-                }) { Text("Share") }
+                }) { Text(stringResource(R.string.crash_share)) }
             },
             dismissButton = {
-                TextButton(onClick = onDiscard) { Text("Discard") }
+                TextButton(onClick = onDiscard) { Text(stringResource(R.string.crash_discard)) }
             },
         )
     }

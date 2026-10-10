@@ -1,0 +1,32 @@
+<resources>
+    <string name="history_title">History</string>
+    <string name="history_empty">Books you read will show up here.</string>
+    <string name="history_today">Today</string>
+    <string name="history_yesterday">Yesterday</string>
+    <string name="history_progress">%1$d%% read</string>
+
+    <string name="history_stats_empty">Books you read will build your stats here.</string>
+    <string name="history_stats_segments">Segments read</string>
+    <string name="history_stats_finished">Books finished</string>
+    <string name="history_stats_activity">Activity</string>
+    <string name="history_stats_most_read">Most read</string>
+    <string name="history_stats_time_estimated">Time reading · estimated</string>
+    <string name="history_stats_chart_desc">Bar chart of daily reading activity</string>
+    <string name="history_stats_streak">Streak</string>
+    <plurals name="history_stats_streak_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="history_stats_streak_longest">
+        <item quantity="one">Longest: %1$d day</item>
+        <item quantity="other">Longest: %1$d days</item>
+    </plurals>
+
+    <string name="history_range_week">7D</string>
+    <string name="history_range_month">30D</string>
+    <string name="history_range_year">1Y</string>
+
+    <string name="history_duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="history_duration_minutes">%1$dm</string>
+    <string name="history_duration_seconds">%1$ds</string>
+</resources>
