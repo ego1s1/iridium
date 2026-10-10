@@ -1,6 +1,6 @@
 [versions]
 aboutLibraries = "13.2.1"
-agp = "8.9.1"
+agp = "8.13.2"
 kotlin = "2.2.21"
 detekt = "1.23.7"
 coroutines = "1.9.0"
