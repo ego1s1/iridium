@@ -239,6 +239,6 @@ class LibraryChromeParityTest2 {
             ),
         )
         setScreen(state(books = listOf(book), contentHits = hits))
-        composeTestRule.onNodeWithText("In books (1)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("In book (1)").assertIsDisplayed()
     }
 }

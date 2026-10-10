@@ -42,6 +42,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -101,7 +102,11 @@ internal fun LibraryRoute(
         viewModel.messages.collect { message ->
             val text = when (message) {
                 is LibraryMessage.IndexFailed ->
-                    context.getString(R.string.library_snack_index_failed, message.failed)
+                    context.resources.getQuantityString(
+                        R.plurals.library_snack_index_failed,
+                        message.failed,
+                        message.failed,
+                    )
                 LibraryMessage.ScanFailed ->
                     context.getString(R.string.library_snack_scan_failed)
             }
@@ -327,8 +332,9 @@ private fun LibraryContent(
                         if (contentHits.isNotEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }, contentType = "hitsHeader") {
                                 Text(
-                                    text = stringResource(
-                                        R.string.library_content_hits,
+                                    text = pluralStringResource(
+                                        R.plurals.library_content_hits,
+                                        contentHits.size,
                                         contentHits.size,
                                     ),
                                     style = MaterialTheme.typography.titleMedium,

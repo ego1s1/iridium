@@ -7,9 +7,9 @@ import org.gradle.kotlin.dsl.configure
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
-internal const val COMPILE_SDK = 35
+internal const val COMPILE_SDK = 36
 internal const val MIN_SDK = 24
-internal const val TARGET_SDK = 35
+internal const val TARGET_SDK = 36
 
 internal fun Project.configureAndroidCommon(
     extension: CommonExtension<*, *, *, *, *, *>,

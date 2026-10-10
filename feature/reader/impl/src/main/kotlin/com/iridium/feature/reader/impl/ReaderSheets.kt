@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumIcons
@@ -93,7 +94,7 @@ internal fun ReaderHighlightsSheet(
 ) {
     IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
-            stringResource(R.string.reader_highlights_title, highlights.size),
+            pluralStringResource(R.plurals.reader_highlights_title, highlights.size, highlights.size),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 20.dp),
         )

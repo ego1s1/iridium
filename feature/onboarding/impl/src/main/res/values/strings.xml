@@ -14,7 +14,10 @@
     <string name="onboarding_access_title">Where are your books?</string>
     <string name="onboarding_access_body">Pick the folders Iridium should scan for EPUBs — Downloads, your ebook folder, an SD card. Files stay exactly where they are; nothing is copied or uploaded.</string>
     <string name="onboarding_access_grant">Choose folders</string>
-    <string name="onboarding_access_granted">%d folders linked — your books will appear in the library.</string>
+    <plurals name="onboarding_access_granted">
+        <item quantity="one">%1$d folder linked — your books will appear in the library.</item>
+        <item quantity="other">%1$d folders linked — your books will appear in the library.</item>
+    </plurals>
     <string name="onboarding_access_hint">Without a folder Iridium can\'t find your books. You can add one later from the library.</string>
     <string name="onboarding_access_note">Only EPUB discovery uses this. Your files never leave the device.</string>
     <string name="onboarding_reading_title">Make reading yours</string>

@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -319,10 +320,24 @@ internal fun SettingsScreen(
                     subtitle = if (folderCount == 0) {
                         stringResource(R.string.settings_storage_location_subtitle)
                     } else {
-                        stringResource(R.string.settings_storage_linked, folderCount)
+                        pluralStringResource(
+                            R.plurals.settings_storage_linked,
+                            folderCount,
+                            folderCount,
+                        )
                     },
                     onClick = onAddFolder,
                 )
+                state.revokedFolders.forEach { uri ->
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_storage_revoked_title),
+                        subtitle = stringResource(
+                            R.string.settings_storage_revoked_body,
+                            displayNameForTreeUri(uri),
+                        ),
+                        onClick = { onAction(SettingsAction.RemoveLinkedFolder(uri)) },
+                    )
+                }
             }
 
             IridiumSectionCard(title = stringResource(R.string.settings_card_about)) {
@@ -337,6 +352,13 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(96.dp))
         }
     }
+}
+
+/** Human label for a SAF tree URI: the folder name after the volume prefix. */
+private fun displayNameForTreeUri(uri: String): String {
+    val last = uri.substringAfterLast('/')
+    val folder = last.substringAfter("%3A", last).substringAfter(':', last)
+    return runCatching { java.net.URLDecoder.decode(folder, "UTF-8") }.getOrDefault(folder)
 }
 
 /** Brand card plus creator attribution, mirroring the reference About hero. */

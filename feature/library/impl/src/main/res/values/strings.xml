@@ -3,7 +3,10 @@
     <string name="library_action_search">Search</string>
     <string name="library_action_sort_filter">Sort and filter</string>
     <string name="library_search_label">Search title or author</string>
-    <string name="library_content_hits">In books (%1$d)</string>
+    <plurals name="library_content_hits">
+        <item quantity="one">In book (%1$d)</item>
+        <item quantity="other">In books (%1$d)</item>
+    </plurals>
     <string name="library_continue_title">Continue reading</string>
     <string name="library_empty_title">No books yet</string>
     <string name="library_empty_body">Iridium reads every EPUB on your device. Nothing is copied — files stay exactly where they are.</string>
@@ -45,7 +48,10 @@
     <string name="library_dialog_cancel">Cancel</string>
     <string name="library_sheet_filter">Filter</string>
     <string name="library_menu_progress">%1$d%% read</string>
-    <string name="library_snack_index_failed">%1$d book(s) couldn\'t be read</string>
+    <plurals name="library_snack_index_failed">
+        <item quantity="one">%1$d book couldn\'t be read</item>
+        <item quantity="other">%1$d books couldn\'t be read</item>
+    </plurals>
     <string name="library_snack_scan_failed">Couldn\'t scan that folder</string>
     <string name="library_rescan">Rescan library</string>
 </resources>

@@ -22,6 +22,12 @@ internal abstract class PreferencesModule {
     abstract fun bindPreferencesDataSource(
         impl: DataStorePreferencesDataSource,
     ): IridiumPreferencesDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindSafGrantStore(
+        impl: ContentResolverGrantStore,
+    ): SafGrantStore
 }
 
 @Module

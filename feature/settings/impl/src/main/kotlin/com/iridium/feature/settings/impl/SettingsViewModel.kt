@@ -3,6 +3,7 @@ package com.iridium.feature.settings.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
+import com.iridium.core.datastore.SafGrantStore
 import com.iridium.core.model.LibraryDisplay
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ReaderPreferences
@@ -15,13 +16,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
+    private val grants: SafGrantStore,
 ) : ViewModel() {
+
+    /** Folders whose persisted SAF grant died: scans skip them, the UI
+     * offers re-link or forget. Refreshes whenever the linked set changes. */
+    private val revokedFolders: StateFlow<Set<String>> = preferences.linkedFolders
+        .mapLatest { folders -> folders - grants.persistedReadUris() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     val uiState: StateFlow<SettingsUiState> = combine(
         preferences.themePreferences,
@@ -30,6 +39,7 @@ class SettingsViewModel @Inject constructor(
         preferences.libraryDisplay,
         preferences.crashReportingEnabled,
         preferences.linkedFolders,
+        revokedFolders,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         SettingsUiState(
@@ -39,6 +49,7 @@ class SettingsViewModel @Inject constructor(
             libraryDisplay = args[3] as LibraryDisplay,
             crashReportingEnabled = args[4] as Boolean,
             linkedFolders = args[5] as Set<String>,
+            revokedFolders = args[6] as Set<String>,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -89,6 +100,10 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetLineHeight -> coalesceSliderWrite("lineHeight") { it.copy(lineHeight = action.lineHeight) }
             is SettingsAction.AddLinkedFolder -> viewModelScope.launch {
                 preferences.addLinkedFolder(action.uri)
+            }
+            is SettingsAction.RemoveLinkedFolder -> viewModelScope.launch {
+                grants.releaseReadUri(action.uri)
+                preferences.removeLinkedFolder(action.uri)
             }
             is SettingsAction.SetCrashReporting -> viewModelScope.launch {
                 preferences.setCrashReporting(action.enabled)

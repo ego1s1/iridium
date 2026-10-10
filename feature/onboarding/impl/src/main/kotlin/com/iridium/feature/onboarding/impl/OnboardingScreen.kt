@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -353,7 +354,11 @@ private fun AccessOptions(
         }
         Text(
             text = if (folderCount > 0) {
-                stringResource(R.string.onboarding_access_granted, folderCount)
+                pluralStringResource(
+                    R.plurals.onboarding_access_granted,
+                    folderCount,
+                    folderCount,
+                )
             } else {
                 stringResource(R.string.onboarding_access_hint)
             },

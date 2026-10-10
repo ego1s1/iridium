@@ -40,6 +40,9 @@ import kotlinx.coroutines.withContext
 /** Outcome of one linked-tree scan. */
 data class IndexReport(val total: Int, val failed: Int)
 
+/** FTS overscan factor: fetch extra rows so round-robin fairness has a pool. */
+private const val SEARCH_FANOUT = 4
+
 /** A full-text match inside a chapter. */
 data class ContentHit(
     val bookId: String,
@@ -283,12 +286,14 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     override suspend fun searchContent(query: String, limit: Int): List<ContentHit> =
         withContext(Dispatchers.IO) {
             val expression = FtsQuery.build(query) ?: return@withContext emptyList()
-            val rows = runCatching { chapterTextDao.search(expression, limit) }
+            val rows = runCatching { chapterTextDao.search(expression, limit * SEARCH_FANOUT) }
                 .getOrDefault(emptyList())
             if (rows.isEmpty()) return@withContext emptyList()
 
             val titles = bookDao.getAll().associate { it.id to it.title }
-            rows.mapNotNull { row ->
+            // Round-robin across books: one hit-heavy book must not starve
+            // the rest out of the global limit.
+            val byBook = rows.mapNotNull { row ->
                 ContentHit(
                     bookId = row.bookId,
                     bookTitle = titles[row.bookId] ?: return@mapNotNull null,
@@ -296,7 +301,19 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                     chapterTitle = row.title,
                     snippet = FtsQuery.snippet(row.body, query),
                 )
+            }.groupBy { it.bookId }
+            val rounds = ArrayDeque(byBook.values.map { it.toMutableList() })
+            val out = ArrayList<ContentHit>(limit.coerceAtLeast(0))
+            while (out.size < limit && rounds.isNotEmpty()) {
+                val queue = rounds.removeFirst()
+                // removeAt(0), not removeFirst(): the latter binds to the
+                // JDK 21 SequencedCollection member when compiling against a
+                // recent android.jar, then throws NoSuchMethodError on every
+                // runtime older than API 35.
+                out += queue.removeAt(0)
+                if (queue.isNotEmpty()) rounds.addLast(queue)
             }
+            out
         }
 
     override suspend fun removeBook(id: String) = withContext(Dispatchers.IO) {

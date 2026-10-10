@@ -16,6 +16,7 @@ data class SettingsUiState(
     val libraryDisplay: LibraryDisplay = LibraryDisplay(),
     val crashReportingEnabled: Boolean = false,
     val linkedFolders: Set<String> = emptySet(),
+    val revokedFolders: Set<String> = emptySet(),
 )
 
 sealed interface SettingsAction {
@@ -38,5 +39,8 @@ sealed interface SettingsAction {
 
     /** Links one SAF folder for library scans. */
     data class AddLinkedFolder(val uri: String) : SettingsAction
+
+    /** Forget a revoked folder (also releases its persisted grant). */
+    data class RemoveLinkedFolder(val uri: String) : SettingsAction
 }
 
