@@ -9,7 +9,6 @@ import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryDisplay
 import com.iridium.core.model.LibraryQuery
-import com.iridium.core.model.continueShelf
 import com.iridium.core.model.resumeTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -129,7 +128,6 @@ class LibraryViewModel @Inject constructor(
             query = query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
-            continueReading = books.continueShelf(),
             indexProgress = progress,
             contentHits = hits,
             display = display,
@@ -144,7 +142,6 @@ class LibraryViewModel @Inject constructor(
             query = LibraryQuery(),
             refreshing = false,
             filterOpen = false,
-            continueReading = emptyList(),
         ),
     )
 

@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.iridium.core.data.ContentHit
 import com.iridium.core.designsystem.IridiumTheme
-import com.iridium.core.model.BookError
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.testing.TestData
@@ -38,7 +37,6 @@ class LibraryChromeParityTest2 {
     private fun state(
         books: List<com.iridium.core.model.Book> = emptyList(),
         text: String = "",
-        continueReading: List<com.iridium.core.model.Book> = emptyList(),
         contentHits: List<ContentHit> = emptyList(),
         refreshing: Boolean = false,
         indexProgress: IndexProgress? = null,
@@ -47,7 +45,6 @@ class LibraryChromeParityTest2 {
         query = LibraryQuery(text = text),
         refreshing = refreshing,
         filterOpen = false,
-        continueReading = continueReading,
         indexProgress = indexProgress,
         contentHits = contentHits,
     )
@@ -71,55 +68,7 @@ class LibraryChromeParityTest2 {
         }
     }
 
-    // --- Shelf derivation edges ---
-
-    @Test
-    fun `empty library yields zeroed shelves in stable order`() {
-        val shelves = libraryShelves(emptyList())
-        assertEquals(listOf("continue", "unread", "finished", "favorites"), shelves.map { it.id })
-        assertTrue(shelves.all { it.count == 0 })
-    }
-
-    @Test
-    fun `shelf boundaries follow progress fractions`() {
-        val books = listOf(
-            TestData.book(id = "zero", progress = 0f, updatedAt = 1L),
-            TestData.book(id = "half", progress = 0.5f, updatedAt = 2L),
-            TestData.book(id = "nearly", progress = 0.99f, updatedAt = 3L),
-            TestData.book(id = "done", progress = 1f, updatedAt = 4L),
-        )
-        val shelves = libraryShelves(books).associateBy { it.id }
-        assertEquals(1, shelves.getValue("unread").count)
-        assertEquals(2, shelves.getValue("continue").count)
-        assertEquals(1, shelves.getValue("finished").count)
-        assertEquals(0, shelves.getValue("favorites").count)
-    }
-
-    @Test
-    fun `errored books never count as unread but keep favorite status`() {
-        val books = listOf(
-            TestData.book(id = "errFresh", progress = 0f, error = BookError.CORRUPT, bookmarked = true),
-            TestData.book(id = "cleanFresh", progress = 0f),
-            TestData.book(id = "loved", progress = 0f, bookmarked = true),
-        )
-        val shelves = libraryShelves(books).associateBy { it.id }
-        // Only the two readable untouched books count as unread.
-        assertEquals(2, shelves.getValue("unread").count)
-        // Favorites ignore readability: the corrupt bookmark still counts.
-        assertEquals(2, shelves.getValue("favorites").count)
-    }
-
-    @Test
-    fun `in-progress shelf keeps errored readers while finished keeps errored completions`() {
-        val books = listOf(
-            TestData.book(id = "errReading", progress = 0.4f, error = BookError.CORRUPT),
-            TestData.book(id = "errDone", progress = 1f, error = BookError.EMPTY),
-        )
-        val shelves = libraryShelves(books).associateBy { it.id }
-        assertEquals(1, shelves.getValue("continue").count)
-        assertEquals(1, shelves.getValue("finished").count)
-        assertEquals(0, shelves.getValue("unread").count)
-    }
+    // --- Shelf-free states ---
 
     @Test
     fun `isEmpty reflects the book list`() {
@@ -159,12 +108,12 @@ class LibraryChromeParityTest2 {
         assertTrue(actions.any { it is LibraryAction.Rescan })
     }
 
-    // --- Search vs shelf ---
+    // --- No hero / shelves ---
 
     @Test
-    fun `continue shelf hides while searching`() {
+    fun `searching shows no hero header`() {
         val book = TestData.book(id = "1", title = "Treasure Island", progress = 0.4f)
-        setScreen(state(books = listOf(book), text = "treasure", continueReading = listOf(book)))
+        setScreen(state(books = listOf(book), text = "treasure"))
         composeTestRule.onNodeWithText("Continue reading").assertDoesNotExist()
         composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()
     }
@@ -172,7 +121,7 @@ class LibraryChromeParityTest2 {
     @Test
     fun `no now-reading hero is shown (instant-open)`() {
         val book = TestData.book(id = "1", title = "Treasure Island", progress = 0.4f)
-        setScreen(state(books = listOf(book), continueReading = listOf(book)))
+        setScreen(state(books = listOf(book)))
         composeTestRule.onNodeWithText("NOW READING").assertDoesNotExist()
         // The book itself still renders in the grid.
         composeTestRule.onNodeWithText("Treasure Island").assertIsDisplayed()

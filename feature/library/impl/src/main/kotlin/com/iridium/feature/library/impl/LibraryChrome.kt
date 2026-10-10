@@ -4,16 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -53,22 +49,20 @@ import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.TopBarTitleStyle
 import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryFilter
 
 /**
  * Mori-parity Library chrome for Iridium, adapted to EPUB semantics.
  *
  * Ports section 3.1 of Mori's UI hierarchy (collapsing top bar with a 28sp
- * title, search pill island, quick-filters, shelves carousel, floating action
- * island) without touching the existing [LibraryScreen]: these are standalone
- * building blocks a future screen revision can compose together.
+ * title, search pill island, quick-filters) without touching the existing
+ * [LibraryScreen]: these are standalone building blocks a future screen
+ * revision can compose together.
  *
  * EPUB adaptations vs Mori (comic reader):
- * - Progress is a 0f..1f locator fraction, never a page index, so the hero and
- *   shelves speak in percentages/fractions rather than "page X of N".
- * - Iridium has no user collections, so shelves are derived from reading
- *   state (continue/unread/finished/favorites) instead of collection chips.
+ * - Progress is a 0f..1f locator fraction, never a page index.
+ * - Iridium has no user collections and no shelves carousel: filtering is
+ *   the quick-filter row plus the sort/filter sheet.
  */
 object LibraryChromeTestTags {
     const val TopBar = "libraryChromeTopBar"
@@ -78,13 +72,10 @@ object LibraryChromeTestTags {
     const val SearchField = "libraryChromeSearchField"
     const val SearchClear = "libraryChromeSearchClear"
     const val QuickFilters = "libraryChromeQuickFilters"
-    const val ShelvesCarousel = "libraryChromeShelves"
     const val ActionLink = "libraryChromeActionLink"
 
     fun quickFilterChip(filter: LibraryFilter): String =
         "libraryChromeQuickFilter:${filter.name}"
-
-    fun shelfCard(id: String): String = "libraryChromeShelf:$id"
 }
 
 /**
@@ -305,128 +296,3 @@ fun LibraryQuickFilters(
         }
     }
 }
-
-/**
- * One derived shelf: a reading-state slice of the EPUB library with its live
- * count. Iridium has no user collections (unlike Mori's comic shelves), so
- * shelves are derived from progress/bookmark state; each maps 1:1 onto a
- * [LibraryFilter].
- */
-data class LibraryShelf(
-    val id: String,
-    val title: String,
-    val count: Int,
-    val filter: LibraryFilter,
-)
-
-/**
- * Derives the shelves carousel model from the current book list. Pure so it
- * stays unit-testable without a Compose runtime.
- */
-fun libraryShelves(books: List<Book>): List<LibraryShelf> {
-    val inProgress = books.count { it.isInProgress }
-    val unread = books.count { it.progress <= 0f && it.error == null }
-    val finished = books.count { it.isFinished }
-    val favorites = books.count { it.bookmarked }
-    return listOf(
-        LibraryShelf(
-            id = "continue",
-            title = "Continue reading",
-            count = inProgress,
-            filter = LibraryFilter.IN_PROGRESS,
-        ),
-        LibraryShelf(
-            id = "unread",
-            title = "Unread",
-            count = unread,
-            filter = LibraryFilter.UNREAD,
-        ),
-        LibraryShelf(
-            id = "finished",
-            title = "Finished",
-            count = finished,
-            filter = LibraryFilter.FINISHED,
-        ),
-        LibraryShelf(
-            id = "favorites",
-            title = "Favorites",
-            count = favorites,
-            filter = LibraryFilter.FAVORITES,
-        ),
-    )
-}
-
-/**
- * Shelves carousel: horizontally scrolling shelf cards with title + count
- * pill. The card matching [selectedId] uses the accent container; tapping a
- * card reports its [LibraryShelf.filter].
- */
-@Composable
-fun LibraryShelvesCarousel(
-    shelves: List<LibraryShelf>,
-    selectedId: String?,
-    onShelfSelect: (LibraryShelf) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = rememberIridiumHaptics()
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        modifier = modifier.testTag(LibraryChromeTestTags.ShelvesCarousel),
-    ) {
-        items(shelves, key = { it.id }) { shelf ->
-            val selected = shelf.id == selectedId
-            Surface(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onShelfSelect(shelf)
-                },
-                shape = MaterialTheme.shapes.large,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                },
-                modifier = Modifier.testTag(LibraryChromeTestTags.shelfCard(shelf.id)),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    Text(
-                        text = shelf.title,
-                        style = IridiumEmphasized.titleSmall,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Surface(
-                        shape = CircleShape,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
-                        } else {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        },
-                    ) {
-                        Text(
-                            text = shelf.count.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            },
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-

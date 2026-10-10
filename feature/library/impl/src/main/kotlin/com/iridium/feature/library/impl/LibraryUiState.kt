@@ -17,8 +17,6 @@ data class LibraryUiState(
     val query: LibraryQuery,
     val refreshing: Boolean,
     val filterOpen: Boolean,
-    /** In-progress books by recency, backing the continue shelf. */
-    val continueReading: List<Book>,
     /** Determinate scan progress (done/total); null when idle. */
     val indexProgress: IndexProgress? = null,
     /** Full-text matches for the current query, newest-first. */

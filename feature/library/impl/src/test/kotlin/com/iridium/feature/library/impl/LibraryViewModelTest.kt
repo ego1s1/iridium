@@ -83,19 +83,6 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `continue shelf lists in-progress books by recency`() = runTest {
-        repository.setBooks(
-            listOf(
-                TestData.book(id = "1", progress = 0.2f, updatedAt = 1L),
-                TestData.book(id = "2", progress = 0f, updatedAt = 9L),
-                TestData.book(id = "3", progress = 0.7f, updatedAt = 5L),
-            ),
-        )
-        val state = viewModel.uiState.first { it.books.size == 3 }
-        assertEquals(listOf("3", "1"), state.continueReading.map { it.id })
-    }
-
-    @Test
     fun `resume target skips errored and untouched books`() = runTest {
         repository.setBooks(
             listOf(

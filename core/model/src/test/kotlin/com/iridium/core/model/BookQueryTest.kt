@@ -68,17 +68,6 @@ class BookQueryTest {
     }
 
     @Test
-    fun `continue shelf is in-progress by recency`() {
-        val books = listOf(
-            book("1", "A", progress = 0.2f, updatedAt = 1L),
-            book("2", "B", progress = 0f, updatedAt = 9L),
-            book("3", "C", progress = 0.8f, updatedAt = 5L),
-            book("4", "D", progress = 1f, updatedAt = 7L),
-        )
-        assertEquals(listOf("3", "1"), books.continueShelf().map { it.id })
-    }
-
-    @Test
     fun `resume target skips errors and untouched books`() {
         val books = listOf(
             book("1", "A", progress = 0.9f, updatedAt = 1L),

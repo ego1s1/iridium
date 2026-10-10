@@ -42,10 +42,6 @@ data class Book(
         get() = progress >= 1f
 }
 
-/** In-progress books by recency, backing the continue shelf (max 10). */
-fun List<Book>.continueShelf(max: Int = 10): List<Book> =
-    filter { it.isInProgress }.sortedByDescending { it.updatedAt }.take(max)
-
 /**
  * Most recently touched readable book. Errored rows and untouched books
  * never win, so resume can't deep-link into something the reader rejects.
