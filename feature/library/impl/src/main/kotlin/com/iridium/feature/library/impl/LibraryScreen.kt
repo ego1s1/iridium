@@ -156,12 +156,6 @@ internal fun LibraryScreen(
             onReadClick(book)
         }
     }
-    val launchDetails: (Book) -> Unit = remember(onDetailsClick) {
-        { book ->
-            launchingId = book.id
-            onDetailsClick(book)
-        }
-    }
     Scaffold(
         topBar = {
             LibraryCollapsingTopBar(
@@ -186,7 +180,7 @@ internal fun LibraryScreen(
                 onGrantAccess = onGrantAccess,
                 onAction = onAction,
                 onReadClick = launchRead,
-                onDetailsClick = launchDetails,
+                onDetailsClick = onDetailsClick,
                 onOpenChapter = onOpenChapter,
                 launchingId = launchingId,
             )
@@ -204,9 +198,6 @@ internal fun LibraryScreen(
                     onAction = onAction,
                     onReadClick = { id ->
                         uiState.books.firstOrNull { it.id == id }?.let(launchRead)
-                    },
-                    onDetailsClick = { id ->
-                        uiState.books.firstOrNull { it.id == id }?.let(launchDetails)
                     },
                 )
             }

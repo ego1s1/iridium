@@ -112,7 +112,7 @@ internal fun BookCard(
                 onClick = click,
                 onClickLabel = stringResource(R.string.library_card_read, book.title),
                 onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_details),
+                onLongClickLabel = stringResource(R.string.library_card_more_actions),
             ),
     ) {
         Column {
@@ -268,7 +268,7 @@ internal fun CoverOnlyBookCard(
                 onClick = click,
                 onClickLabel = stringResource(R.string.library_card_read, book.title),
                 onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_details),
+                onLongClickLabel = stringResource(R.string.library_card_more_actions),
             ),
     ) {
         Box(
@@ -392,7 +392,7 @@ internal fun BookListRow(
                 onClick = click,
                 onClickLabel = stringResource(R.string.library_card_read, book.title),
                 onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_details),
+                onLongClickLabel = stringResource(R.string.library_card_more_actions),
             ),
     ) {
         Row(
@@ -499,7 +499,7 @@ private fun BookCardChrome(
                 onClick = click,
                 onClickLabel = stringResource(R.string.library_card_read, book.title),
                 onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_details),
+                onLongClickLabel = stringResource(R.string.library_card_more_actions),
             ),
     ) {
         Column {

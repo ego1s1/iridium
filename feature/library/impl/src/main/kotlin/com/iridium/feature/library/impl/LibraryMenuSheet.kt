@@ -28,9 +28,9 @@ import com.iridium.core.model.Book
 import kotlinx.coroutines.launch
 
 /**
- * Long-press quick actions for one book: read/resume, details, bookmark,
- * and remove (behind a confirm dialog). Title in the Flex emphasized face;
- * rows share the settings row language.
+ * Long-press quick actions for one book: read/resume, bookmark, and remove
+ * (behind a confirm dialog). Title in the Flex emphasized face; rows share
+ * the settings row language.
  */
 @Composable
 fun LibraryMenuSheet(
@@ -38,7 +38,6 @@ fun LibraryMenuSheet(
     deleteConfirm: Boolean,
     onAction: (LibraryAction) -> Unit,
     onReadClick: (bookId: String) -> Unit,
-    onDetailsClick: (bookId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     IridiumSheet(
@@ -53,7 +52,6 @@ fun LibraryMenuSheet(
             deleteConfirm = deleteConfirm,
             onAction = onAction,
             onReadClick = onReadClick,
-            onDetailsClick = onDetailsClick,
         )
     }
 }
@@ -65,7 +63,6 @@ internal fun LibraryMenuContent(
     deleteConfirm: Boolean,
     onAction: (LibraryAction) -> Unit,
     onReadClick: (bookId: String) -> Unit,
-    onDetailsClick: (bookId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()

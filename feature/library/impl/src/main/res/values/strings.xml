@@ -7,7 +7,6 @@
         <item quantity="one">In book (%1$d)</item>
         <item quantity="other">In books (%1$d)</item>
     </plurals>
-    <string name="library_continue_title">Continue reading</string>
     <string name="library_empty_title">No books yet</string>
     <string name="library_empty_body">Iridium reads every EPUB on your device. Nothing is copied — files stay exactly where they are.</string>
     <string name="library_grant_access">Grant access</string>
@@ -20,7 +19,7 @@
     <string name="library_filter_finished">Finished</string>
     <string name="library_filter_favorites">Favorites</string>
     <string name="library_card_read">Read %1$s</string>
-    <string name="library_card_details">Book details</string>
+    <string name="library_card_more_actions">More actions</string>
     <string name="library_card_unreadable">Can\'t read</string>
     <string name="library_card_bookmarked">Bookmarked</string>
     <string name="library_sheet_sort_by">Sort by</string>
@@ -36,7 +35,6 @@
     <string name="library_display_cover_only">Cover only</string>
     <string name="library_display_list">List</string>
     <string name="library_columns_auto">Auto</string>
-    <string name="library_hero_eyebrow">NOW READING</string>
     <string name="library_menu_resume">Resume</string>
     <string name="library_menu_read">Read</string>
     <string name="library_menu_bookmark_add">Add to favorites</string>
