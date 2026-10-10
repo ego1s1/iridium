@@ -57,31 +57,22 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun `zones split thirds and mirror for rtl`() {
-        val ltr = ChromeReadingDirection.LEFT_TO_RIGHT
-        val rtl = ChromeReadingDirection.RIGHT_TO_LEFT
-        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.1f, 0.5f, ltr))
-        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f, ltr))
-        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.9f, 0.5f, ltr))
-        // RTL mirrors forward: the left third advances.
-        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.1f, 0.5f, rtl))
-        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.9f, 0.5f, rtl))
+    fun `zones split fixed thirds`() {
+        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.1f, 0.5f))
+        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f))
+        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.9f, 0.5f))
     }
 
     @Test
-    fun `invert switch mirrors the thirds`() {
-        val ltr = ChromeReadingDirection.LEFT_TO_RIGHT
-        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.1f, 0.5f, ltr, invertTaps = true))
-        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f, ltr, invertTaps = true))
-        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.9f, 0.5f, ltr, invertTaps = true))
+    fun `invert switch mirrors the thirds for reachability`() {
+        assertEquals(ChromeTapZone.NEXT, chromeZoneForTap(0.1f, 0.5f, invertTaps = true))
+        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.5f, invertTaps = true))
+        assertEquals(ChromeTapZone.PREV, chromeZoneForTap(0.9f, 0.5f, invertTaps = true))
     }
 
     @Test
     fun `top strip always toggles chrome`() {
-        assertEquals(
-            ChromeTapZone.MENU,
-            chromeZoneForTap(0.5f, 0.01f, ChromeReadingDirection.LEFT_TO_RIGHT),
-        )
+        assertEquals(ChromeTapZone.MENU, chromeZoneForTap(0.5f, 0.01f))
     }
 
     // Composables
@@ -93,7 +84,6 @@ class ReaderChromeTest {
                 ReaderScrubberIsland(
                     positionIndex = 12,
                     positionCount = 173,
-                    direction = ChromeReadingDirection.LEFT_TO_RIGHT,
                     onSeek = {},
                     onPrevious = {},
                     onNext = {},
@@ -116,7 +106,6 @@ class ReaderChromeTest {
                 ReaderScrubberIsland(
                     positionIndex = 0,
                     positionCount = 173,
-                    direction = ChromeReadingDirection.LEFT_TO_RIGHT,
                     onSeek = {},
                     onPrevious = {},
                     onNext = {},
@@ -137,7 +126,6 @@ class ReaderChromeTest {
                 ReaderScrubberIsland(
                     positionIndex = 12,
                     positionCount = 173,
-                    direction = ChromeReadingDirection.LEFT_TO_RIGHT,
                     onSeek = {},
                     onPrevious = { previous++ },
                     onNext = { next++ },

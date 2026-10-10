@@ -58,7 +58,6 @@ import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.model.ReadingFlow
 import kotlin.math.roundToInt
 
 /**
@@ -72,13 +71,9 @@ import kotlin.math.roundToInt
  *
  * EPUB adaptation notes (comic pages -> reflowable positions):
  * - Mori's page index/count becomes the EPUB position index/count.
- * - Mori's reading direction still mirrors the scrubber + tap zones.
+ * - Reading direction stays LTR; the invert-taps switch mirrors the tap
+ *   zones for reachability only (left forward / right back).
  */
-enum class ChromeReadingDirection {
-    LEFT_TO_RIGHT,
-    RIGHT_TO_LEFT,
-}
-
 /** Tap-zone outcome for a tap inside the reading surface. */
 enum class ChromeTapZone {
     PREV,
@@ -136,17 +131,16 @@ fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total
 /**
  * Resolves which tap zone a tap at ([fractionX], [fractionY]) falls into:
  * fixed horizontal thirds (outer partitions navigate, the center toggles
- * chrome), optionally mirrored for right-to-left reading or the user's
- * invert-taps switch. Taps landing on the top chrome strip always toggle.
+ * chrome). The invert-taps switch mirrors the thirds for reachability (left
+ * taps turn forward, right taps back); the reading direction does not mirror
+ * the zones. Taps landing on the top chrome strip always toggle.
  */
 fun chromeZoneForTap(
     fractionX: Float,
     fractionY: Float,
-    direction: ChromeReadingDirection,
     invertTaps: Boolean = false,
 ): ChromeTapZone {
-    val mirror = invertTaps != (direction == ChromeReadingDirection.RIGHT_TO_LEFT)
-    val x = if (mirror) {
+    val x = if (invertTaps) {
         1f - fractionX.coerceIn(0f, 1f)
     } else {
         fractionX.coerceIn(0f, 1f)
@@ -170,7 +164,6 @@ fun chromeZoneForTap(
 fun ReaderScrubberIsland(
     positionIndex: Int,
     positionCount: Int,
-    direction: ChromeReadingDirection,
     onSeek: (Float) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -179,17 +172,11 @@ fun ReaderScrubberIsland(
     val haptics = rememberIridiumHaptics()
     val prevLabel = stringResource(R.string.reader_scrub_previous)
     val nextLabel = stringResource(R.string.reader_scrub_next)
-    val rowDirection = if (direction == ChromeReadingDirection.RIGHT_TO_LEFT) {
-        LayoutDirection.Rtl
-    } else {
-        LayoutDirection.Ltr
-    }
     val safeIndex = positionIndex.coerceIn(0, (positionCount - 1).coerceAtLeast(0))
     var scrub by remember(positionCount) { mutableStateOf<Int?>(null) }
     val shownIndex = scrub ?: safeIndex
-    val isRtl = direction == ChromeReadingDirection.RIGHT_TO_LEFT
-    val prevIcon = if (isRtl) IridiumIcons.SkipNext else IridiumIcons.SkipPrevious
-    val nextIcon = if (isRtl) IridiumIcons.SkipPrevious else IridiumIcons.SkipNext
+    val prevIcon = IridiumIcons.SkipPrevious
+    val nextIcon = IridiumIcons.SkipNext
     val prevEnabled = canChromeGoBackward(safeIndex)
     val nextEnabled = canChromeGoForward(safeIndex, positionCount)
     val prevContainer = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -232,7 +219,8 @@ fun ReaderScrubberIsland(
         }
 
         if (positionCount > 1) {
-            CompositionLocalProvider(LocalLayoutDirection provides rowDirection) {
+            // Reading direction does not flip the scrubber: always LTR order.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -288,7 +276,8 @@ fun ReaderScrubberIsland(
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            // Force the LTR slider geometry even in RTL rows:
+                            // Keep the slider geometry LTR regardless of any
+                            // surrounding layout direction:
                             // the value domain (first -> last position) must
                             // not flip with layout direction.
                             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

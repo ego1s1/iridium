@@ -447,7 +447,6 @@ class ReaderViewModel @Inject constructor(
             chromeZoneForTap(
                 fractionX,
                 fractionY,
-                ChromeReadingDirection.LEFT_TO_RIGHT,
                 prefsFlow.value.invertTaps,
             )
         ) {

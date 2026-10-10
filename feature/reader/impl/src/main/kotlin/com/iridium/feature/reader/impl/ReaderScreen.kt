@@ -382,7 +382,6 @@ internal fun ReaderScreen(
                 ReaderScrubberIsland(
                     positionIndex = state.positionIndex,
                     positionCount = state.positionCount,
-                    direction = ChromeReadingDirection.LEFT_TO_RIGHT,
                     onSeek = { onAction(ReaderAction.SeekTo(it)) },
                     onPrevious = { onAction(ReaderAction.GoBackward()) },
                     onNext = { onAction(ReaderAction.GoForward()) },
