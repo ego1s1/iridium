@@ -62,13 +62,18 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
             }
             return
         }
+        val config = EpubNavigatorFragment.Configuration(
+            selectionActionModeCallback = selectionActionModeCallback,
+        ).also { cfg ->
+            cfg.registerJavascriptInterface("IridiumReader") { _ ->
+                IridiumReaderJsInterface { src -> store.showImage(src) }
+            }
+        }
         childFragmentManager.fragmentFactory = factory.createFragmentFactory(
             initialLocator = store.initialLocator,
             initialPreferences = store.initialPreferences ?: EpubPreferences(),
             listener = this,
-            configuration = EpubNavigatorFragment.Configuration(
-                selectionActionModeCallback = selectionActionModeCallback,
-            ),
+            configuration = config,
         )
         super.onCreate(savedInstanceState)
     }

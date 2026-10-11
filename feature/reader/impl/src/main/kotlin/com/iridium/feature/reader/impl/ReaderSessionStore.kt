@@ -96,6 +96,18 @@ class ReaderSessionStore @Inject constructor() {
     private val _selectedText = MutableStateFlow<String?>(null)
     val selectedText: StateFlow<String?> = _selectedText.asStateFlow()
 
+    /** Book `<img>` being showcased full-screen (src href), or null when closed. */
+    private val _shownImage = MutableStateFlow<String?>(null)
+    val shownImage: StateFlow<String?> = _shownImage.asStateFlow()
+
+    fun showImage(src: String) {
+        _shownImage.value = src
+    }
+
+    fun dismissImage() {
+        _shownImage.value = null
+    }
+
     /** True once [publish] has run; the reader host may attach only then. */
     private val _sessionReady = MutableStateFlow(false)
     val sessionReady: StateFlow<Boolean> = _sessionReady.asStateFlow()

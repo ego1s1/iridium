@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,6 +101,7 @@ internal fun ReaderRoute(
     val sessionReady by viewModel.sessionReady.collectAsStateWithLifecycle()
     val volumePagingActive by viewModel.volumePagingActive.collectAsStateWithLifecycle()
     val dictionaryState by viewModel.dictionaryUi.collectAsStateWithLifecycle()
+    val shownImage by viewModel.shownImage.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -144,6 +147,7 @@ internal fun ReaderRoute(
             sessionReady = sessionReady,
             volumePagingActive = volumePagingActive,
             dictionaryState = dictionaryState,
+            shownImage = shownImage,
             onAction = viewModel::onAction,
             onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
             onBackClick = onBackClick,
@@ -163,6 +167,7 @@ internal fun ReaderScreen(
     sessionReady: Boolean,
     volumePagingActive: Boolean,
     dictionaryState: DictionaryUiState?,
+    shownImage: String?,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
     snackbarHost: SnackbarHostState,
@@ -445,6 +450,12 @@ internal fun ReaderScreen(
             )
         }
     }
+    if (shownImage != null) {
+        ReaderImageShowcase(
+            src = shownImage,
+            onDismiss = { onAction(ReaderAction.DismissImage) },
+        )
+    }
     if (showAddDialog) {
         AddHighlightDialog(
             onSave = { color, note ->
@@ -552,6 +563,40 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
             fm.findFragmentByTag(tag)?.takeIf { it.isAdded }?.let {
                 fm.beginTransaction().remove(it).commitAllowingStateLoss()
             }
+        }
+    }
+}
+
+/**
+ * Full-screen showcase for a tapped book image (image-showcase plumbing).
+ * The bridge → store → overlay path is wired; rendering the actual book
+ * resource bitmap is deferred (visual check). Shows a scrim + filename for
+ * now; a tap anywhere dismisses back to the book.
+ */
+@Composable
+private fun ReaderImageShowcase(
+    src: String,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(onClick = onDismiss)
+            .testTag("readerImageShowcase"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = src.substringAfterLast('/').substringAfterLast('\\'),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+            )
+            Text(
+                text = "Tap to close",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f),
+            )
         }
     }
 }

@@ -53,6 +53,7 @@ sealed interface ReaderAction {
     data object OpenHighlights : ReaderAction
     data object CloseHighlights : ReaderAction
     data object DismissDictionary : ReaderAction
+    data object DismissImage : ReaderAction
     data class SeekTo(val progression: Float) : ReaderAction
     data class GoTocEntry(val entry: TocEntry) : ReaderAction
     data class GoForward(val animated: Boolean = true) : ReaderAction

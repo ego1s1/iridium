@@ -239,6 +239,7 @@ class ReaderViewModel @Inject constructor(
                 scheduleChromeHide()
             }
             ReaderAction.DismissDictionary -> dismissDictionary()
+            ReaderAction.DismissImage -> store.dismissImage()
             is ReaderAction.SeekTo -> {
                 seekTo(action.progression)
                 scheduleChromeHide()
@@ -409,6 +410,8 @@ class ReaderViewModel @Inject constructor(
                 runCatching { store.navigator?.submitPreferences(prefs) }
                 applyThemeOverride()
                 applyDecorations(highlights.first())
+                // Image-showcase bridge: wire taps in the freshly loaded document.
+                runCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
             }
             is ReaderSessionEvent.DecorationTapped -> {
                 focusedHighlightId.value = event.decorationId
@@ -526,6 +529,9 @@ class ReaderViewModel @Inject constructor(
 
     private val _dictionaryUi = MutableStateFlow<DictionaryUiState?>(null)
     val dictionaryUi: StateFlow<DictionaryUiState?> = _dictionaryUi.asStateFlow()
+
+    /** Href of the book `<img>` being showcased full-screen, or null. */
+    val shownImage: StateFlow<String?> = store.shownImage
 
     private fun onSelectionChanged(text: String?) {
         dictionaryJob?.cancel()
