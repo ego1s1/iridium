@@ -31,4 +31,5 @@ dependencies {
     testImplementation(libs.androidx.room.runtime)
     testImplementation(libs.androidx.room.ktx)
     testImplementation(project(":core:testing"))
+    testImplementation(project(":core:test-fakes"))
 }

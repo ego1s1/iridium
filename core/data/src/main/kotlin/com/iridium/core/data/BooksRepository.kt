@@ -71,8 +71,10 @@ interface BooksRepository {
     suspend fun setBookmarked(id: String, bookmarked: Boolean)
     suspend fun upsertHighlight(highlight: Highlight)
     suspend fun deleteHighlight(id: String)
+    suspend fun deleteAllHighlights(bookId: String)
     suspend fun upsertBookmark(bookmark: Bookmark)
     suspend fun deleteBookmark(id: String)
+    suspend fun deleteAllBookmarks(bookId: String)
 
     /**
      * Extracts and indexes a book's chapter text for full-text search.
@@ -224,12 +226,20 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         highlightDao.deleteById(id)
     }
 
+    override suspend fun deleteAllHighlights(bookId: String) {
+        highlightDao.deleteForBook(bookId)
+    }
+
     override suspend fun upsertBookmark(bookmark: Bookmark) {
         bookmarkDao.upsert(bookmark.toEntity())
     }
 
     override suspend fun deleteBookmark(id: String) {
         bookmarkDao.deleteById(id)
+    }
+
+    override suspend fun deleteAllBookmarks(bookId: String) {
+        bookmarkDao.deleteForBook(bookId)
     }
 
     /**

@@ -48,6 +48,10 @@ class TestBooksRepository : BooksRepository {
         highlightsFlow.value = highlights
     }
 
+    fun setBookmarks(bookmarks: List<Bookmark>) {
+        bookmarksFlow.value = bookmarks
+    }
+
     fun progressWritesFor(id: String): List<Float> =
         progressWrites.filter { it.first == id }.map { it.second }
 
@@ -106,8 +110,16 @@ class TestBooksRepository : BooksRepository {
         highlightsFlow.update { list -> list.filterNot { it.id == id } }
     }
 
+    override suspend fun deleteAllHighlights(bookId: String) {
+        highlightsFlow.update { list -> list.filterNot { it.bookId == bookId } }
+    }
+
     override suspend fun upsertBookmark(bookmark: Bookmark) {
         bookmarksFlow.update { list -> list.filterNot { it.id == bookmark.id } + bookmark }
+    }
+
+    override suspend fun deleteAllBookmarks(bookId: String) {
+        bookmarksFlow.update { list -> list.filterNot { it.bookId == bookId } }
     }
 
     override suspend fun deleteBookmark(id: String) {
