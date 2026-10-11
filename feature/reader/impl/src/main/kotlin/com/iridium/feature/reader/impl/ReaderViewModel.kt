@@ -41,9 +41,11 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
+import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
+import org.readium.r2.shared.util.Url
 import java.util.UUID
 
 @HiltViewModel
@@ -532,6 +534,16 @@ class ReaderViewModel @Inject constructor(
 
     /** Href of the book `<img>` being showcased full-screen, or null. */
     val shownImage: StateFlow<String?> = store.shownImage
+
+    /** Reads a book resource's bytes for the image showcase (null if gone). */
+    @OptIn(ExperimentalReadiumApi::class)
+    suspend fun loadImageBytes(src: String): ByteArray? {
+        val publication = store.publication ?: return null
+        val url = Url(src) ?: return null
+        val resource = publication.get(url) ?: return null
+        val length = resource.length().getOrNull() ?: return null
+        return runCatching { resource.read(0 until length).getOrNull() }.getOrNull()
+    }
 
     private fun onSelectionChanged(text: String?) {
         dictionaryJob?.cancel()

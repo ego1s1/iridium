@@ -1,6 +1,7 @@
 package com.iridium.feature.reader.impl
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -8,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -28,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -47,6 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -148,6 +154,7 @@ internal fun ReaderRoute(
             volumePagingActive = volumePagingActive,
             dictionaryState = dictionaryState,
             shownImage = shownImage,
+            loadImageBytes = viewModel::loadImageBytes,
             onAction = viewModel::onAction,
             onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
             onBackClick = onBackClick,
@@ -168,6 +175,7 @@ internal fun ReaderScreen(
     volumePagingActive: Boolean,
     dictionaryState: DictionaryUiState?,
     shownImage: String?,
+    loadImageBytes: suspend (String) -> ByteArray?,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
     snackbarHost: SnackbarHostState,
@@ -453,6 +461,7 @@ internal fun ReaderScreen(
     if (shownImage != null) {
         ReaderImageShowcase(
             src = shownImage,
+            loadImageBytes = loadImageBytes,
             onDismiss = { onAction(ReaderAction.DismissImage) },
         )
     }
@@ -568,16 +577,24 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
 }
 
 /**
- * Full-screen showcase for a tapped book image (image-showcase plumbing).
- * The bridge → store → overlay path is wired; rendering the actual book
- * resource bitmap is deferred (visual check). Shows a scrim + filename for
- * now; a tap anywhere dismisses back to the book.
+ * Full-screen showcase for a tapped book image (image showcase). Loads the
+ * tapped resource's bytes and draws them edge-to-edge; a tap anywhere
+ * dismisses back to the book.
  */
 @Composable
 private fun ReaderImageShowcase(
     src: String,
+    loadImageBytes: suspend (String) -> ByteArray?,
     onDismiss: () -> Unit,
 ) {
+    var bitmap by remember(src) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(src) {
+        bitmap = runCatching {
+            loadImageBytes(src)
+                ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                ?.asImageBitmap()
+        }.getOrNull()
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -586,16 +603,15 @@ private fun ReaderImageShowcase(
             .testTag("readerImageShowcase"),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = src.substringAfterLast('/').substringAfterLast('\\'),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-            )
-            Text(
-                text = "Tap to close",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
+        val bmp = bitmap
+        if (bmp == null) {
+            CircularProgressIndicator(color = Color.White)
+        } else {
+            Image(
+                bitmap = bmp,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
