@@ -403,6 +403,7 @@ class ReaderViewModel @Inject constructor(
                 // Fresh navigator: submit current prefs + decorations.
                 val prefs = EpubPreferencesMapper.map(preferences.readerPreferences.first())
                 runCatching { store.navigator?.submitPreferences(prefs) }
+                applyThemeOverride()
                 applyDecorations(highlights.first())
             }
             is ReaderSessionEvent.DecorationTapped -> {
@@ -665,6 +666,17 @@ class ReaderViewModel @Inject constructor(
             preferences.updateReaderPreferences(transform)
             val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
             runCatching { store.navigator?.submitPreferences(updated) }
+            // Lithium-style forced-override theming: always (re)inject the
+            // theme stylesheet so exact colors win over the book's own CSS.
+            applyThemeOverride()
+        }
+    }
+
+    /** Forces the current theme's colors onto the book page via injected CSS. */
+    private suspend fun applyThemeOverride() {
+        val theme = preferences.readerPreferences.first().theme
+        runCatching {
+            store.navigator?.evaluateJavascript(ReaderThemeOverride.injectOverrideScript(theme))
         }
     }
 
