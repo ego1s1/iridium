@@ -29,8 +29,14 @@ object ReaderThemeOverride {
      * link color in [ColorSchemeChoice]).
      */
     fun overrideCss(theme: ColorSchemeChoice): String {
-        val bg = "#" + hex(theme.pageBackgroundArgb())
-        val fg = "#" + hex(theme.pageForegroundArgb())
+        val (bg, fg) = theme.pageBackgroundArgb() to theme.pageForegroundArgb()
+        return overrideCssColors(hex(bg), hex(fg))
+    }
+
+    /** Forced-override CSS for explicit bare-hex colors (custom palettes). */
+    fun overrideCssColors(bgHex: String, fgHex: String): String {
+        val bg = "#$bgHex"
+        val fg = "#$fgHex"
         // `body.__Ir_Theme.__Ir_Theme...` — 16x repetition beats any book rule.
         val bodySelector = (0 until 16).joinToString(separator = " ", prefix = "body") {
             ".$SPECIFICITY_CLASS"
@@ -56,7 +62,17 @@ object ReaderThemeOverride {
      * single `evaluateJavascript` string.
      */
     fun injectOverrideScript(theme: ColorSchemeChoice): String {
-        val css = overrideCss(theme)
+        val (bg, fg) = theme.pageBackgroundArgb() to theme.pageForegroundArgb()
+        return injectOverrideScriptColors(hex(bg), hex(fg))
+    }
+
+    /**
+     * A JavaScript statement that injects (or updates) a `<style>` carrying
+     * [overrideCssColors] into the current document. Safe to embed in a
+     * single `evaluateJavascript` string.
+     */
+    fun injectOverrideScriptColors(bgHex: String, fgHex: String): String {
+        val css = overrideCssColors(bgHex, fgHex)
         val escaped = css
             .replace("\\", "\\\\")
             .replace("'", "\\'")

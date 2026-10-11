@@ -429,7 +429,7 @@ internal fun ReaderScreen(
         ReaderSettingsSheet(prefs = state.prefs, onAction = onAction)
     }
     if (state.themeSheetOpen) {
-        ReaderThemeSheet(selected = state.prefs.theme, onAction = onAction)
+        ReaderThemeSheet(prefs = state.prefs, onAction = onAction)
     }
     if (state.tocOpen) {
         ReaderTocSheet(

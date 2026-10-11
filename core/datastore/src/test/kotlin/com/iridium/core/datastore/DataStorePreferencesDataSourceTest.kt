@@ -7,7 +7,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.LibraryFilter
+import com.iridium.core.model.isCustomThemeActive
+import com.iridium.core.model.resolvedColors
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.ReadingFlow
@@ -53,6 +56,29 @@ class DataStorePreferencesDataSourceTest {
         assertEquals(TextAlign.ORIGINAL, source.readerPreferences.first().textAlign)
         assertEquals(LibrarySortOrder.RECENTLY_ADDED, source.libraryDisplay.first().sortOrder)
         assertEquals(LibraryFilter.ALL, source.libraryDisplay.first().filter)
+    }
+
+    @Test
+    fun `custom themes round-trip through the store`() = runTest {
+        val custom = CustomReaderTheme("c1", "Forest", 0xFF1B2A1B.toInt(), 0xFFE8F0E8.toInt())
+        source.updateReaderPreferences {
+            it.copy(customThemes = listOf(custom), customThemeId = "c1")
+        }
+        val prefs = source.readerPreferences.first()
+        assertEquals(listOf(custom), prefs.customThemes)
+        assertEquals("c1", prefs.customThemeId)
+        assertEquals(0xFF1B2A1B.toInt() to 0xFFE8F0E8.toInt(), prefs.resolvedColors())
+        assertTrue(prefs.isCustomThemeActive())
+    }
+
+    @Test
+    fun `custom theme codec rejects junk`() {
+        assertEquals(null, decodeCustomTheme("nope"))
+        assertEquals(null, decodeCustomTheme("a|b|zz|00"))
+        val theme = CustomReaderTheme("c1", "A|B", 0xFF000000.toInt(), 0xFFFFFFFF.toInt())
+        val decoded = decodeCustomTheme(encodeCustomTheme(theme))
+        assertEquals("c1", decoded?.id)
+        assertEquals("AB", decoded?.name)
     }
 
     @Test

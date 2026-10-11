@@ -2,6 +2,7 @@ package com.iridium.feature.reader.impl
 
 import com.iridium.core.model.Book
 import com.iridium.core.model.Highlight
+import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TocEntry
@@ -53,6 +54,15 @@ sealed interface ReaderAction {
     data object OpenHighlights : ReaderAction
     data object CloseHighlights : ReaderAction
     data object ExportAnnotations : ReaderAction
+
+    /** Selects a user palette (null clears back to the preset). */
+    data class SetCustomTheme(val id: String?) : ReaderAction
+
+    /** Saves (adds or replaces) a user palette by id. */
+    data class SaveCustomTheme(val theme: CustomReaderTheme) : ReaderAction
+
+    /** Deletes a user palette; clears the selection when active. */
+    data class DeleteCustomTheme(val id: String) : ReaderAction
 
     data object DismissDictionary : ReaderAction
     data object DismissImage : ReaderAction

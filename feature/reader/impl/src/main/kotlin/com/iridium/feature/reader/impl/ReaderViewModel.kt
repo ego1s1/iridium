@@ -15,6 +15,7 @@ import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.TocEntry
+import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -262,6 +263,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetFlow,
             is ReaderAction.SetFontScale,
             is ReaderAction.SetFontFamily,
+            is ReaderAction.SetCustomTheme,
+            is ReaderAction.SaveCustomTheme,
+            is ReaderAction.DeleteCustomTheme,
             is ReaderAction.SetLineHeight,
             is ReaderAction.SetTextAlign,
             is ReaderAction.SetTheme,
@@ -291,7 +295,18 @@ class ReaderViewModel @Inject constructor(
                 it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f))
             }
             is ReaderAction.SetTextAlign -> updateReaderPrefs { it.copy(textAlign = action.align) }
-            is ReaderAction.SetTheme -> updateReaderPrefs { it.copy(theme = action.theme) }
+            is ReaderAction.SetTheme -> updateReaderPrefs { it.copy(theme = action.theme, customThemeId = null) }
+            is ReaderAction.SetCustomTheme -> updateReaderPrefs { it.copy(customThemeId = action.id) }
+            is ReaderAction.SaveCustomTheme -> updateReaderPrefs { prefs ->
+                val themes = prefs.customThemes.filterNot { it.id == action.theme.id } + action.theme
+                prefs.copy(customThemes = themes, customThemeId = action.theme.id)
+            }
+            is ReaderAction.DeleteCustomTheme -> updateReaderPrefs { prefs ->
+                prefs.copy(
+                    customThemes = prefs.customThemes.filterNot { it.id == action.id },
+                    customThemeId = prefs.customThemeId?.takeUnless { it == action.id },
+                )
+            }
             is ReaderAction.SetBrightness -> updateReaderPrefs {
                 it.copy(brightness = action.brightness.coerceIn(-1f, 1f))
             }
@@ -714,9 +729,14 @@ class ReaderViewModel @Inject constructor(
 
     /** Forces the current theme's colors onto the book page via injected CSS. */
     private suspend fun applyThemeOverride() {
-        val theme = preferences.readerPreferences.first().theme
+        val prefs = preferences.readerPreferences.first()
+        val (bg, fg) = prefs.resolvedColors()
+        val script = ReaderThemeOverride.injectOverrideScriptColors(
+            ReaderThemeOverride.hex(bg),
+            ReaderThemeOverride.hex(fg),
+        )
         runCatching {
-            store.navigator?.evaluateJavascript(ReaderThemeOverride.injectOverrideScript(theme))
+            store.navigator?.evaluateJavascript(script)
         }
     }
 

@@ -20,6 +20,17 @@ enum class ReaderFontFamily(val cssName: String?) {
         entries[(ordinal - 1 + entries.size) % entries.size]
 }
 
+/**
+ * A user-defined reading palette. Colors are opaque ARGB ints; [id] is a
+ * UUID assigned at creation. Pro-gated in the UI; the model itself is inert.
+ */
+data class CustomReaderTheme(
+    val id: String,
+    val name: String,
+    val backgroundArgb: Int,
+    val foregroundArgb: Int,
+)
+
 /** Reader preferences persisted in DataStore. */
 data class ReaderPreferences(
     val flow: ReadingFlow = ReadingFlow.AUTO,
@@ -38,5 +49,22 @@ data class ReaderPreferences(
     val nightLightIntensity: Float = 0.25f,
     val pageMargins: Float = 1f,
     val lineHeight: Float = 1.4f,
+    /** User palettes; [customThemeId] selects the active one (null = preset). */
+    val customThemes: List<CustomReaderTheme> = emptyList(),
+    val customThemeId: String? = null,
 )
+
+/** Exact page colors after resolving a custom theme over the preset. */
+fun ReaderPreferences.resolvedColors(): Pair<Int, Int> {
+    val custom = customThemeId?.let { id -> customThemes.firstOrNull { it.id == id } }
+    return if (custom != null) {
+        custom.backgroundArgb to custom.foregroundArgb
+    } else {
+        theme.pageBackgroundArgb() to theme.pageForegroundArgb()
+    }
+}
+
+/** True when a custom palette is selected and present. */
+fun ReaderPreferences.isCustomThemeActive(): Boolean =
+    customThemeId?.let { id -> customThemes.any { it.id == id } } == true
 

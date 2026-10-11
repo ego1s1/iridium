@@ -16,6 +16,7 @@ import com.iridium.core.model.LibraryDisplayMode
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
+import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
@@ -77,6 +78,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
             pageMargins = this[PAGE_MARGINS] ?: 1f,
             lineHeight = this[LINE_HEIGHT] ?: 1.4f,
+            customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme),
+            customThemeId = this[CUSTOM_THEME_ID],
         )
 
     /**
@@ -104,6 +107,13 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             prefs[NIGHT_LIGHT_INTENSITY] = updated.nightLightIntensity
             prefs[PAGE_MARGINS] = updated.pageMargins
             prefs[LINE_HEIGHT] = updated.lineHeight
+            prefs[CUSTOM_THEMES] = updated.customThemes.map(::encodeCustomTheme).toSet()
+            val customId = updated.customThemeId
+            if (customId == null) {
+                prefs.remove(CUSTOM_THEME_ID)
+            } else {
+                prefs[CUSTOM_THEME_ID] = customId
+            }
         }
     }
 
@@ -236,6 +246,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val NIGHT_LIGHT_INTENSITY = floatPreferencesKey("night_light_intensity")
         val PAGE_MARGINS = floatPreferencesKey("page_margins")
         val LINE_HEIGHT = floatPreferencesKey("line_height")
+        val CUSTOM_THEMES = stringSetPreferencesKey("custom_themes")
+        val CUSTOM_THEME_ID = stringPreferencesKey("custom_theme_id")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val APP_COLOR_SCHEME = stringPreferencesKey("app_color_scheme")
@@ -248,4 +260,31 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val LIBRARY_DISPLAY_MODE = stringPreferencesKey("library_display_mode")
         val LIBRARY_GRID_COLUMNS = intPreferencesKey("library_grid_columns")
     }
+}
+
+/**
+ * Compact `id|name|bgHex|fgHex` encoding for one custom palette. Names never
+ * carry `|` (sanitized on save); colors are 8-hex-digit ARGB.
+ */
+internal fun encodeCustomTheme(theme: CustomReaderTheme): String {
+    val name = theme.name.replace("|", "").take(64).ifBlank { "Custom" }
+    return listOf(
+        theme.id.replace("|", ""),
+        name,
+        theme.backgroundArgb.toUInt().toString(16).padStart(8, '0'),
+        theme.foregroundArgb.toUInt().toString(16).padStart(8, '0'),
+    ).joinToString("|")
+}
+
+internal fun decodeCustomTheme(raw: String): CustomReaderTheme? {
+    val parts = raw.split("|")
+    if (parts.size != 4 || parts[0].isBlank()) return null
+    val bg = parts[2].toULongOrNull(16)?.toInt() ?: return null
+    val fg = parts[3].toULongOrNull(16)?.toInt() ?: return null
+    return CustomReaderTheme(
+        id = parts[0],
+        name = parts[1].ifBlank { "Custom" },
+        backgroundArgb = bg,
+        foregroundArgb = fg,
+    )
 }

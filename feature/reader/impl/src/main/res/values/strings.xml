@@ -40,6 +40,15 @@
     <string name="reader_settings_invert_taps">Invert tap zones</string>
     <string name="reader_settings_invert_taps_body">Left taps go forward, right taps go back</string>
     <string name="reader_theme_sheet_title">Reading theme</string>
+    <string name="reader_theme_custom_title">Custom</string>
+    <string name="reader_theme_custom_new">New custom theme</string>
+    <string name="reader_theme_custom_untitled">Untitled theme</string>
+    <string name="reader_theme_custom_delete">Delete custom theme</string>
+    <string name="reader_theme_custom_editor_title">Custom theme</string>
+    <string name="reader_theme_custom_name">Name</string>
+    <string name="reader_theme_custom_background">Background</string>
+    <string name="reader_theme_custom_foreground">Text</string>
+    <string name="reader_theme_custom_save">Save</string>
     <string name="reader_theme_light">Light</string>
     <string name="reader_theme_sepia">Sepia</string>
     <string name="reader_theme_grey">Grey</string>

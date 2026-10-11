@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.ReaderPreferences
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
@@ -110,7 +111,7 @@ class ReaderSettingsSheetTest {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 ReaderThemeSheetContent(
-                    selected = ColorSchemeChoice.SEPIA,
+                    prefs = ReaderPreferences(theme = ColorSchemeChoice.SEPIA),
                     onAction = actions::add,
                 )
             }
@@ -121,5 +122,26 @@ class ReaderSettingsSheetTest {
         }
         composeTestRule.onNodeWithText("Dark").performClick()
         assertEquals(listOf(ReaderAction.SetTheme(ColorSchemeChoice.DARK)), actions)
+    }
+
+    @Test
+    fun `theme sheet lists custom palettes and dispatches selection`() {
+        val actions = mutableListOf<ReaderAction>()
+        composeTestRule.setContent {
+            IridiumTheme(expressiveMotion = false) {
+                ReaderThemeSheetContent(
+                    prefs = ReaderPreferences(
+                        customThemes = listOf(
+                            CustomReaderTheme("c1", "Forest", 0xFF1B2A1B.toInt(), 0xFFE8F0E8.toInt()),
+                        ),
+                    ),
+                    onAction = actions::add,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Custom").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Forest").performScrollTo().performClick()
+        assertEquals(listOf(ReaderAction.SetCustomTheme("c1")), actions)
     }
 }
