@@ -1,6 +1,8 @@
 package com.iridium.feature.settings.impl
 
 import com.iridium.core.fakes.FakeSafGrantStore
+import com.iridium.core.data.LibraryBackupManager
+import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.LibrarySortOrder
@@ -22,11 +24,12 @@ class SettingsViewModelTest {
     val dispatcherRule = TestDispatcherRule()
 
     private val preferences = TestPreferencesDataSource()
+    private val backup = LibraryBackupManager(TestBooksRepository())
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setup() {
-        viewModel = SettingsViewModel(preferences, FakeSafGrantStore())
+        viewModel = SettingsViewModel(preferences, FakeSafGrantStore(), backup)
     }
 
     @Test
@@ -111,7 +114,7 @@ class SettingsViewModelTest {
     @Test
     fun `revoked folders surface with live grants hidden`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/kept"))
-        val scoped = SettingsViewModel(preferences, grants)
+        val scoped = SettingsViewModel(preferences, grants, backup)
         preferences.addLinkedFolder("content://trees/kept")
         preferences.addLinkedFolder("content://trees/lost")
 
@@ -122,7 +125,7 @@ class SettingsViewModelTest {
     @Test
     fun `forgetting a folder releases its grant and drops it`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/old"))
-        val scoped = SettingsViewModel(preferences, grants)
+        val scoped = SettingsViewModel(preferences, grants, backup)
         preferences.addLinkedFolder("content://trees/old")
 
         scoped.onAction(SettingsAction.RemoveLinkedFolder("content://trees/old"))

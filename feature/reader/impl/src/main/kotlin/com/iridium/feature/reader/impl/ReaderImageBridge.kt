@@ -3,9 +3,9 @@ package com.iridium.feature.reader.impl
 import android.webkit.JavascriptInterface
 
 /**
- * Image-showcase plumbing for the reader (Lithium-style tap-to-view).
+ * Image-showcase plumbing for the reader (tap-to-view).
  *
- * Lithium detects taps on `<img>` not inside a link and calls `openImage`
+ * This detects taps on `<img>` not inside a link and calls `openImage`
  * into native. We replicate that with a tiny injected script that binds image
  * taps to the registered `IridiumReader` JS interface. Pure string + testable;
  * the on-device visual flow is verified separately.

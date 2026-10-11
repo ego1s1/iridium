@@ -3,7 +3,7 @@ package com.iridium.feature.reader.impl
 import com.iridium.core.model.Highlight
 
 /**
- * Export of a book's highlights + notes (Lithium-style). Pure string building,
+ * Export of a book's highlights + notes. Pure string building,
  * unit-tested; the caller ships the text via a share/SAF intent.
  */
 object AnnotationExporter {

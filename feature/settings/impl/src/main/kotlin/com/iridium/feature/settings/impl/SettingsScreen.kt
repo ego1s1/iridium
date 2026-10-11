@@ -3,6 +3,9 @@ package com.iridium.feature.settings.impl
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +71,7 @@ import com.iridium.core.designsystem.SchemePickerRow
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
+import kotlinx.coroutines.launch
 import com.iridium.core.model.ThemeMode
 
 /** Public tab content for the main viewport. */
@@ -91,12 +96,42 @@ internal fun SettingsRoute(
     val launchPicker = rememberLinkedFolderPicker {
         viewModel.onAction(SettingsAction.AddLinkedFolder(it))
     }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val json = context.contentResolver.openInputStream(uri)
+                ?.bufferedReader()?.readText() ?: return@launch
+            val report = runCatching { viewModel.importSnapshot(json) }.getOrNull()
+            Toast.makeText(
+                context,
+                context.getString(R.string.settings_backup_imported, report?.restored ?: 0),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
     SettingsScreen(
         state = state,
         appVersion = appVersion,
         onAction = viewModel::onAction,
         onLicensesClick = onLicensesClick,
         onAddFolder = launchPicker,
+        onExportBackup = {
+            scope.launch {
+                val json = runCatching { viewModel.exportSnapshot() }.getOrNull() ?: return@launch
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_SUBJECT, "Iridium backup")
+                    putExtra(Intent.EXTRA_TEXT, json)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(share, context.getString(R.string.settings_backup_export)))
+                }
+            }
+        },
+        onImportBackup = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
         modifier = modifier,
     )
 }
@@ -110,6 +145,8 @@ internal fun SettingsScreen(
     modifier: Modifier = Modifier,
     onLicensesClick: () -> Unit = {},
     onAddFolder: () -> Unit = {},
+    onExportBackup: () -> Unit = {},
+    onImportBackup: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -338,6 +375,21 @@ internal fun SettingsScreen(
                         onClick = { onAction(SettingsAction.RemoveLinkedFolder(uri)) },
                     )
                 }
+            }
+
+            IridiumSectionCard(title = stringResource(R.string.settings_backup_title)) {
+                IridiumSettingRow(
+                    title = stringResource(R.string.settings_backup_export),
+                    subtitle = stringResource(R.string.settings_backup_export_body),
+                    icon = com.iridium.core.designsystem.IridiumIcons.Share,
+                    onClick = onExportBackup,
+                )
+                IridiumSettingRow(
+                    title = stringResource(R.string.settings_backup_import),
+                    subtitle = stringResource(R.string.settings_backup_import_body),
+                    icon = com.iridium.core.designsystem.IridiumIcons.ImportFile,
+                    onClick = onImportBackup,
+                )
             }
 
             IridiumSectionCard(title = stringResource(R.string.settings_card_about)) {

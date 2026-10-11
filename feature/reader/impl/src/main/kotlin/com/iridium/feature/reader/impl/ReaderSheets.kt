@@ -185,7 +185,7 @@ private fun HighlightRow(
 }
 
 /**
- * Add-highlight dialog (Lithium's color row + "Tap to add a note"):
+ * Add-highlight dialog (a color row + "Tap to add a note"):
  * pick a color, optionally attach a note, save the current selection.
  */
 @Composable

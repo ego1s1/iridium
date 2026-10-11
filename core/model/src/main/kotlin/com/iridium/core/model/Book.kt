@@ -1,6 +1,6 @@
 package com.iridium.core.model
 
-/** Reading flow for the EPUB navigator. Mirrors Lithium's Auto/Paged/Scrolled. */
+/** Reading flow for the EPUB navigator. Mirrors a common reader's Auto/Paged/Scrolled. */
 enum class ReadingFlow { AUTO, PAGED, SCROLLED }
 
 enum class BookFormat { EPUB }

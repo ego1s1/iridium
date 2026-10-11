@@ -45,7 +45,7 @@ import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TextAlign
 
 /**
- * Reader settings sheet (Lithium's "Choose from three themes" card):
+ * Reader settings sheet (a "Choose from three themes" card):
  * Flow Auto/Paged/Scrolled, brightness slider, theme swatches, text size
  * stepper, text alignment — using M3 Expressive ButtonGroups.
  */

@@ -7,7 +7,7 @@ enum class ThemeMode {
     DARK,
 }
 
-/** Reader color scheme presets (reader themes, Lithium-style). */
+/** Reader color scheme presets (reader themes). */
 enum class ColorSchemeChoice {
     LIGHT,
     SEPIA,

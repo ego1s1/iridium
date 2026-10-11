@@ -55,7 +55,7 @@ internal const val DICTIONARY_ENTER_MS = 220
 internal const val DICTIONARY_FADE_MS = 180
 
 /**
- * Lithium-style word lookup popup: word header with phonetic, then short
+ * Word lookup popup: word header with phonetic, then short
  * per-part-of-speech definitions — no clutter. Copy puts the word on the
  * clipboard; Close (or tapping outside) dismisses.
  *

@@ -5,9 +5,9 @@ import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.pageForegroundArgb
 
 /**
- * Lithium-style forced-override theming for the reader page (on Readium).
+ * Forced-override theming for the reader page (on Readium).
  *
- * Lithium re-colors arbitrary book CSS by injecting a stylesheet that wins
+ * This re-colors arbitrary book CSS by injecting a stylesheet that wins
  * every specificity fight: a body class repeated enough to beat the book's
  * own rules, `!important` on every declaration, and
  * `-webkit-text-fill-color: currentcolor !important` so WebKit gives up the

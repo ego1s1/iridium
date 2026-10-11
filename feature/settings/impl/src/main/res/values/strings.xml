@@ -45,6 +45,12 @@
         <item quantity="one">%1$d folder linked — tap to add another</item>
         <item quantity="other">%1$d folders linked — tap to add another</item>
     </plurals>
+    <string name="settings_backup_title">Backup</string>
+    <string name="settings_backup_export">Export library data</string>
+    <string name="settings_backup_export_body">Share your progress, bookmarks and highlights. Book files stay on device.</string>
+    <string name="settings_backup_import">Import library data</string>
+    <string name="settings_backup_import_body">Restore progress and annotations from a backup file.</string>
+    <string name="settings_backup_imported">Restored %1$d book(s) from backup</string>
 
     <string name="settings_about_app">Iridium</string>
     <string name="settings_about_tagline">A calm, high-craft EPUB reader</string>

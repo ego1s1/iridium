@@ -2,6 +2,8 @@ package com.iridium.feature.settings.impl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iridium.core.data.LibraryBackupManager
+import com.iridium.core.data.RestoreReport
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.datastore.SafGrantStore
 import com.iridium.core.model.LibraryDisplay
@@ -24,7 +26,14 @@ import kotlinx.coroutines.launch
 class SettingsViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
     private val grants: SafGrantStore,
+    private val backup: LibraryBackupManager,
 ) : ViewModel() {
+
+    /** Serializes the whole library's metadata for export. */
+    suspend fun exportSnapshot(): String = backup.snapshot()
+
+    /** Applies a backup's metadata; returns how many books were restored. */
+    suspend fun importSnapshot(json: String): RestoreReport = backup.restore(json)
 
     /** Folders whose persisted SAF grant died: scans skip them, the UI
      * offers re-link or forget. Refreshes whenever the linked set changes. */

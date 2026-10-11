@@ -706,7 +706,7 @@ class ReaderViewModel @Inject constructor(
             preferences.updateReaderPreferences(transform)
             val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
             runCatching { store.navigator?.submitPreferences(updated) }
-            // Lithium-style forced-override theming: always (re)inject the
+            // Forced-override theming: always (re)inject the
             // theme stylesheet so exact colors win over the book's own CSS.
             applyThemeOverride()
         }

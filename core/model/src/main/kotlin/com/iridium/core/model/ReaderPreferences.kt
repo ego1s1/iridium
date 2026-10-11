@@ -1,13 +1,13 @@
 package com.iridium.core.model
 
-/** Text alignment for reflowable EPUB content (Lithium's Text align row). */
+/** Text alignment for reflowable EPUB content. */
 enum class TextAlign {
     ORIGINAL,
     LEFT,
     JUSTIFY,
 }
 
-/** Reader body font family selection (Lithium's Font picker). */
+/** Reader body font family selection. */
 enum class ReaderFontFamily(val cssName: String?) {
     /** Follow the book's own fonts. */
     BOOK(null),
