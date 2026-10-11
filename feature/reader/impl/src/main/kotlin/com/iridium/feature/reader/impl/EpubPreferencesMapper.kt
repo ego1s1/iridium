@@ -1,10 +1,12 @@
 package com.iridium.feature.reader.impl
 
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.FontFamily as ReadiumFontFamily
 import org.readium.r2.navigator.preferences.TextAlign as ReadiumTextAlign
 import org.readium.r2.navigator.preferences.Theme as ReadiumTheme
 
@@ -23,6 +25,7 @@ object EpubPreferencesMapper {
             ReadingFlow.AUTO, ReadingFlow.PAGED -> false
         },
         fontSize = prefs.fontScale.coerceIn(0.5f, 3f).toDouble(),
+        fontFamily = prefs.fontFamily.cssName?.let { ReadiumFontFamily(it) },
         pageMargins = prefs.pageMargins.coerceIn(0.5f, 4f).toDouble(),
         lineHeight = prefs.lineHeight.coerceIn(1f, 3f).toDouble(),
         textAlign = when (prefs.textAlign) {

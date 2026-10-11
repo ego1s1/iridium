@@ -7,10 +7,24 @@ enum class TextAlign {
     JUSTIFY,
 }
 
+/** Reader body font family selection (Lithium's Font picker). */
+enum class ReaderFontFamily(val cssName: String?) {
+    /** Follow the book's own fonts. */
+    BOOK(null),
+    SERIF("serif"),
+    SANS_SERIF("sans-serif"),
+    MONOSPACE("monospace");
+
+    fun next(): ReaderFontFamily = entries[(ordinal + 1) % entries.size]
+    fun previous(): ReaderFontFamily =
+        entries[(ordinal - 1 + entries.size) % entries.size]
+}
+
 /** Reader preferences persisted in DataStore. */
 data class ReaderPreferences(
     val flow: ReadingFlow = ReadingFlow.AUTO,
     val fontScale: Float = 1f,
+    val fontFamily: ReaderFontFamily = ReaderFontFamily.BOOK,
     val textAlign: TextAlign = TextAlign.ORIGINAL,
     val theme: ColorSchemeChoice = ColorSchemeChoice.SEPIA,
     val brightness: Float = -1f,

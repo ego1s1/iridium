@@ -256,6 +256,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
             is ReaderAction.SetFlow,
             is ReaderAction.SetFontScale,
+            is ReaderAction.SetFontFamily,
             is ReaderAction.SetLineHeight,
             is ReaderAction.SetTextAlign,
             is ReaderAction.SetTheme,
@@ -277,6 +278,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetFlow -> updateReaderPrefs { it.copy(flow = action.flow) }
             is ReaderAction.SetFontScale -> updateReaderPrefs {
                 it.copy(fontScale = action.scale.coerceIn(0.5f, 3f))
+            }
+            is ReaderAction.SetFontFamily -> updateReaderPrefs {
+                it.copy(fontFamily = action.family)
             }
             is ReaderAction.SetLineHeight -> updateReaderPrefs {
                 it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f))

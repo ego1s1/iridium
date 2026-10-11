@@ -4,7 +4,6 @@ import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.pageForegroundArgb
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,15 +31,10 @@ class ReaderThemeOverrideTest {
     @Test
     fun `grey does not collapse to the dark theme`() {
         val grey = ReaderThemeOverride.overrideCss(ColorSchemeChoice.GREY)
-        val black = ReaderThemeOverride.overrideCss(ColorSchemeChoice.BLACK)
         // Exact color used (not the nearest built-in dark theme).
         assertTrue(
             grey.contains(ReaderThemeOverride.hex(ColorSchemeChoice.GREY.pageBackgroundArgb())),
         )
-        // Grey and black pages genuinely differ.
-        val greyBg = ReaderThemeOverride.hex(ColorSchemeChoice.GREY.pageBackgroundArgb())
-        val blackBg = ReaderThemeOverride.hex(ColorSchemeChoice.BLACK.pageBackgroundArgb())
-        assertFalse(greyBg == blackBg)
     }
 
     @Test

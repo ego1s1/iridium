@@ -18,6 +18,11 @@
     <string name="reader_settings_brightness">Brightness</string>
     <string name="reader_settings_theme">Theme</string>
     <string name="reader_settings_text_size">Text size</string>
+    <string name="reader_settings_font">Font</string>
+    <string name="reader_font_book">Book default</string>
+    <string name="reader_font_serif">Serif</string>
+    <string name="reader_font_sans">Sans serif</string>
+    <string name="reader_font_mono">Monospace</string>
     <string name="reader_settings_line_height">Line height</string>
     <string name="reader_settings_text_smaller">Smaller text</string>
     <string name="reader_settings_text_larger">Larger text</string>

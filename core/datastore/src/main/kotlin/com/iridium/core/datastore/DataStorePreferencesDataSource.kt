@@ -16,6 +16,7 @@ import com.iridium.core.model.LibraryDisplayMode
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
+import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
@@ -52,6 +53,9 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
             } ?: ReadingFlow.AUTO,
             fontScale = this[FONT_SCALE] ?: 1f,
+            fontFamily = this[FONT_FAMILY]?.let {
+                runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
+            } ?: ReaderFontFamily.BOOK,
             textAlign = this[TEXT_ALIGN]?.let {
                 runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.ORIGINAL)
             } ?: TextAlign.ORIGINAL,
@@ -85,6 +89,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             val updated = transform(prefs.toReaderPreferences())
             prefs[READING_FLOW] = updated.flow.name
             prefs[FONT_SCALE] = updated.fontScale
+            prefs[FONT_FAMILY] = updated.fontFamily.name
             prefs[TEXT_ALIGN] = updated.textAlign.name
             prefs[READER_THEME] = updated.theme.name
             prefs[BRIGHTNESS] = updated.brightness
@@ -210,6 +215,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val CRASH_REPORTING_ASKED = booleanPreferencesKey("crash_reporting_asked")
         val READING_FLOW = stringPreferencesKey("reading_flow")
         val FONT_SCALE = floatPreferencesKey("font_scale")
+        val FONT_FAMILY = stringPreferencesKey("font_family")
         val TEXT_ALIGN = stringPreferencesKey("text_align")
         val READER_THEME = stringPreferencesKey("reader_theme")
         val BRIGHTNESS = floatPreferencesKey("brightness")

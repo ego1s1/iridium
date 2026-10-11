@@ -3,6 +3,7 @@ package com.iridium.feature.reader.impl
 import com.iridium.core.model.Book
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.HighlightColor
+import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TocEntry
 
 sealed interface ReaderUiState {
@@ -64,6 +65,7 @@ sealed interface ReaderAction {
     // Reader preference edits (persisted + submitted to the navigator).
     data class SetFlow(val flow: com.iridium.core.model.ReadingFlow) : ReaderAction
     data class SetFontScale(val scale: Float) : ReaderAction
+    data class SetFontFamily(val family: ReaderFontFamily) : ReaderAction
     data class SetLineHeight(val lineHeight: Float) : ReaderAction
     data class SetTextAlign(val align: com.iridium.core.model.TextAlign) : ReaderAction
     data class SetTheme(val theme: com.iridium.core.model.ColorSchemeChoice) : ReaderAction

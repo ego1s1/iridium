@@ -41,6 +41,7 @@ import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ReadingFlow
+import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TextAlign
 
 /**
@@ -163,6 +164,32 @@ internal fun ReaderSettingsContent(
                 }
                 IconButton(onClick = { onAction(ReaderAction.SetFontScale(prefs.fontScale + 0.1f)) }) {
                     Icon(IridiumIcons.Add, contentDescription = stringResource(R.string.reader_settings_text_larger))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.reader_settings_font), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        fontLabel(prefs.fontFamily),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        onAction(ReaderAction.SetFontFamily(prefs.fontFamily.previous()))
+                    },
+                ) {
+                    Icon(IridiumIcons.Remove, contentDescription = "Previous font")
+                }
+                IconButton(
+                    onClick = {
+                        onAction(ReaderAction.SetFontFamily(prefs.fontFamily.next()))
+                    },
+                ) {
+                    Icon(IridiumIcons.Add, contentDescription = "Next font")
                 }
             }
 
@@ -294,4 +321,12 @@ internal fun ReaderSettingsContent(
             )
         }
     }
+
+@Composable
+private fun fontLabel(family: ReaderFontFamily): String = when (family) {
+    ReaderFontFamily.BOOK -> stringResource(R.string.reader_font_book)
+    ReaderFontFamily.SERIF -> stringResource(R.string.reader_font_serif)
+    ReaderFontFamily.SANS_SERIF -> stringResource(R.string.reader_font_sans)
+    ReaderFontFamily.MONOSPACE -> stringResource(R.string.reader_font_mono)
+}
 
