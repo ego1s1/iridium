@@ -56,6 +56,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumEmphasized
@@ -98,6 +102,20 @@ internal fun SettingsRoute(
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val account by viewModel.driveAccount.collectAsStateWithLifecycle()
+    val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val signInLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        runCatching { task.result }.getOrNull()?.email?.let(viewModel::onDriveSignedIn)
+    }
+    syncMessage?.let { message ->
+        androidx.compose.runtime.LaunchedEffect(message) {
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearSyncMessage()
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -132,6 +150,21 @@ internal fun SettingsRoute(
             }
         },
         onImportBackup = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
+        driveAccount = account,
+        onDriveSignIn = {
+            val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(Scope(DriveSyncManager.APPDATA_SCOPE))
+                .build()
+            val client = GoogleSignIn.getClient(context, options)
+            signInLauncher.launch(client.signInIntent)
+        },
+        onDriveSignOut = {
+            val client = GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN)
+            client.signOut()
+            viewModel.onDriveSignOut()
+        },
+        onSyncNow = viewModel::onSyncNow,
         modifier = modifier,
     )
 }
@@ -147,6 +180,10 @@ internal fun SettingsScreen(
     onAddFolder: () -> Unit = {},
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {},
+    driveAccount: String? = null,
+    onDriveSignIn: () -> Unit = {},
+    onDriveSignOut: () -> Unit = {},
+    onSyncNow: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -390,6 +427,27 @@ internal fun SettingsScreen(
                     icon = com.iridium.core.designsystem.IridiumIcons.ImportFile,
                     onClick = onImportBackup,
                 )
+                if (driveAccount == null) {
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sign_in),
+                        subtitle = stringResource(R.string.settings_backup_sign_in_body),
+                        icon = com.iridium.core.designsystem.IridiumIcons.Storage,
+                        onClick = onDriveSignIn,
+                    )
+                } else {
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sync),
+                        subtitle = driveAccount,
+                        icon = com.iridium.core.designsystem.IridiumIcons.Refresh,
+                        onClick = onSyncNow,
+                    )
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sign_out),
+                        subtitle = driveAccount,
+                        icon = com.iridium.core.designsystem.IridiumIcons.Close,
+                        onClick = onDriveSignOut,
+                    )
+                }
             }
 
             IridiumSectionCard(title = stringResource(R.string.settings_card_about)) {

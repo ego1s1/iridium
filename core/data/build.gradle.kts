@@ -25,6 +25,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
+    implementation(libs.play.services.auth)
+    implementation(libs.google.api.client.android)
+    implementation(libs.google.http.client.gson)
+    implementation(libs.google.api.services.drive)
 
     testImplementation(libs.bundles.test.common)
     testImplementation(libs.turbine)

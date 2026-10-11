@@ -1,6 +1,8 @@
 package com.iridium.feature.settings.impl
 
 import com.iridium.core.fakes.FakeSafGrantStore
+import com.iridium.core.data.DriveGatewayFactory
+import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.data.LibraryBackupManager
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
@@ -25,11 +27,15 @@ class SettingsViewModelTest {
 
     private val preferences = TestPreferencesDataSource()
     private val backup = LibraryBackupManager(TestBooksRepository())
+    private val sync = DriveSyncManager(
+        backup,
+        DriveGatewayFactory { throw UnsupportedOperationException("no network in settings tests") },
+    )
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setup() {
-        viewModel = SettingsViewModel(preferences, FakeSafGrantStore(), backup)
+        viewModel = SettingsViewModel(preferences, FakeSafGrantStore(), backup, sync)
     }
 
     @Test
@@ -114,7 +120,7 @@ class SettingsViewModelTest {
     @Test
     fun `revoked folders surface with live grants hidden`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/kept"))
-        val scoped = SettingsViewModel(preferences, grants, backup)
+        val scoped = SettingsViewModel(preferences, grants, backup, sync)
         preferences.addLinkedFolder("content://trees/kept")
         preferences.addLinkedFolder("content://trees/lost")
 
@@ -125,7 +131,7 @@ class SettingsViewModelTest {
     @Test
     fun `forgetting a folder releases its grant and drops it`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/old"))
-        val scoped = SettingsViewModel(preferences, grants, backup)
+        val scoped = SettingsViewModel(preferences, grants, backup, sync)
         preferences.addLinkedFolder("content://trees/old")
 
         scoped.onAction(SettingsAction.RemoveLinkedFolder("content://trees/old"))

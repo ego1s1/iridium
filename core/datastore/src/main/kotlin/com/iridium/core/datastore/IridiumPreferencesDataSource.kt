@@ -50,4 +50,9 @@ interface IridiumPreferencesDataSource {
     suspend fun addLinkedFolder(uri: String)
 
     suspend fun removeLinkedFolder(uri: String)
+
+    /** Signed-in Drive account email for sync, or null when signed out. */
+    val driveAccount: Flow<String?>
+
+    suspend fun setDriveAccount(email: String?)
 }

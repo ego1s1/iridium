@@ -50,6 +50,10 @@
     <string name="settings_backup_export_body">Share your progress, bookmarks and highlights. Book files stay on device.</string>
     <string name="settings_backup_import">Import library data</string>
     <string name="settings_backup_import_body">Restore progress and annotations from a backup file.</string>
+    <string name="settings_backup_sign_in">Sync with Drive</string>
+    <string name="settings_backup_sign_in_body">Sign in to back up and sync your library data.</string>
+    <string name="settings_backup_sync">Sync now</string>
+    <string name="settings_backup_sign_out">Sign out of Drive</string>
     <string name="settings_backup_imported">Restored %1$d book(s) from backup</string>
 
     <string name="settings_about_app">Iridium</string>

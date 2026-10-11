@@ -67,6 +67,13 @@ class TestPreferencesDataSource : IridiumPreferencesDataSource {
         folders.update { it - uri }
     }
 
+    private val driveAccountFlow = MutableStateFlow<String?>(null)
+    override val driveAccount: Flow<String?> = driveAccountFlow
+
+    override suspend fun setDriveAccount(email: String?) {
+        driveAccountFlow.value = email
+    }
+
     /** Seed hooks so tests start from non-default state without transforms. */
     fun setReader(prefs: ReaderPreferences) {
         reader.value = prefs

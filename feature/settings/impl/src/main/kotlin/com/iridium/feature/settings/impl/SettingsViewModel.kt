@@ -2,9 +2,13 @@ package com.iridium.feature.settings.impl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iridium.core.data.DriveSyncManager
+import com.iridium.core.data.DriveSyncResult
 import com.iridium.core.data.LibraryBackupManager
 import com.iridium.core.data.RestoreReport
 import com.iridium.core.datastore.IridiumPreferencesDataSource
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import com.iridium.core.datastore.SafGrantStore
 import com.iridium.core.model.LibraryDisplay
 import com.iridium.core.model.MotionStyle
@@ -27,6 +31,7 @@ class SettingsViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
     private val grants: SafGrantStore,
     private val backup: LibraryBackupManager,
+    private val sync: DriveSyncManager,
 ) : ViewModel() {
 
     /** Serializes the whole library's metadata for export. */
@@ -34,6 +39,38 @@ class SettingsViewModel @Inject constructor(
 
     /** Applies a backup's metadata; returns how many books were restored. */
     suspend fun importSnapshot(json: String): RestoreReport = backup.restore(json)
+
+    /** Signed-in Drive account for sync, or null. */
+    val driveAccount: StateFlow<String?> = preferences.driveAccount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _syncMessage = MutableStateFlow<String?>(null)
+    val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    fun onDriveSignedIn(email: String) {
+        viewModelScope.launch { preferences.setDriveAccount(email) }
+    }
+
+    fun onDriveSignOut() {
+        viewModelScope.launch { preferences.setDriveAccount(null) }
+    }
+
+    fun onSyncNow() {
+        val email = driveAccount.value ?: return
+        viewModelScope.launch {
+            _syncMessage.value = when (val result = sync.syncNow(email)) {
+                DriveSyncResult.SignedOut -> null
+                DriveSyncResult.UpToDate -> "Already up to date"
+                is DriveSyncResult.Uploaded -> "Backed up ${result.books} book(s)"
+                is DriveSyncResult.Downloaded -> "Restored ${result.restored} book(s)"
+                is DriveSyncResult.Failed -> "Sync failed: ${result.reason}"
+            }
+        }
+    }
+
+    fun clearSyncMessage() {
+        _syncMessage.value = null
+    }
 
     /** Folders whose persisted SAF grant died: scans skip them, the UI
      * offers re-link or forget. Refreshes whenever the linked set changes. */

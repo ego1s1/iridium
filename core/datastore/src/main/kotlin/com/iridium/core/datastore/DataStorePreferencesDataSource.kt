@@ -204,6 +204,15 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         dataStore.edit { it[LINKED_FOLDERS] = (it[LINKED_FOLDERS] ?: emptySet()) - uri }
     }
 
+    override val driveAccount: Flow<String?> =
+        dataStore.data.catchOnCorruption().map { it[DRIVE_ACCOUNT] }
+
+    override suspend fun setDriveAccount(email: String?) {
+        dataStore.edit {
+            if (email == null) it.remove(DRIVE_ACCOUNT) else it[DRIVE_ACCOUNT] = email
+        }
+    }
+
     override suspend fun setCrashReporting(enabled: Boolean) {
         dataStore.edit {
             it[CRASH_REPORTING_ENABLED] = enabled
@@ -235,6 +244,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val VOLUME_KEYS_INVERTED = booleanPreferencesKey("volume_keys_inverted")
         val TAP_INVERT = booleanPreferencesKey("tap_invert")
         val LINKED_FOLDERS = stringSetPreferencesKey("linked_folders")
+        val DRIVE_ACCOUNT = stringPreferencesKey("drive_account")
         // Legacy tap-zone keys (pre single-switch): read once for migration.
         val TAP_ZONE_MODE = stringPreferencesKey("tap_zone_mode")
         val TAP_ZONE_INVERT = stringPreferencesKey("tap_zone_invert")

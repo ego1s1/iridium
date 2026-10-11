@@ -16,5 +16,6 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:datastore"))
     implementation(project(":core:data"))
+    implementation(libs.play.services.auth)
     implementation(libs.kotlinx.serialization.json)
 }

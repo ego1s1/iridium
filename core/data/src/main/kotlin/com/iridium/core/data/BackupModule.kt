@@ -14,4 +14,9 @@ object BackupModule {
     fun provideLibraryBackupManager(
         repository: BooksRepository,
     ): LibraryBackupManager = LibraryBackupManager(repository)
+
+    @Provides
+    fun provideDriveGatewayFactory(
+        impl: GoogleDriveGatewayFactory,
+    ): DriveGatewayFactory = impl
 }
