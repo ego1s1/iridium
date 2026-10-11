@@ -34,23 +34,20 @@ up — the existing `mori` AVD was reused.)
 
 ## Bugs found
 
-### B1 (medium): reader page letterboxed by visibility-ignoring insets
-`NavigatorHost` pads with `statusBarsIgnoringVisibility` /
-`navigationBarsIgnoringVisibility`, which are non-zero even when the system
-bars are hidden. In immersive mode (chrome hidden) this leaves a permanent
-dark strip (~140 px) above the page and a black band below the counter —
-the window background shows where the WebView never draws. On API 35 this
-is more visible because enforced edge-to-edge ignores the legacy
-`statusBarColor` tint. The stable insets are deliberate for the *chrome*
-bars (no animation jump); the *content host* should use visibility-aware
-insets instead.
-File: `feature/reader/impl/.../ReaderScreen.kt:270-278`.
+### ~B1 (medium): reader page letterboxed by visibility-ignoring insets — FIXED
+~`NavigatorHost` padded with `statusBarsIgnoringVisibility` /
+`navigationBarsIgnoringVisibility`, leaving a dark strip in immersive mode.
+Resolved: `NavigatorHost` now uses visibility-aware insets
+(`statusBars`/`navigationBars`) so the page is full-bleed when bars hide;
+chrome bars keep the stable ignoring-visibility insets. Verified on emulator
+(immersive top/bottom rows match page bg).
+File: `feature/reader/impl/.../ReaderScreen.kt`.
 
-### B2 (minor): bookmark row subtitle is static
-Menu sheet shows `Add to favorites` with subtitle `Bookmarked` even when
-the book is not bookmarked. The subtitle should reflect state (or be
-dropped for the add case).
-File: `feature/library/impl/.../LibraryMenuSheet.kt`, `library_card_bookmarked`.
+### ~B2 (minor): bookmark row subtitle is static — FIXED
+~Menu sheet showed `Add to favorites` with subtitle `Bookmarked` even when
+not bookmarked. Resolved: subtitle is state-aware ("Mark this book as a
+favorite" / "Bookmarked"). Covered by `LibraryMenuSheetTest`.
+File: `feature/library/impl/.../LibraryMenuSheet.kt`.
 
 ## Non-issues confirmed during the pass
 

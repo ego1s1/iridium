@@ -37,6 +37,7 @@
     <string name="library_menu_resume">Resume</string>
     <string name="library_menu_read">Read</string>
     <string name="library_menu_bookmark_add">Add to favorites</string>
+    <string name="library_menu_bookmark_add_subtitle">Mark this book as a favorite</string>
     <string name="library_menu_bookmark_remove">Remove from favorites</string>
     <string name="library_menu_delete">Delete</string>
     <string name="library_menu_delete_title">Remove book?</string>

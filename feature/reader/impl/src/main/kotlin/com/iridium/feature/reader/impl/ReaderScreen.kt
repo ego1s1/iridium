@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DropdownMenu
@@ -179,6 +181,13 @@ internal fun ReaderScreen(
     val bottomSafeInsets =
         WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)
 
+    // The CONTENT host, by contrast, uses visibility-aware insets so the page
+    // truly goes full-bleed when the system bars are hidden (no letterbox).
+    // The aware insets collapse to 0 when bars hide, so this only pads the
+    // text clear of the bars while they are actually visible.
+    val topVisibleInset = WindowInsets.statusBars.only(WindowInsetsSides.Top)
+    val bottomVisibleInset = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
+
     // Per-book brightness override (-1 = system).
     DisposableEffect(state.prefs.brightness) {
         val window = activity?.window
@@ -273,8 +282,8 @@ internal fun ReaderScreen(
             bookId = state.book.id,
             sessionReady = sessionReady,
             modifier = Modifier.fillMaxSize()
-                .windowInsetsPadding(topSafeInsets)
-                .windowInsetsPadding(bottomSafeInsets),
+                .windowInsetsPadding(topVisibleInset)
+                .windowInsetsPadding(bottomVisibleInset),
         )
         if (!state.chromeVisible && state.prefs.showPageCounter) {
             state.positionText?.let {

@@ -105,7 +105,13 @@ internal fun LibraryMenuContent(
                     R.string.library_menu_bookmark_add
                 },
             ),
-            subtitle = stringResource(R.string.library_card_bookmarked),
+            subtitle = stringResource(
+                if (book.bookmarked) {
+                    R.string.library_card_bookmarked
+                } else {
+                    R.string.library_menu_bookmark_add_subtitle
+                },
+            ),
             icon = if (book.bookmarked) {
                 IridiumIcons.Bookmark
             } else {
