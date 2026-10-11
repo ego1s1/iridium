@@ -1,5 +1,6 @@
 package com.iridium.feature.reader.impl
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.view.KeyEvent
@@ -124,6 +125,7 @@ internal fun ReaderRoute(
                     snackbarHost.showSnackbar(context.getString(R.string.reader_select_text_first))
                 ReaderMessage.HighlightSaved ->
                     snackbarHost.showSnackbar(context.getString(R.string.reader_highlight_saved))
+                is ReaderMessage.ShareExport -> shareAnnotations(context, message)
                 ReaderMessage.Pop -> onBackClick()
             }
         }
@@ -441,6 +443,7 @@ internal fun ReaderScreen(
             highlights = state.highlights,
             focusedId = state.focusedHighlightId,
             onDelete = { onAction(ReaderAction.DeleteHighlight(it)) },
+            onExport = { onAction(ReaderAction.ExportAnnotations) },
             onDismiss = { onAction(ReaderAction.CloseHighlights) },
         )
     }
@@ -615,4 +618,24 @@ private fun ReaderImageShowcase(
             )
         }
     }
+}
+
+/** Shares an annotation export via Markdown + HTML intents (SAF/share). */
+private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport) {
+    val markdown = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, msg.filename + ".md")
+        putExtra(Intent.EXTRA_TEXT, msg.markdown)
+    }
+    val html = Intent(Intent.ACTION_SEND).apply {
+        type = "text/html"
+        putExtra(Intent.EXTRA_HTML_TEXT, msg.html)
+        putExtra(Intent.EXTRA_SUBJECT, msg.filename + ".html")
+    }
+    val chooser = Intent.createChooser(
+        markdown,
+        context.getString(R.string.reader_highlights_export),
+    )
+    chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(html))
+    runCatching { context.startActivity(chooser) }
 }

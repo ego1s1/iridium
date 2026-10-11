@@ -48,6 +48,7 @@ import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.Url
 import java.util.UUID
 
+@Suppress("TooManyFunctions") // Large host ViewModel; refactor deferred.
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -242,6 +243,7 @@ class ReaderViewModel @Inject constructor(
             }
             ReaderAction.DismissDictionary -> dismissDictionary()
             ReaderAction.DismissImage -> store.dismissImage()
+            ReaderAction.ExportAnnotations -> exportAnnotations()
             is ReaderAction.SeekTo -> {
                 seekTo(action.progression)
                 scheduleChromeHide()
@@ -585,6 +587,22 @@ class ReaderViewModel @Inject constructor(
         _dictionaryUi.value = null
         store.clearSelection()
         runCatching { store.navigator?.clearSelection() }
+    }
+
+    /** Builds a Markdown + HTML export of the current book's highlights/notes. */
+    private fun exportAnnotations() {
+        viewModelScope.launch {
+            val ready = uiState.value as? ReaderUiState.Ready
+            val title = ready?.book?.title ?: return@launch
+            val hs = highlights.first()
+            messageChannel.send(
+                ReaderMessage.ShareExport(
+                    markdown = AnnotationExporter.markdown(title, hs),
+                    html = AnnotationExporter.html(title, hs),
+                    filename = title.replace(Regex("[^A-Za-z0-9]+"), "_"),
+                ),
+            )
+        }
     }
 
     // Navigation + annotations

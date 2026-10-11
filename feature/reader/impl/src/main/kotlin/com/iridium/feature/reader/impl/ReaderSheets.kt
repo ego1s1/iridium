@@ -89,6 +89,7 @@ internal fun ReaderHighlightsSheet(
     highlights: List<Highlight>,
     focusedId: String?,
     onDelete: (String) -> Unit,
+    onExport: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -120,6 +121,12 @@ internal fun ReaderHighlightsSheet(
                     )
                 }
             }
+        }
+        TextButton(
+            onClick = onExport,
+            modifier = Modifier.align(Alignment.End).padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            Text(stringResource(R.string.reader_highlights_export))
         }
     }
 }

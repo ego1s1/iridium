@@ -5,6 +5,7 @@
         <item quantity="other">Highlights (%1$d)</item>
     </plurals>
     <string name="reader_highlights_empty">Long-press text, then use “Highlight selection” in the menu to save one here.</string>
+    <string name="reader_highlights_export">Export</string>
     <string name="reader_highlight_delete">Delete highlight</string>
     <string name="reader_add_highlight_title">Highlight</string>
     <string name="reader_add_highlight_note_hint">Tap to add a note</string>

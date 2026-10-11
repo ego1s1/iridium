@@ -52,6 +52,8 @@ sealed interface ReaderAction {
     data object CloseToc : ReaderAction
     data object OpenHighlights : ReaderAction
     data object CloseHighlights : ReaderAction
+    data object ExportAnnotations : ReaderAction
+
     data object DismissDictionary : ReaderAction
     data object DismissImage : ReaderAction
     data class SeekTo(val progression: Float) : ReaderAction
@@ -83,6 +85,7 @@ sealed interface ReaderAction {
 /** One-shot UI messages. */
 sealed interface ReaderMessage {
     data class OpenUrl(val url: String) : ReaderMessage
+    data class ShareExport(val markdown: String, val html: String, val filename: String) : ReaderMessage
     data object ContentUnavailable : ReaderMessage
     data object SelectTextFirst : ReaderMessage
     data object HighlightSaved : ReaderMessage
