@@ -37,9 +37,10 @@ class ChapterIndexerTest {
     @Test
     fun `extracts plain text for each spine chapter`() = runTest {
         val file = writeEpub()
-        val rows = indexer.extract(file.absolutePath, "test.epub", toc = emptyList())
+        val rows = indexer.extract("book-1", file.absolutePath, "test.epub", toc = emptyList())
 
         assertEquals(2, rows.size)
+        assertEquals("book-1", rows[0].bookId)
         assertEquals("OEBPS/ch1.xhtml", rows[0].href)
         assertEquals("Chapter 1", rows[0].title)
         assertTrue(rows[0].body.contains("Hispaniola"))
@@ -52,6 +53,7 @@ class ChapterIndexerTest {
     fun `uses toc titles when the href matches`() = runTest {
         val file = writeEpub()
         val rows = indexer.extract(
+            "book-1",
             file.absolutePath,
             "test.epub",
             toc = listOf(com.iridium.core.model.TocEntry("OEBPS/ch1.xhtml", "The Old Buccaneer")),
@@ -61,14 +63,14 @@ class ChapterIndexerTest {
 
     @Test
     fun `a missing file yields no rows instead of throwing`() = runTest {
-        val rows = indexer.extract("/does/not/exist.epub", "missing.epub", toc = emptyList())
+        val rows = indexer.extract("book-1", "/does/not/exist.epub", "missing.epub", toc = emptyList())
         assertTrue(rows.isEmpty())
     }
 
     @Test
     fun `a non-epub file yields no rows instead of throwing`() = runTest {
         val file = File(tempDir, "garbage.epub").apply { writeBytes(ByteArray(2048) { 7 }) }
-        val rows = indexer.extract(file.absolutePath, "garbage.epub", toc = emptyList())
+        val rows = indexer.extract("book-1", file.absolutePath, "garbage.epub", toc = emptyList())
         assertTrue(rows.isEmpty())
     }
 

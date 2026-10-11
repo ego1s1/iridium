@@ -50,6 +50,7 @@ class OfflineFirstBooksRepositoryTest {
         lister = FakeLister()
         tempDir = File(context.cacheDir, "repo-test").apply { mkdirs() }
         repository = OfflineFirstBooksRepository(
+            context = context,
             database = database,
             bookDao = database.bookDao(),
             highlightDao = database.highlightDao(),
@@ -81,6 +82,49 @@ class OfflineFirstBooksRepositoryTest {
         assertEquals(1, books.size)
         assertEquals("Treasure Island", books.first().title)
         assertEquals(2, books.first().spineCount)
+    }
+
+    @Test
+    fun `importEpub copies bytes and indexes the book`() = runTest {
+        val bytes = writeEpub("Treasure Island").readBytes()
+
+        val id = repository.importEpub("shared-book.epub") { bytes.inputStream() }
+
+        val books = repository.observeLibrary(LibraryQuery()).first()
+        assertEquals(1, books.size)
+        assertEquals("Treasure Island", books.first().title)
+        assertEquals(id, books.first().id)
+        assertTrue(books.first().sourcePath.startsWith(context.filesDir.absolutePath))
+        assertTrue(File(books.first().sourcePath).isFile)
+        assertTrue(repository.isContentIndexed(id))
+    }
+
+    @Test
+    fun `importEpub rejects junk bytes`() = runTest {
+        val before = repository.observeLibrary(LibraryQuery()).first().size
+        val failed = runCatching {
+            repository.importEpub("notes.txt") { "not an epub".byteInputStream() }
+        }.isFailure
+        assertTrue(failed)
+        assertEquals(before, repository.observeLibrary(LibraryQuery()).first().size)
+    }
+
+    @Test
+    fun `importEpub rejects a missing stream`() = runTest {
+        assertTrue(runCatching { repository.importEpub("ghost.epub") { null } }.isFailure)
+    }
+
+    @Test
+    fun `removeBook deletes the imported copy but never linked originals`() = runTest {
+        val bytes = writeEpub("Treasure Island").readBytes()
+        val id = repository.importEpub("shared-book.epub") { bytes.inputStream() }
+        val path = repository.observeBook(id).first()?.sourcePath.orEmpty()
+        assertTrue(File(path).isFile)
+
+        repository.removeBook(id)
+
+        assertEquals(null, repository.observeBook(id).first())
+        assertTrue(!File(path).exists())
     }
 
     @Test

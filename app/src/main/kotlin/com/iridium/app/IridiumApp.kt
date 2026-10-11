@@ -75,6 +75,13 @@ fun IridiumApp(
                     return@Surface
                 }
                 val navController = rememberNavController()
+                // Deep-link imports land here: open the imported book once
+                // the graph exists (replay-1 covers the cold-start race).
+                androidx.compose.runtime.LaunchedEffect(navController) {
+                    viewModel.openBookEvents.collect { bookId ->
+                        navController.navigateToReader(bookId)
+                    }
+                }
                 SharedTransitionLayout {
                     CompositionLocalProvider(LocalSharedTransitionScope provides this) {
                         NavHost(

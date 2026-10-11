@@ -29,7 +29,11 @@ data class AppUiState(
 class IridiumAppViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
     private val crashReporter: CrashReporter,
+    deepLinkNavigator: DeepLinkNavigator,
 ) : ViewModel() {
+
+    /** Book ids imported via deep link, awaiting reader navigation. */
+    val openBookEvents = deepLinkNavigator.openBook
 
     /**
      * Null until the first preference emission: the onboarding gate must not

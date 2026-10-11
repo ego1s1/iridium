@@ -25,6 +25,7 @@ internal class ChapterIndexer @Inject constructor(
     private val engine: IridiumEpubEngine,
 ) {
     suspend fun extract(
+        bookId: String,
         sourcePath: String,
         displayName: String,
         toc: List<TocEntry>,
@@ -62,7 +63,7 @@ internal class ChapterIndexer @Inject constructor(
                     val clipped = text.take(MAX_BODY_CHARS)
                     totalChars += clipped.length
                     rows += ChapterTextEntity(
-                        bookId = sourcePath,
+                        bookId = bookId,
                         href = href,
                         title = title,
                         body = clipped,

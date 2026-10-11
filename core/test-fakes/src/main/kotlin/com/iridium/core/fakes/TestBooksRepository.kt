@@ -134,6 +134,22 @@ class TestBooksRepository : BooksRepository {
         indexedBooks.remove(id)
     }
 
+    override suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String {
+        openStream()?.close() ?: throw java.io.IOException("Unable to read $displayName")
+        val id = "imported-${imports.size + 1}"
+        val book = com.iridium.core.model.Book(
+            id = id,
+            title = displayName.substringBeforeLast('.'),
+            sourcePath = "file:///imports/$id.epub",
+            sourceDisplayName = displayName,
+        )
+        booksFlow.update { it + book }
+        imports += id to displayName
+        return id
+    }
+
+    val imports = mutableListOf<Pair<String, String>>()
+
     // Full-text search hooks.
 
     var indexResultCount: Int = 0

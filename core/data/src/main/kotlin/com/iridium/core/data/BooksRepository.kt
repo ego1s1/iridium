@@ -27,6 +27,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -90,6 +91,14 @@ interface BooksRepository {
 
     /** Unlinks a book: removes the row, thumbnail and search index. */
     suspend fun removeBook(id: String)
+
+    /**
+     * Imports one EPUB shared from another app: copies the bytes into
+     * app-private storage, inspects/indexes them like a scan would, and
+     * returns the new book id. Throws [java.io.IOException] when the stream
+     * is missing, too large, or not a readable EPUB.
+     */
+    suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String
 }
 
 /**
@@ -100,6 +109,7 @@ interface BooksRepository {
  */
 @Singleton
 internal class OfflineFirstBooksRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: IridiumDatabase,
     private val bookDao: BookDao,
     private val highlightDao: HighlightDao,
@@ -277,7 +287,7 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         val row = bookDao.getById(bookId) ?: return@withContext 0
         val toc = row.tocEntries()
         val chapters = runCatching {
-            chapterIndexer.extract(row.sourcePath, row.sourceDisplayName, toc)
+            chapterIndexer.extract(bookId, row.sourcePath, row.sourceDisplayName, toc)
         }.getOrDefault(emptyList())
 
         // Never wipe a good index for a failed extract (unmounted file,
@@ -338,8 +348,84 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 bookDao.deleteById(id)
             }
             deleteCover(row.coverPath)
+            // Imported copies are app-owned: dropping the row must not orphan
+            // the bytes. Linked originals (content://) are never touched.
+            deleteImportedFile(row.sourcePath)
         }
         Unit
+    }
+
+    /**
+     * Imports one shared EPUB into app-private storage (`filesDir/books`).
+     * The copy is streamed with a size cap; inspection/indexing reuse the
+     * scan path, so imported books behave exactly like scanned ones. Prune
+     * queries only touch `content://` rows, so imports survive rescans.
+     */
+    override suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String =
+        withContext(Dispatchers.IO) {
+            val name = sanitizeImportDisplayName(displayName)
+            val id = UUID.randomUUID().toString()
+            val booksDir = File(context.filesDir, IMPORT_DIR).apply { mkdirs() }
+            val dest = File(booksDir, "$id.epub")
+            val stream = openStream() ?: throw IOException("Unable to read $name")
+            try {
+                stream.use { input ->
+                    dest.outputStream().use { output ->
+                        copyCapped(input, output, MAX_IMPORT_BYTES)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                dest.delete()
+                throw e
+            }
+            val now = System.currentTimeMillis()
+            try {
+                val inspected = sourceFactory.open(dest.absolutePath, name)
+                    .use { source -> backend.inspect(source, name.substringBeforeLast('.')) }
+                if (inspected.spineCount == 0 && inspected.chapters.isEmpty()) {
+                    throw IOException("Not a readable EPUB: $name")
+                }
+                val coverPath = covers.generate(inspected.coverBytes, "import-$id")
+                bookDao.upsert(
+                    BookEntity(
+                        id = id,
+                        title = inspected.title,
+                        author = inspected.author,
+                        format = com.iridium.core.model.BookFormat.EPUB.name,
+                        spineCount = inspected.spineCount,
+                        sourcePath = dest.absolutePath,
+                        coverPath = coverPath,
+                        progress = 0f,
+                        lastLocator = null,
+                        sourceDisplayName = name,
+                        sourceModified = dest.lastModified(),
+                        tocJson = encodeToc(inspected.chapters.map { TocEntry(it.href, it.title) }),
+                        error = null,
+                        createdAt = now,
+                        updatedAt = now,
+                        bookmarked = false,
+                    ),
+                )
+                // Best-effort FTS like the scan's follow-up pass.
+                runCatching { indexBookContent(id) }
+                id
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                dest.delete()
+                throw (e as? IOException ?: IOException("Could not import $name", e))
+            }
+        }
+
+    /** Deletes an app-owned import copy; never touches linked originals. */
+    private fun deleteImportedFile(sourcePath: String) {
+        val booksDir = File(context.filesDir, IMPORT_DIR).absolutePath
+        val file = File(sourcePath)
+        if (file.absolutePath.startsWith(booksDir + File.separator)) {
+            runCatching { file.delete() }
+        }
     }
 
     /**
