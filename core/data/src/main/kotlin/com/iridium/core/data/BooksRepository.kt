@@ -4,9 +4,7 @@ import android.content.Context
 import androidx.room.withTransaction
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.BookEntity
-import com.iridium.core.database.BookmarkDao
 import com.iridium.core.database.ChapterTextDao
-import com.iridium.core.database.HighlightDao
 import com.iridium.core.database.IridiumDatabase
 import com.iridium.core.model.Book
 import com.iridium.core.model.BookError
@@ -15,7 +13,6 @@ import com.iridium.core.model.Highlight
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.TocEntry
 import com.iridium.core.model.applyQuery
-import com.iridium.core.common.DefaultDispatcher
 import com.iridium.core.common.IoDispatcher
 import com.iridium.epub.EpubBackend
 import com.iridium.epub.EpubSource
@@ -110,16 +107,15 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: IridiumDatabase,
     private val bookDao: BookDao,
-    private val highlightDao: HighlightDao,
-    private val bookmarkDao: BookmarkDao,
     private val chapterTextDao: ChapterTextDao,
     private val backend: EpubBackend,
     private val covers: EpubCoverGenerator,
     private val treeLister: LinkedTreeLister,
     private val sourceFactory: EpubSourceFactory,
+    private val observer: LibraryObserver,
     private val search: ContentSearchUseCase,
+    private val annotations: AnnotationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : BooksRepository {
 
     /**
@@ -128,31 +124,19 @@ internal class OfflineFirstBooksRepository @Inject constructor(
      * [distinctUntilChanged] drops equal lists before they can recompose.
      */
     override fun observeLibrary(query: LibraryQuery): Flow<List<Book>> =
-        bookDao.observeAll()
-            .map { entities -> entities.map { it.toModel() }.applyQuery(query) }
-            .distinctUntilChanged()
-            .flowOn(defaultDispatcher)
+        observer.observeLibrary(query)
 
     override fun observeBook(id: String): Flow<Book?> =
-        bookDao.observeById(id)
-            .map { it?.toModel() }
-            .distinctUntilChanged()
-            .flowOn(defaultDispatcher)
+        observer.observeBook(id)
 
     override fun observeToc(bookId: String): Flow<List<TocEntry>> =
-        bookDao.observeById(bookId).map { it?.tocEntries().orEmpty() }
-            .distinctUntilChanged()
-            .flowOn(defaultDispatcher)
+        observer.observeToc(bookId)
 
     override fun observeHighlights(bookId: String): Flow<List<Highlight>> =
-        highlightDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
-            .distinctUntilChanged()
-            .flowOn(defaultDispatcher)
+        observer.observeHighlights(bookId)
 
     override fun observeBookmarks(bookId: String): Flow<List<Bookmark>> =
-        bookmarkDao.observeForBook(bookId).map { list -> list.map { it.toModel() } }
-            .distinctUntilChanged()
-            .flowOn(defaultDispatcher)
+        observer.observeBookmarks(bookId)
 
     override suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
@@ -228,29 +212,23 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         bookDao.updateBookmark(id, bookmarked, System.currentTimeMillis())
     }
 
-    override suspend fun upsertHighlight(highlight: Highlight) {
-        highlightDao.upsert(highlight.toEntity())
-    }
+    override suspend fun upsertHighlight(highlight: Highlight) =
+        annotations.upsertHighlight(highlight)
 
-    override suspend fun deleteHighlight(id: String) {
-        highlightDao.deleteById(id)
-    }
+    override suspend fun deleteHighlight(id: String) =
+        annotations.deleteHighlight(id)
 
-    override suspend fun deleteAllHighlights(bookId: String) {
-        highlightDao.deleteForBook(bookId)
-    }
+    override suspend fun deleteAllHighlights(bookId: String) =
+        annotations.deleteAllHighlights(bookId)
 
-    override suspend fun upsertBookmark(bookmark: Bookmark) {
-        bookmarkDao.upsert(bookmark.toEntity())
-    }
+    override suspend fun upsertBookmark(bookmark: Bookmark) =
+        annotations.upsertBookmark(bookmark)
 
-    override suspend fun deleteBookmark(id: String) {
-        bookmarkDao.deleteById(id)
-    }
+    override suspend fun deleteBookmark(id: String) =
+        annotations.deleteBookmark(id)
 
-    override suspend fun deleteAllBookmarks(bookId: String) {
-        bookmarkDao.deleteForBook(bookId)
-    }
+    override suspend fun deleteAllBookmarks(bookId: String) =
+        annotations.deleteAllBookmarks(bookId)
 
     /**
      * Prunes rows deleted from the tree out from under us — never on a
@@ -298,8 +276,8 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         val row = bookDao.getById(id)
         if (row != null) {
             database.withTransaction {
-                highlightDao.deleteForBook(id)
-                bookmarkDao.deleteForBook(id)
+                annotations.deleteAllHighlights(id)
+                annotations.deleteAllBookmarks(id)
                 chapterTextDao.deleteForBook(id)
                 bookDao.deleteById(id)
             }

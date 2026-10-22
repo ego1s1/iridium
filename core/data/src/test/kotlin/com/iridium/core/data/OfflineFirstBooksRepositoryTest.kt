@@ -54,21 +54,28 @@ class OfflineFirstBooksRepositoryTest {
             context = context,
             database = database,
             bookDao = database.bookDao(),
-            highlightDao = database.highlightDao(),
-            bookmarkDao = database.bookmarkDao(),
             chapterTextDao = database.chapterTextDao(),
             backend = IridiumEpubEngine(),
             covers = EpubCoverGenerator(context),
             treeLister = lister,
             sourceFactory = EpubSourceFactory(context),
+            observer = LibraryObserver(
+                bookDao = database.bookDao(),
+                highlightDao = database.highlightDao(),
+                bookmarkDao = database.bookmarkDao(),
+                defaultDispatcher = UnconfinedTestDispatcher(),
+            ),
             search = ContentSearchUseCase(
                 bookDao = database.bookDao(),
                 chapterTextDao = database.chapterTextDao(),
                 chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
                 ioDispatcher = UnconfinedTestDispatcher(),
             ),
+            annotations = AnnotationRepository(
+                highlightDao = database.highlightDao(),
+                bookmarkDao = database.bookmarkDao(),
+            ),
             ioDispatcher = UnconfinedTestDispatcher(),
-            defaultDispatcher = UnconfinedTestDispatcher(),
         )
     }
 
