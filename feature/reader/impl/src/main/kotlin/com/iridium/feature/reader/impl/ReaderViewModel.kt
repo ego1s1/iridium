@@ -786,11 +786,5 @@ class ReaderViewModel @Inject constructor(
     }
 }
 
-internal fun highlightTint(color: com.iridium.core.model.HighlightColor): Int = when (color) {
-    com.iridium.core.model.HighlightColor.YELLOW -> 0xFFFFFF00.toInt()
-    com.iridium.core.model.HighlightColor.GREEN -> 0xFF90EE90.toInt()
-    com.iridium.core.model.HighlightColor.TEAL -> 0xFF40E0D0.toInt()
-    com.iridium.core.model.HighlightColor.BLUE -> 0xFFADD8E6.toInt()
-    com.iridium.core.model.HighlightColor.RED -> 0xFFFF7F7F.toInt()
-    com.iridium.core.model.HighlightColor.PURPLE -> 0xFFDDA0DD.toInt()
-}
+/** Canonical tint for [color]: the single source of truth also used by exports. */
+internal fun highlightTint(color: com.iridium.core.model.HighlightColor): Int = color.argb

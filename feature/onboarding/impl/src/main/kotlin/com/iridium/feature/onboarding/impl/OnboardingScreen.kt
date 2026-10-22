@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -107,7 +108,6 @@ internal fun OnboardingRoute(
 }
 
 @Composable
-@Suppress("UnusedContentLambdaTargetStateParameter")
 internal fun OnboardingScreen(
     uiState: OnboardingUiState,
     onAction: (OnboardingAction) -> Unit,
@@ -123,18 +123,12 @@ internal fun OnboardingScreen(
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         val stepEnter = IridiumEnter.enter(IridiumEnterKind.FADE_THROUGH)
         val stepExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
-        val stepKey = when (uiState) {
-            OnboardingUiState.Welcome -> 0
-            is OnboardingUiState.Access -> 1
-            is OnboardingUiState.Reading -> 2
-            is OnboardingUiState.Appearance -> 3
-        }
         AnimatedContent(
-            targetState = stepKey,
+            targetState = uiState,
             transitionSpec = { stepEnter togetherWith stepExit },
             label = "onboardingStep",
-        ) { _ ->
-            when (uiState) {
+        ) { target ->
+            when (target) {
                 OnboardingUiState.Welcome -> WelcomeContent(
                     onGetStarted = { onAction(OnboardingAction.GetStarted) },
                     onSkip = {
@@ -155,7 +149,7 @@ internal fun OnboardingScreen(
                     continueCaption = "",
                 ) {
                     AccessOptions(
-                        folderCount = uiState.folderCount,
+                        folderCount = target.folderCount,
                         onAddFolder = { onAction(OnboardingAction.AddLinkedFolder(it)) },
                     )
                 }
@@ -172,7 +166,7 @@ internal fun OnboardingScreen(
                     continueLabel = stringResource(R.string.onboarding_continue),
                     continueCaption = "",
                 ) {
-                    ReadingOptions(prefs = uiState.prefs, onAction = onAction)
+                    ReadingOptions(prefs = target.prefs, onAction = onAction)
                 }
                 is OnboardingUiState.Appearance -> WizardStep(
                     stepIndex = 2,
@@ -189,7 +183,7 @@ internal fun OnboardingScreen(
                     continueLabel = stringResource(R.string.onboarding_continue),
                     continueCaption = stringResource(R.string.onboarding_appearance_caption),
                 ) {
-                    AppearanceOptions(theme = uiState.theme, onAction = onAction)
+                    AppearanceOptions(theme = target.theme, onAction = onAction)
                 }
             }
         }
@@ -420,15 +414,27 @@ private fun ReadingOptions(
             }
         }
         Text(stringResource(R.string.onboarding_reading_line_spacing), style = MaterialTheme.typography.titleMedium)
+        // Draft thumb while dragging: prefs-backed value lags the gesture, so
+        // rendering it directly makes the thumb snap back mid-scrub.
+        var lineHeightDraft by remember(prefs.lineHeight) { mutableFloatStateOf(prefs.lineHeight) }
+        var lineHeightDragging by remember { mutableStateOf(false) }
+        LaunchedEffect(prefs.lineHeight) {
+            if (!lineHeightDragging) lineHeightDraft = prefs.lineHeight
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "${(prefs.lineHeight * 100).roundToInt()}%",
+                text = "${(lineHeightDraft * 100).roundToInt()}%",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
             Slider(
-                value = prefs.lineHeight,
-                onValueChange = { onAction(OnboardingAction.SetLineHeight(it)) },
+                value = lineHeightDraft,
+                onValueChange = {
+                    lineHeightDragging = true
+                    lineHeightDraft = it
+                    onAction(OnboardingAction.SetLineHeight(it))
+                },
+                onValueChangeFinished = { lineHeightDragging = false },
                 valueRange = 1f..2.5f,
                 modifier = Modifier.weight(2f),
             )

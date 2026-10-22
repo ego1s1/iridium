@@ -84,7 +84,7 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
         savedInstanceState: Bundle?,
     ): View {
         val root = FrameLayout(requireContext()).apply {
-            id = View.generateViewId()
+            id = R.id.reader_navigator_container
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,

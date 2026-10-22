@@ -12,6 +12,7 @@ import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.resumeTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -301,6 +302,8 @@ class LibraryViewModel @Inject constructor(
             if (report.failed > 0) {
                 messageChannel.send(LibraryMessage.IndexFailed(report.failed))
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             messageChannel.send(LibraryMessage.ScanFailed)
         }

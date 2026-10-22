@@ -81,6 +81,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# --- Local planning notes (never commit) ---
+plan.md
+/plan.md
+*.plan.md
+
 # Design-reference drops at the repo root (screenshots, mockups, sample books).
 # Real assets live in module res/ dirs; these must never be committed.
 /*.png

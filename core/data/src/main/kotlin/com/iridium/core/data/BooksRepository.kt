@@ -19,12 +19,7 @@ import com.iridium.epub.EpubBackend
 import com.iridium.epub.EpubSource
 import com.iridium.epub.InspectedEpub
 import com.iridium.epub.nativecore.NativeEpub
-import dagger.Binds
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -512,40 +507,4 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     private fun deleteCover(coverPath: String?) {
         if (coverPath != null) runCatching { File(coverPath).delete() }
     }
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class DataModule {
-
-    @Binds
-    @Singleton
-    abstract fun bindBooksRepository(
-        impl: OfflineFirstBooksRepository,
-    ): BooksRepository
-
-    @Binds
-    abstract fun bindBookOpener(
-        impl: ReadiumOpener,
-    ): BookOpener
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-internal object EpubModule {
-
-    @Provides
-    @Singleton
-    fun provideEpubEngine(): com.iridium.epub.engine.IridiumEpubEngine =
-        com.iridium.epub.engine.IridiumEpubEngine()
-
-    @Provides
-    @Singleton
-    fun provideEpubBackend(
-        engine: com.iridium.epub.engine.IridiumEpubEngine,
-    ): EpubBackend = engine
-
-    @Provides
-    @Singleton
-    fun provideLinkedTreeLister(lister: SafLinkedTreeLister): LinkedTreeLister = lister
 }

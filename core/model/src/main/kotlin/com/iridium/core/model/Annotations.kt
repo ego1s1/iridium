@@ -13,13 +13,13 @@ data class Highlight(
     val createdAt: Long = 0L,
 )
 
-enum class HighlightColor {
-    YELLOW,
-    GREEN,
-    TEAL,
-    BLUE,
-    RED,
-    PURPLE,
+enum class HighlightColor(val argb: Int) {
+    YELLOW(0xFFFFFF00.toInt()),
+    GREEN(0xFF90EE90.toInt()),
+    TEAL(0xFF40E0D0.toInt()),
+    BLUE(0xFFADD8E6.toInt()),
+    RED(0xFFFF7F7F.toInt()),
+    PURPLE(0xFFDDA0DD.toInt()),
 }
 
 /** A bookmark at a stable EPUB locator. */

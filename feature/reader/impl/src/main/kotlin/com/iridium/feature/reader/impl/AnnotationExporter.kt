@@ -68,12 +68,5 @@ object AnnotationExporter {
     private fun rgb(argb: Int): String =
         listOf(16, 8, 0).map { shift -> (argb shr shift) and 0xFF }.joinToString(", ")
 
-    private fun hexFor(color: com.iridium.core.model.HighlightColor): Int = when (color) {
-        com.iridium.core.model.HighlightColor.YELLOW -> 0xFFFFFF00.toInt()
-        com.iridium.core.model.HighlightColor.GREEN -> 0xFF90EE90.toInt()
-        com.iridium.core.model.HighlightColor.TEAL -> 0xFF40E0D0.toInt()
-        com.iridium.core.model.HighlightColor.BLUE -> 0xFFADD8E6.toInt()
-        com.iridium.core.model.HighlightColor.RED -> 0xFFFF9A9A.toInt()
-        com.iridium.core.model.HighlightColor.PURPLE -> 0xFFDDA0DD.toInt()
-    }
+    private fun hexFor(color: com.iridium.core.model.HighlightColor): Int = color.argb
 }

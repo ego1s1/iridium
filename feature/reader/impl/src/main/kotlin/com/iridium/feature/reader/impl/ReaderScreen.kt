@@ -568,6 +568,10 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
 
     DisposableEffect(bookId, containerId) {
         onDispose {
+            // Config change (rotation) disposes effects but the FragmentManager
+            // restores the navigator itself into the stable container id —
+            // only detach when truly leaving the reader.
+            if (activity.isChangingConfigurations || activity.isFinishing) return@onDispose
             // Leaving the reader: detach the navigator so a stale WebView never
             // lingers behind the library. commitAllowingStateLoss (not
             // commitNow) avoids throwing if the host already saved state.
@@ -591,11 +595,11 @@ private fun ReaderImageShowcase(
     onDismiss: () -> Unit,
 ) {
     var bitmap by remember(src) { mutableStateOf<ImageBitmap?>(null) }
+    val context = LocalContext.current
     LaunchedEffect(src) {
         bitmap = runCatching {
-            loadImageBytes(src)
-                ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                ?.asImageBitmap()
+            val bytes = loadImageBytes(src) ?: return@runCatching null
+            decodeShowcaseBitmap(bytes, context)?.asImageBitmap()
         }.getOrNull()
     }
     Box(
@@ -618,6 +622,26 @@ private fun ReaderImageShowcase(
             )
         }
     }
+}
+
+/**
+ * Bounded showcase decode: subsamples huge EPUB illustrations down to the
+ * display size before allocating pixels. A 4000x6000 plate is ~96MB decoded
+ * at full res — enough to OOM the reader — while the screen can only show
+ * ~2MP of it anyway.
+ */
+internal fun decodeShowcaseBitmap(bytes: ByteArray, context: Context): android.graphics.Bitmap? {
+    if (bytes.isEmpty()) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val metrics = context.resources.displayMetrics
+    val screenMax = maxOf(metrics.widthPixels, metrics.heightPixels).coerceAtLeast(1)
+    val imageMax = maxOf(bounds.outWidth, bounds.outHeight)
+    var sample = 1
+    while (imageMax / (sample * 2) >= screenMax) sample *= 2
+    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
 }
 
 /** Shares an annotation export via Markdown + HTML intents (SAF/share). */

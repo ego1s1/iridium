@@ -27,7 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,14 +67,23 @@ fun IridiumSliderRow(
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val dragged by source.collectIsDraggedAsState()
     var lastTickBucket by remember { mutableIntStateOf(Int.MIN_VALUE) }
+    // Draft thumb while dragging: DataStore-backed `value` lags behind the
+    // gesture (write coalescing), so rendering it directly makes the thumb
+    // snap back. Track the gesture locally; resync when the drag ends or an
+    // external change lands while idle.
+    var draft by remember { mutableFloatStateOf(value) }
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(value) {
+        if (!dragging) draft = value
+    }
 
     // Quantized scrub ticks: one FrequentTick per twentieth of travel.
-    LaunchedEffect(value, dragged) {
+    LaunchedEffect(draft, dragged) {
         if (!dragged) {
             lastTickBucket = Int.MIN_VALUE
             return@LaunchedEffect
         }
-        val bucket = computeScrubBucket(value, valueRange)
+        val bucket = computeScrubBucket(draft, valueRange)
         if (bucket != lastTickBucket) {
             lastTickBucket = bucket
             haptics(IridiumHaptic.FrequentTick)
@@ -96,10 +107,16 @@ fun IridiumSliderRow(
             }
         }
         Slider(
-            value = value,
-            onValueChange = onValueChange,
+            value = draft,
+            onValueChange = {
+                dragging = true
+                draft = it
+                onValueChange(it)
+            },
             valueRange = valueRange,
             onValueChangeFinished = {
+                dragging = false
+                draft = draft.coerceIn(valueRange.start, valueRange.endInclusive)
                 haptics(IridiumHaptic.Tick)
                 onValueChangeFinished()
             },

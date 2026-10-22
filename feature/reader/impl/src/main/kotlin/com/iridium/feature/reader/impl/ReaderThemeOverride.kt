@@ -38,7 +38,7 @@ object ReaderThemeOverride {
         val bg = "#$bgHex"
         val fg = "#$fgHex"
         // `body.__Ir_Theme.__Ir_Theme...` — 16x repetition beats any book rule.
-        val bodySelector = (0 until 16).joinToString(separator = " ", prefix = "body") {
+        val bodySelector = (0 until 16).joinToString(separator = "", prefix = "body") {
             ".$SPECIFICITY_CLASS"
         }
         val allSelector = (0 until 15).joinToString(separator = "", prefix = ".$SPECIFICITY_CLASS") {
