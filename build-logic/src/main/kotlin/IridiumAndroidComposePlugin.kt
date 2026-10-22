@@ -12,6 +12,34 @@ class IridiumAndroidComposePlugin : Plugin<Project> {
             // plugins block; convention plugins cannot resolve external plugin ids.
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
+            // Compose compiler metrics + reports (stability audit trail for
+            // the 3.6 pass): per-module build/compose-metrics and
+            // build/compose-reports. Scoped to modules with the compose
+            // compiler plugin; configured afterEvaluate so extension order
+            // does not matter.
+            afterEvaluate {
+                if (pluginManager.hasPlugin("org.jetbrains.kotlin.plugin.compose")) {
+                    val metricsDir = layout.buildDirectory.dir("compose-metrics").get().asFile
+                    val reportsDir = layout.buildDirectory.dir("compose-reports").get().asFile
+                    val kotlin = extensions.findByType(
+                        org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompilerOptions::class.java,
+                    )
+                    // Fall through to the Android variant when the plain JVM
+                    // options type is not registered.
+                    val options = kotlin ?: extensions.findByName("kotlin")?.let {
+                        it as? org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+                    }?.compilerOptions
+                    options?.freeCompilerArgs?.addAll(
+                        "-P",
+                        "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=" +
+                            metricsDir.absolutePath,
+                        "-P",
+                        "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" +
+                            reportsDir.absolutePath,
+                    )
+                }
+            }
+
             // New AGP DSL (AppExtension/LibraryExtension are deprecated and
             // break on AGP 9). Lenient afterEvaluate lookup: the Android
             // extension is registered by AGP after this plugin applies.
