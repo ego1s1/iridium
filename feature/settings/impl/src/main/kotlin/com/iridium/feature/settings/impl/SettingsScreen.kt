@@ -3,7 +3,6 @@ package com.iridium.feature.settings.impl
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -30,6 +29,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -102,6 +103,7 @@ internal fun SettingsRoute(
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHost = remember { SnackbarHostState() }
     val account by viewModel.driveAccount.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val signInLauncher = rememberLauncherForActivityResult(
@@ -112,7 +114,7 @@ internal fun SettingsRoute(
     }
     syncMessage?.let { message ->
         androidx.compose.runtime.LaunchedEffect(message) {
-            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+            snackbarHost.showSnackbar(message)
             viewModel.clearSyncMessage()
         }
     }
@@ -123,16 +125,15 @@ internal fun SettingsRoute(
             val json = context.contentResolver.openInputStream(uri)
                 ?.bufferedReader()?.readText() ?: return@launch
             val report = runCatching { viewModel.importSnapshot(json) }.getOrNull()
-            Toast.makeText(
-                context,
+            snackbarHost.showSnackbar(
                 context.getString(R.string.settings_backup_imported, report?.restored ?: 0),
-                Toast.LENGTH_SHORT,
-            ).show()
+            )
         }
     }
     SettingsScreen(
         state = state,
         appVersion = appVersion,
+        snackbarHost = snackbarHost,
         onAction = viewModel::onAction,
         onLicensesClick = onLicensesClick,
         onAddFolder = launchPicker,
@@ -184,8 +185,10 @@ internal fun SettingsScreen(
     onDriveSignIn: () -> Unit = {},
     onDriveSignOut: () -> Unit = {},
     onSyncNow: () -> Unit = {},
+    snackbarHost: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             TopAppBar(
                 title = {
