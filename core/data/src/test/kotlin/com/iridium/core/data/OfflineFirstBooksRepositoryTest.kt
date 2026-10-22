@@ -51,14 +51,6 @@ class OfflineFirstBooksRepositoryTest {
         lister = FakeLister()
         tempDir = File(context.cacheDir, "repo-test").apply { mkdirs() }
         repository = OfflineFirstBooksRepository(
-            context = context,
-            database = database,
-            bookDao = database.bookDao(),
-            chapterTextDao = database.chapterTextDao(),
-            backend = IridiumEpubEngine(),
-            covers = EpubCoverGenerator(context),
-            treeLister = lister,
-            sourceFactory = EpubSourceFactory(context),
             observer = LibraryObserver(
                 bookDao = database.bookDao(),
                 highlightDao = database.highlightDao(),
@@ -86,7 +78,34 @@ class OfflineFirstBooksRepositoryTest {
                 ),
                 ioDispatcher = UnconfinedTestDispatcher(),
             ),
-            ioDispatcher = UnconfinedTestDispatcher(),
+            scanner = LibraryScanUseCase(
+                context = context,
+                database = database,
+                bookDao = database.bookDao(),
+                chapterTextDao = database.chapterTextDao(),
+                backend = IridiumEpubEngine(),
+                covers = EpubCoverGenerator(context),
+                treeLister = lister,
+                sourceFactory = EpubSourceFactory(context),
+                management = BookManagementUseCase(
+                    context = context,
+                    database = database,
+                    bookDao = database.bookDao(),
+                    chapterTextDao = database.chapterTextDao(),
+                    annotations = AnnotationRepository(
+                        highlightDao = database.highlightDao(),
+                        bookmarkDao = database.bookmarkDao(),
+                    ),
+                    ioDispatcher = UnconfinedTestDispatcher(),
+                ),
+                search = ContentSearchUseCase(
+                    bookDao = database.bookDao(),
+                    chapterTextDao = database.chapterTextDao(),
+                    chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
+                    ioDispatcher = UnconfinedTestDispatcher(),
+                ),
+                ioDispatcher = UnconfinedTestDispatcher(),
+            ),
         )
     }
 
