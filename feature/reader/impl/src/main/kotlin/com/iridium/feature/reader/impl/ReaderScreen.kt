@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.view.KeyEvent
-import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -62,7 +61,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
-import androidx.core.view.WindowCompat
 import com.iridium.core.designsystem.findActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
@@ -203,77 +201,12 @@ internal fun ReaderScreen(
     val topVisibleInset = WindowInsets.statusBars.only(WindowInsetsSides.Top)
     val bottomVisibleInset = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
 
-    // Per-book brightness override (-1 = system).
-    DisposableEffect(state.prefs.brightness) {
-        val window = activity?.window
-        val previous = window?.attributes?.screenBrightness ?: -1f
-        window?.let {
-            val attrs = it.attributes
-            attrs.screenBrightness = state.prefs.brightness
-            it.attributes = attrs
-        }
-        onDispose {
-            window?.let {
-                val attrs = it.attributes
-                attrs.screenBrightness = previous
-                it.attributes = attrs
-            }
-        }
-    }
-
-    // Immersive reading: hide system bars with the chrome.
-    DisposableEffect(state.chromeVisible) {
-        val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
-        if (state.chromeVisible) {
-            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        } else {
-            controller?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            controller?.systemBarsBehavior =
-                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-        // Leaving the reader with hidden chrome must not leave the library
-        // with hidden system bars.
-        onDispose {
-            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        }
-    }
-
-    // Seamless system bars: tint status + navigation bars to the page
-    // background of the active reader theme so no black strips frame the
-    // page, with icon contrast to match. Unrelated to the visibility effect
-    // above (that one only shows/hides); restored when the theme changes.
-    DisposableEffect(state.prefs.theme) {
-        val window = activity?.window
-        val controller =
-            activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
-        if (window == null || controller == null) return@DisposableEffect onDispose { }
-        val previousStatus = window.statusBarColor
-        val previousNav = window.navigationBarColor
-        val previousLightStatus = controller.isAppearanceLightStatusBars
-        val previousLightNav = controller.isAppearanceLightNavigationBars
-        val pageBg = state.prefs.theme.pageBackground()
-        window.statusBarColor = pageBg.toArgb()
-        window.navigationBarColor = pageBg.toArgb()
-        controller.isAppearanceLightStatusBars = state.prefs.theme.lightSystemBars()
-        controller.isAppearanceLightNavigationBars = state.prefs.theme.lightSystemBars()
-        onDispose {
-            window.statusBarColor = previousStatus
-            window.navigationBarColor = previousNav
-            controller.isAppearanceLightStatusBars = previousLightStatus
-            controller.isAppearanceLightNavigationBars = previousLightNav
-        }
-    }
-
-    // Keep the screen awake while reading, when the user asked for it.
-    DisposableEffect(state.prefs.keepScreenOn) {
-        val window = activity?.window
-        if (state.prefs.keepScreenOn) {
-            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-    }
+    ReaderWindowEffects(
+        chromeVisible = state.chromeVisible,
+        brightness = state.prefs.brightness,
+        keepScreenOn = state.prefs.keepScreenOn,
+        theme = state.prefs.theme,
+    )
 
     /**
      * Volume-key paging. The handler is installed only while the gate holds
