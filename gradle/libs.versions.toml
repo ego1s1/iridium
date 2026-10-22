@@ -114,6 +114,7 @@ pulsar = { group = "com.swmansion", name = "pulsar", version.ref = "pulsar" }
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
+hilt-gradlePlugin = { group = "com.google.dagger.hilt.android", name = "com.google.dagger.hilt.android.gradle.plugin", version.ref = "hilt" }
 javapoet = { group = "com.squareup", name = "javapoet", version.ref = "javapoet" }
 
 [bundles]

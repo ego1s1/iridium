@@ -1,7 +1,5 @@
 plugins {
     alias(libs.plugins.iridium.android.library)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
     alias(libs.plugins.iridium.hilt)
     alias(libs.plugins.kotlin.serialization)
 }

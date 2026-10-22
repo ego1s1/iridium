@@ -12,7 +12,11 @@ java {
 dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
-    compileOnly(libs.ksp.gradlePlugin)
+    // Plugin markers needed at convention-application time (pluginManager
+    // cannot resolve external ids from compileOnly): ksp + hilt ride the
+    // build-logic runtime classpath so iridium.hilt applies them itself.
+    implementation(libs.ksp.gradlePlugin)
+    implementation(libs.hilt.gradlePlugin)
 }
 
 gradlePlugin {

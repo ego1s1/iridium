@@ -7,8 +7,12 @@ import org.gradle.kotlin.dsl.getByType
 class IridiumHiltPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // NOTE: modules must also apply `ksp` and `hilt` via alias in their own
-            // plugins block; convention plugins cannot resolve external plugin ids.
+            // Applied here (not via alias in each module) so a new module
+            // gets ksp + hilt wiring by applying iridium.hilt alone.
+            with(pluginManager) {
+                apply("com.google.devtools.ksp")
+                apply("com.google.dagger.hilt.android")
+            }
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
             dependencies {
