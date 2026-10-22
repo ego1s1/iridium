@@ -38,9 +38,6 @@ import kotlinx.coroutines.withContext
 /** Outcome of one linked-tree scan. */
 data class IndexReport(val total: Int, val failed: Int)
 
-/** FTS overscan factor: fetch extra rows so round-robin fairness has a pool. */
-private const val SEARCH_FANOUT = 4
-
 /** A full-text match inside a chapter. */
 data class ContentHit(
     val bookId: String,
@@ -120,7 +117,7 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     private val covers: EpubCoverGenerator,
     private val treeLister: LinkedTreeLister,
     private val sourceFactory: EpubSourceFactory,
-    private val chapterIndexer: ChapterIndexer,
+    private val search: ContentSearchUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : BooksRepository {
@@ -286,58 +283,14 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         return prunedLinked
     }
 
-    override suspend fun indexBookContent(bookId: String): Int = withContext(ioDispatcher) {
-        val row = bookDao.getById(bookId) ?: return@withContext 0
-        val toc = row.tocEntries()
-        val chapters = runCatching {
-            chapterIndexer.extract(bookId, row.sourcePath, row.sourceDisplayName, toc)
-        }.getOrDefault(emptyList())
-
-        // Never wipe a good index for a failed extract (unmounted file,
-        // transient parse error): the atomic replace below only runs when
-        // there is something to replace with.
-        if (chapters.isEmpty()) return@withContext 0
-        chapterTextDao.replaceForBook(bookId, chapters)
-        chapters.size
-    }
+    override suspend fun indexBookContent(bookId: String): Int =
+        search.indexBookContent(bookId)
 
     override suspend fun isContentIndexed(bookId: String): Boolean =
-        withContext(ioDispatcher) {
-            runCatching { chapterTextDao.countForBook(bookId) > 0 }.getOrDefault(false)
-        }
+        search.isContentIndexed(bookId)
 
     override suspend fun searchContent(query: String, limit: Int): List<ContentHit> =
-        withContext(ioDispatcher) {
-            val expression = FtsQuery.build(query) ?: return@withContext emptyList()
-            val rows = runCatching { chapterTextDao.search(expression, limit * SEARCH_FANOUT) }
-                .getOrDefault(emptyList())
-            if (rows.isEmpty()) return@withContext emptyList()
-
-            val titles = bookDao.getAll().associate { it.id to it.title }
-            // Round-robin across books: one hit-heavy book must not starve
-            // the rest out of the global limit.
-            val byBook = rows.mapNotNull { row ->
-                ContentHit(
-                    bookId = row.bookId,
-                    bookTitle = titles[row.bookId] ?: return@mapNotNull null,
-                    href = row.href,
-                    chapterTitle = row.title,
-                    snippet = FtsQuery.snippet(row.body, query),
-                )
-            }.groupBy { it.bookId }
-            val rounds = ArrayDeque(byBook.values.map { it.toMutableList() })
-            val out = ArrayList<ContentHit>(limit.coerceAtLeast(0))
-            while (out.size < limit && rounds.isNotEmpty()) {
-                val queue = rounds.removeFirst()
-                // removeAt(0), not removeFirst(): the latter binds to the
-                // JDK 21 SequencedCollection member when compiling against a
-                // recent android.jar, then throws NoSuchMethodError on every
-                // runtime older than API 35.
-                out += queue.removeAt(0)
-                if (queue.isNotEmpty()) rounds.addLast(queue)
-            }
-            out
-        }
+        search.searchContent(query, limit)
 
     override suspend fun removeBook(id: String) = withContext(ioDispatcher) {
         // Unlink only: the user's original file must survive removal.

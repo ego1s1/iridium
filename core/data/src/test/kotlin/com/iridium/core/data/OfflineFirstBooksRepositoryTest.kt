@@ -61,7 +61,12 @@ class OfflineFirstBooksRepositoryTest {
             covers = EpubCoverGenerator(context),
             treeLister = lister,
             sourceFactory = EpubSourceFactory(context),
-            chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
+            search = ContentSearchUseCase(
+                bookDao = database.bookDao(),
+                chapterTextDao = database.chapterTextDao(),
+                chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
+                ioDispatcher = UnconfinedTestDispatcher(),
+            ),
             ioDispatcher = UnconfinedTestDispatcher(),
             defaultDispatcher = UnconfinedTestDispatcher(),
         )
