@@ -75,6 +75,17 @@ class OfflineFirstBooksRepositoryTest {
                 highlightDao = database.highlightDao(),
                 bookmarkDao = database.bookmarkDao(),
             ),
+            management = BookManagementUseCase(
+                context = context,
+                database = database,
+                bookDao = database.bookDao(),
+                chapterTextDao = database.chapterTextDao(),
+                annotations = AnnotationRepository(
+                    highlightDao = database.highlightDao(),
+                    bookmarkDao = database.bookmarkDao(),
+                ),
+                ioDispatcher = UnconfinedTestDispatcher(),
+            ),
             ioDispatcher = UnconfinedTestDispatcher(),
         )
     }

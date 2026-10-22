@@ -113,6 +113,7 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     private val treeLister: LinkedTreeLister,
     private val sourceFactory: EpubSourceFactory,
     private val observer: LibraryObserver,
+    private val management: BookManagementUseCase,
     private val search: ContentSearchUseCase,
     private val annotations: AnnotationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -200,16 +201,16 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 walkFailed = walkFailed,
             )
         }
-        prunedLinked.forEach { deleteCover(it.coverPath) }
+        prunedLinked.forEach { management.deleteCover(it.coverPath) }
         IndexReport(total = docs.size, failed = failed)
     }
 
     override suspend fun updateProgress(id: String, progress: Float, locator: String?) {
-        bookDao.updateProgress(id, progress.coerceIn(0f, 1f), locator, System.currentTimeMillis())
+        management.updateProgress(id, progress, locator)
     }
 
     override suspend fun setBookmarked(id: String, bookmarked: Boolean) {
-        bookDao.updateBookmark(id, bookmarked, System.currentTimeMillis())
+        management.setBookmarked(id, bookmarked)
     }
 
     override suspend fun upsertHighlight(highlight: Highlight) =
@@ -270,24 +271,8 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     override suspend fun searchContent(query: String, limit: Int): List<ContentHit> =
         search.searchContent(query, limit)
 
-    override suspend fun removeBook(id: String) = withContext(ioDispatcher) {
-        // Unlink only: the user's original file must survive removal.
-        // Atomic: a crash can never leave annotations/FTS without their book.
-        val row = bookDao.getById(id)
-        if (row != null) {
-            database.withTransaction {
-                annotations.deleteAllHighlights(id)
-                annotations.deleteAllBookmarks(id)
-                chapterTextDao.deleteForBook(id)
-                bookDao.deleteById(id)
-            }
-            deleteCover(row.coverPath)
-            // Imported copies are app-owned: dropping the row must not orphan
-            // the bytes. Linked originals (content://) are never touched.
-            deleteImportedFile(row.sourcePath)
-        }
-        Unit
-    }
+    override suspend fun removeBook(id: String) =
+        management.removeBook(id)
 
     /**
      * Imports one shared EPUB into app-private storage (`filesDir/books`).
@@ -352,15 +337,6 @@ internal class OfflineFirstBooksRepository @Inject constructor(
                 throw (e as? IOException ?: IOException("Could not import $name", e))
             }
         }
-
-    /** Deletes an app-owned import copy; never touches linked originals. */
-    private fun deleteImportedFile(sourcePath: String) {
-        val booksDir = File(context.filesDir, IMPORT_DIR).absolutePath
-        val file = File(sourcePath)
-        if (file.absolutePath.startsWith(booksDir + File.separator)) {
-            runCatching { file.delete() }
-        }
-    }
 
     /**
      * Inspects one linked document and builds its row WITHOUT writing, so the
@@ -441,9 +417,5 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         }
         return sourceFactory.open(doc.uri.toString(), doc.name)
             .use { source -> backend.inspect(source, fallback) }
-    }
-
-    private fun deleteCover(coverPath: String?) {
-        if (coverPath != null) runCatching { File(coverPath).delete() }
     }
 }
