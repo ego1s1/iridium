@@ -3,7 +3,6 @@ package com.iridium.feature.reader.impl
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.view.KeyEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,7 +79,6 @@ import com.iridium.core.model.isLightScheme
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
-import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
@@ -104,7 +102,6 @@ internal fun ReaderRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionReady by viewModel.sessionReady.collectAsStateWithLifecycle()
-    val volumePagingActive by viewModel.volumePagingActive.collectAsStateWithLifecycle()
     val dictionaryState by viewModel.dictionaryUi.collectAsStateWithLifecycle()
     val shownImage by viewModel.shownImage.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
@@ -151,12 +148,10 @@ internal fun ReaderRoute(
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
             sessionReady = sessionReady,
-            volumePagingActive = volumePagingActive,
             dictionaryState = dictionaryState,
             shownImage = shownImage,
             loadImageBytes = viewModel::loadImageBytes,
             onAction = viewModel::onAction,
-            onVolumeKeyEvent = viewModel::onVolumeKeyEvent,
             onBackClick = onBackClick,
             snackbarHost = snackbarHost,
             modifier = modifier,
@@ -172,14 +167,12 @@ internal fun ReaderRoute(
 internal fun ReaderScreen(
     state: ReaderUiState.Ready,
     sessionReady: Boolean,
-    volumePagingActive: Boolean,
     dictionaryState: DictionaryUiState?,
     shownImage: String?,
     loadImageBytes: suspend (String) -> ByteArray?,
     onAction: (ReaderAction) -> Unit,
     onBackClick: () -> Unit,
     snackbarHost: SnackbarHostState,
-    onVolumeKeyEvent: (KeyEvent) -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -207,19 +200,6 @@ internal fun ReaderScreen(
         keepScreenOn = state.prefs.keepScreenOn,
         theme = state.prefs.theme,
     )
-
-    /**
-     * Volume-key paging. The handler is installed only while the gate holds
-     * (single source: [ReaderViewModel.volumePagingActive]), so volume always
-     * works normally everywhere else; it consumes both the down and up events
-     * so the system volume panel never appears during a page turn.
-     */
-    DisposableEffect(volumePagingActive) {
-        // Mirrors the ViewModel gate (hidden-chrome + invert swap); installing
-        // only while active keeps volume normal everywhere else.
-        ReaderKeyInterceptor.handler = if (volumePagingActive) onVolumeKeyEvent else null
-        onDispose { ReaderKeyInterceptor.handler = null }
-    }
 
     // Full-bleed reader: the book fills the whole window and the chrome floats
     // transparently above it. The old Scaffold slots + content padding resized

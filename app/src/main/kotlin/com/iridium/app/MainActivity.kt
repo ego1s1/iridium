@@ -22,6 +22,9 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var deepLinkNavigator: DeepLinkNavigator
 
+    @Inject
+    lateinit var keyInterceptor: ReaderKeyInterceptor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -51,7 +54,7 @@ class MainActivity : AppCompatActivity() {
      */
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (ReaderKeyInterceptor.handler?.invoke(event) == true) return true
+        if (keyInterceptor.consume(event)) return true
         return super.dispatchKeyEvent(event)
     }
 }

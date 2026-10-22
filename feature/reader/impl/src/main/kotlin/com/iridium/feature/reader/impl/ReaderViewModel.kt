@@ -18,6 +18,7 @@ import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.TocEntry
 import com.iridium.core.model.resolvedColors
+import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -48,6 +49,7 @@ import org.readium.r2.shared.util.Url
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val clock: com.iridium.core.common.AppClock,
+    private val keyInterceptor: ReaderKeyInterceptor,
     private val repository: BooksRepository,
     private val preferences: IridiumPreferencesDataSource,
     private val opener: BookOpener,
@@ -443,6 +445,17 @@ class ReaderViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    init {
+        // The handler lives only while the gate holds, so volume always
+        // works normally everywhere else; cleared with the ViewModel so a
+        // stale handler can never page a dead navigator.
+        viewModelScope.launch {
+            volumePagingActive.collect { active ->
+                if (active) keyInterceptor.install(::onVolumeKeyEvent) else keyInterceptor.clear()
+            }
+        }
+    }
+
     private fun isVolumePagingActive(state: ReaderUiState.Ready): Boolean {
         return state.prefs.volumeKeys &&
             !state.chromeVisible &&
@@ -511,6 +524,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        keyInterceptor.clear()
         if (store.bookId == bookId) {
             // Flush the latest locator before closing in the application
             // scope: viewModelScope is already cancelled here (even

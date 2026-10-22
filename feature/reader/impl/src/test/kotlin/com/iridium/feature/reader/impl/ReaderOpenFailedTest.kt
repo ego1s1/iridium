@@ -11,6 +11,7 @@ import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.fakes.FakeClock
+import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
@@ -117,6 +118,7 @@ class ReaderOpenFailedTest {
         val viewModel = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
             clock = FakeClock(),
+            keyInterceptor = ReaderKeyInterceptor(),
             repository = TestBooksRepository(),
             preferences = TestPreferencesDataSource(),
             opener = FakeOpener(),

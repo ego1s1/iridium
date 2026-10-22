@@ -3,6 +3,7 @@ package com.iridium.feature.reader.impl
 import androidx.lifecycle.SavedStateHandle
 import com.iridium.core.data.OpenResult
 import com.iridium.core.fakes.FakeClock
+import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
@@ -52,6 +53,7 @@ class ReaderViewModelTest {
         viewModel = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
             clock = FakeClock(),
+            keyInterceptor = ReaderKeyInterceptor(),
             repository = repository,
             preferences = preferences,
             opener = opener,
@@ -73,6 +75,7 @@ class ReaderViewModelTest {
         val missing = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
             clock = FakeClock(),
+            keyInterceptor = ReaderKeyInterceptor(),
             repository = repository,
             preferences = preferences,
             opener = opener,
@@ -92,6 +95,7 @@ class ReaderViewModelTest {
         val broken = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
             clock = FakeClock(),
+            keyInterceptor = ReaderKeyInterceptor(),
             repository = repository,
             preferences = preferences,
             opener = opener,

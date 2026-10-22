@@ -13,4 +13,5 @@ dependencies {
     api(project(":core:model"))
     api(libs.kotlinx.serialization.json)
     api(libs.androidx.navigation.compose)
+    implementation(libs.javax.inject)
 }
