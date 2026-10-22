@@ -102,35 +102,25 @@ class LibraryViewModel @Inject constructor(
         )
 
     val uiState: StateFlow<LibraryUiState> = combine(
-        books,
-        query,
+        combine(books, query, ::Shelf),
         combine(refreshing, filterOpen, ::Chrome),
-        indexProgress,
-        contentHits,
+        combine(indexProgress, contentHits, ::Indexing),
         preferences.libraryDisplay,
         combine(menuBook, menuDeleteConfirm, ::MenuChrome),
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        val books = args[0] as List<Book>
-        val query = args[1] as LibraryQuery
-        val chrome = args[2] as Chrome
-        val progress = args[3] as IndexProgress?
-        val hits = args[4] as List<ContentHit>
-        val display = args[5] as com.iridium.core.model.LibraryDisplay
-        val menu = args[6] as MenuChrome
+    ) { shelf, chrome, indexing, display, menu ->
         // Refresh the retained snapshot against the live list so the sheet
         // never shows stale progress/bookmarks; fall back to the snapshot so
         // the menu survives filtering the book out of the grid.
         val menuBook = menu.book?.let { retained ->
-            books.firstOrNull { it.id == retained.id } ?: retained
+            shelf.books.firstOrNull { it.id == retained.id } ?: retained
         }
         LibraryUiState(
-            books = books,
-            query = query,
+            books = shelf.books,
+            query = shelf.query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
-            indexProgress = progress,
-            contentHits = hits,
+            indexProgress = indexing.progress,
+            contentHits = indexing.contentHits,
             display = display,
             menuBook = menuBook,
             menuDeleteConfirm = menu.deleteConfirm,
@@ -235,6 +225,18 @@ class LibraryViewModel @Inject constructor(
     private data class Chrome(
         val refreshing: Boolean,
         val filterOpen: Boolean,
+    )
+
+    /** Shelf rows plus the query that produced them. */
+    private data class Shelf(
+        val books: List<Book>,
+        val query: LibraryQuery,
+    )
+
+    /** Background indexing state: scan progress + full-text hits. */
+    private data class Indexing(
+        val progress: IndexProgress?,
+        val contentHits: List<ContentHit>,
     )
 
     /** Ephemeral menu chrome kept out of the query/data flows. */

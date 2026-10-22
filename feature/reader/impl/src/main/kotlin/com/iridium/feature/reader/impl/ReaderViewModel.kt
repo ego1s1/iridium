@@ -14,6 +14,7 @@ import com.iridium.core.model.Book
 import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.HighlightColor
+import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.TocEntry
 import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderRoute
@@ -83,11 +84,11 @@ class ReaderViewModel @Inject constructor(
     private var lastProgrammaticNavMs: Long = 0L
 
     /** Cached prefs for tap paths that must not suspend on DataStore IO. */
-    private val prefsFlow: StateFlow<com.iridium.core.model.ReaderPreferences> =
+    private val prefsFlow: StateFlow<ReaderPreferences> =
         preferences.readerPreferences.stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = com.iridium.core.model.ReaderPreferences(),
+            initialValue = ReaderPreferences(),
         )
 
     /** Publication positions for the slider/position text (no fixed pages). */
@@ -121,50 +122,70 @@ class ReaderViewModel @Inject constructor(
         .distinctUntilChanged { a, b -> kotlin.math.abs(a - b) < 0.0005f }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
 
+    /** Publication content: book + navigation + annotations + prefs. */
+    private data class ReaderContent(
+        val book: Book?,
+        val toc: List<TocEntry>,
+        val highlights: List<Highlight>,
+        val prefs: ReaderPreferences,
+    )
+
+    /** Chrome/sheet visibility bundle. */
+    private data class ReaderChromeBundle(
+        val chromeVisible: Boolean,
+        val settingsOpen: Boolean,
+        val tocOpen: Boolean,
+        val highlightsOpen: Boolean,
+        val themeSheetOpen: Boolean,
+    )
+
+    /** Navigation/session bundle. */
+    private data class ReaderNavBundle(
+        val focusedHighlightId: String?,
+        val navigatorAttached: Boolean,
+        val openFailed: Boolean,
+        val progression: Float,
+        val openFileMissing: Boolean,
+    )
+
+    private val content: Flow<ReaderContent> =
+        combine(book, toc, highlights, preferences.readerPreferences, ::ReaderContent)
+    private val chromeBundle: Flow<ReaderChromeBundle> =
+        combine(chromeVisible, settingsOpen, tocOpen, highlightsOpen, themeSheetOpen, ::ReaderChromeBundle)
+    private val navBundle: Flow<ReaderNavBundle> =
+        combine(
+            focusedHighlightId, navigatorAttached, openFailed, progression,
+            openFileMissing, ::ReaderNavBundle,
+        )
+
     val uiState: StateFlow<ReaderUiState> = combine(
-        book, toc, highlights, preferences.readerPreferences, chromeVisible, settingsOpen, tocOpen,
-        highlightsOpen, focusedHighlightId, navigatorAttached, openFailed, progression,
-        themeSheetOpen, openFileMissing, positionsVersion,
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        val b = args[0] as Book?
-        val t = args[1] as List<TocEntry>
-        val h = args[2] as List<Highlight>
-        val p = args[3] as com.iridium.core.model.ReaderPreferences
-        val chrome = args[4] as Boolean
-        val settings = args[5] as Boolean
-        val tocOpenV = args[6] as Boolean
-        val hlOpen = args[7] as Boolean
-        val focused = args[8] as String?
-        val attached = args[9] as Boolean
-        val failed = args[10] as Boolean
-        val prog = args[11] as Float
-        val themeSheet = args[12] as Boolean
-        val fileMissing = args[13] as Boolean
-        // positionsVersion (args[14]) is a recombine trigger only: reading it
-        // here keeps the scrubber/counter in sync when positions land.
+        content, chromeBundle, navBundle, positionsVersion,
+    ) { c, ch, n, _,
+        ->
+        // The version flow is a recombine trigger only (unused here): reading
+        // positionsCache keeps the scrubber/counter in sync when positions land.
         when {
-            b == null && failed -> ReaderUiState.OpenFailed(fileMissing)
-            b == null -> ReaderUiState.Gone
-            failed -> ReaderUiState.OpenFailed(fileMissing)
+            c.book == null && n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
+            c.book == null -> ReaderUiState.Gone
+            n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
             else -> {
                 val (positionIndex, positionCount) = positionIndexAndCount()
                 ReaderUiState.Ready(
-                    book = b,
-                    toc = t,
-                    highlights = h,
-                    prefs = p,
-                    chromeVisible = chrome,
-                    settingsOpen = settings,
-                    tocOpen = tocOpenV,
-                    highlightsOpen = hlOpen,
-                    progression = (b.progress.takeIf { prog == 0f } ?: prog),
+                    book = c.book,
+                    toc = c.toc,
+                    highlights = c.highlights,
+                    prefs = c.prefs,
+                    chromeVisible = ch.chromeVisible,
+                    settingsOpen = ch.settingsOpen,
+                    tocOpen = ch.tocOpen,
+                    highlightsOpen = ch.highlightsOpen,
+                    progression = (c.book.progress.takeIf { n.progression == 0f } ?: n.progression),
                     positionText = positionText(),
                     positionIndex = positionIndex,
                     positionCount = positionCount,
-                    focusedHighlightId = focused,
-                    navigatorAttached = attached,
-                    themeSheetOpen = themeSheet,
+                    focusedHighlightId = n.focusedHighlightId,
+                    navigatorAttached = n.navigatorAttached,
+                    themeSheetOpen = ch.themeSheetOpen,
                 )
             }
         }
@@ -682,7 +703,7 @@ class ReaderViewModel @Inject constructor(
         return pos to positions.size
     }
 
-    private fun updateReaderPrefs(transform: (com.iridium.core.model.ReaderPreferences) -> com.iridium.core.model.ReaderPreferences) {
+    private fun updateReaderPrefs(transform: (ReaderPreferences) -> ReaderPreferences) {
         viewModelScope.launch {
             preferences.updateReaderPreferences(transform)
             val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
