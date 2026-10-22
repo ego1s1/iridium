@@ -56,13 +56,13 @@ sealed interface ReaderAction {
     data object ExportAnnotations : ReaderAction
 
     /** Selects a user palette (null clears back to the preset). */
-    data class SetCustomTheme(val id: String?) : ReaderAction
+    data class SetCustomTheme(val id: String?) : ReaderAction, PrefsChange
 
     /** Saves (adds or replaces) a user palette by id. */
-    data class SaveCustomTheme(val theme: CustomReaderTheme) : ReaderAction
+    data class SaveCustomTheme(val theme: CustomReaderTheme) : ReaderAction, PrefsChange
 
     /** Deletes a user palette; clears the selection when active. */
-    data class DeleteCustomTheme(val id: String) : ReaderAction
+    data class DeleteCustomTheme(val id: String) : ReaderAction, PrefsChange
 
     data object DismissDictionary : ReaderAction
     data object DismissImage : ReaderAction
@@ -76,20 +76,25 @@ sealed interface ReaderAction {
     data class DeleteHighlight(val id: String) : ReaderAction
 
     // Reader preference edits (persisted + submitted to the navigator).
-    data class SetFlow(val flow: com.iridium.core.model.ReadingFlow) : ReaderAction
-    data class SetFontScale(val scale: Float) : ReaderAction
-    data class SetFontFamily(val family: ReaderFontFamily) : ReaderAction
-    data class SetLineHeight(val lineHeight: Float) : ReaderAction
-    data class SetTextAlign(val align: com.iridium.core.model.TextAlign) : ReaderAction
-    data class SetTheme(val theme: com.iridium.core.model.ColorSchemeChoice) : ReaderAction
-    data class SetBrightness(val brightness: Float) : ReaderAction
-    data class SetKeepScreenOn(val enabled: Boolean) : ReaderAction
-    data class SetShowPageCounter(val enabled: Boolean) : ReaderAction
-    data class SetVolumeKeys(val enabled: Boolean) : ReaderAction
-    data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction
-    data class SetInvertTaps(val inverted: Boolean) : ReaderAction
-    data class SetNightLight(val enabled: Boolean) : ReaderAction
-    data class SetNightLightIntensity(val intensity: Float) : ReaderAction
+    // Each also implements PrefsChange so onAction routes them with one
+    // `is` check instead of a 17-entry fallthrough list. They stay nested
+    // directly under ReaderAction (dual supertypes) so existing
+    // `ReaderAction.SetTheme(...)` call sites keep compiling unchanged.
+    sealed interface PrefsChange : ReaderAction
+    data class SetFlow(val flow: com.iridium.core.model.ReadingFlow) : ReaderAction, PrefsChange
+    data class SetFontScale(val scale: Float) : ReaderAction, PrefsChange
+    data class SetFontFamily(val family: ReaderFontFamily) : ReaderAction, PrefsChange
+    data class SetLineHeight(val lineHeight: Float) : ReaderAction, PrefsChange
+    data class SetTextAlign(val align: com.iridium.core.model.TextAlign) : ReaderAction, PrefsChange
+    data class SetTheme(val theme: com.iridium.core.model.ColorSchemeChoice) : ReaderAction, PrefsChange
+    data class SetBrightness(val brightness: Float) : ReaderAction, PrefsChange
+    data class SetKeepScreenOn(val enabled: Boolean) : ReaderAction, PrefsChange
+    data class SetShowPageCounter(val enabled: Boolean) : ReaderAction, PrefsChange
+    data class SetVolumeKeys(val enabled: Boolean) : ReaderAction, PrefsChange
+    data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction, PrefsChange
+    data class SetInvertTaps(val inverted: Boolean) : ReaderAction, PrefsChange
+    data class SetNightLight(val enabled: Boolean) : ReaderAction, PrefsChange
+    data class SetNightLightIntensity(val intensity: Float) : ReaderAction, PrefsChange
 }
 
 /** One-shot UI messages. */

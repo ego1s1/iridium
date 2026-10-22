@@ -203,45 +203,31 @@ class ReaderViewModel @Inject constructor(
 
     // UI actions
 
+    /** Opens a sheet and holds chrome; TOC/highlights only cancel auto-hide. */
+    private fun openSheet(sheet: MutableStateFlow<Boolean>, pinChromeVisible: Boolean = false) {
+        sheet.value = true
+        if (pinChromeVisible) chromeVisible.value = true
+        chromeJob?.cancel()
+    }
+
+    /** Closes a sheet and resumes auto-hide; highlight sheets also clear focus. */
+    private fun closeSheet(sheet: MutableStateFlow<Boolean>, clearHighlightFocus: Boolean = false) {
+        sheet.value = false
+        if (clearHighlightFocus) focusedHighlightId.value = null
+        scheduleChromeHide()
+    }
+
     fun onAction(action: ReaderAction) {
         when (action) {
             ReaderAction.Back -> viewModelScope.launch { messageChannel.send(ReaderMessage.Pop) }
-            ReaderAction.OpenSettings -> {
-                settingsOpen.value = true
-                chromeVisible.value = true
-                chromeJob?.cancel()
-            }
-            ReaderAction.CloseSettings -> {
-                settingsOpen.value = false
-                scheduleChromeHide()
-            }
-            ReaderAction.OpenThemeSheet -> {
-                themeSheetOpen.value = true
-                chromeVisible.value = true
-                chromeJob?.cancel()
-            }
-            ReaderAction.CloseThemeSheet -> {
-                themeSheetOpen.value = false
-                scheduleChromeHide()
-            }
-            ReaderAction.OpenToc -> {
-                tocOpen.value = true
-                chromeJob?.cancel()
-            }
-            ReaderAction.CloseToc -> {
-                tocOpen.value = false
-                scheduleChromeHide()
-            }
-            ReaderAction.OpenHighlights -> {
-                highlightsOpen.value = true
-                focusedHighlightId.value = null
-                chromeJob?.cancel()
-            }
-            ReaderAction.CloseHighlights -> {
-                highlightsOpen.value = false
-                focusedHighlightId.value = null
-                scheduleChromeHide()
-            }
+            ReaderAction.OpenSettings -> openSheet(settingsOpen, pinChromeVisible = true)
+            ReaderAction.CloseSettings -> closeSheet(settingsOpen)
+            ReaderAction.OpenThemeSheet -> openSheet(themeSheetOpen, pinChromeVisible = true)
+            ReaderAction.CloseThemeSheet -> closeSheet(themeSheetOpen)
+            ReaderAction.OpenToc -> openSheet(tocOpen)
+            ReaderAction.CloseToc -> closeSheet(tocOpen)
+            ReaderAction.OpenHighlights -> openSheet(highlightsOpen)
+            ReaderAction.CloseHighlights -> closeSheet(highlightsOpen, clearHighlightFocus = true)
             ReaderAction.DismissDictionary -> dismissDictionary()
             ReaderAction.DismissImage -> store.dismissImage()
             ReaderAction.ExportAnnotations -> exportAnnotations()
@@ -260,29 +246,12 @@ class ReaderViewModel @Inject constructor(
             }
             is ReaderAction.AddHighlight -> addHighlight(action.color, action.note)
             is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
-            is ReaderAction.SetFlow,
-            is ReaderAction.SetFontScale,
-            is ReaderAction.SetFontFamily,
-            is ReaderAction.SetCustomTheme,
-            is ReaderAction.SaveCustomTheme,
-            is ReaderAction.DeleteCustomTheme,
-            is ReaderAction.SetLineHeight,
-            is ReaderAction.SetTextAlign,
-            is ReaderAction.SetTheme,
-            is ReaderAction.SetBrightness,
-            is ReaderAction.SetKeepScreenOn,
-            is ReaderAction.SetShowPageCounter,
-            is ReaderAction.SetVolumeKeys,
-            is ReaderAction.SetVolumeKeysInverted,
-            is ReaderAction.SetInvertTaps,
-            is ReaderAction.SetNightLight,
-            is ReaderAction.SetNightLightIntensity,
-            -> onPrefsAction(action)
+            is ReaderAction.PrefsChange -> onPrefsAction(action)
         }
     }
 
     /** Reader-preference writes, split out so onAction stays under the complexity gate. */
-    private fun onPrefsAction(action: ReaderAction) {
+    private fun onPrefsAction(action: ReaderAction.PrefsChange) {
         when (action) {
             is ReaderAction.SetFlow -> updateReaderPrefs { it.copy(flow = action.flow) }
             is ReaderAction.SetFontScale -> updateReaderPrefs {
@@ -331,9 +300,6 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetNightLightIntensity -> updateReaderPrefs {
                 it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
             }
-            // Statement position: anything else was routed here by mistake and
-            // is intentionally ignored (callers only pass prefs actions).
-            else -> Unit
         }
     }
 
