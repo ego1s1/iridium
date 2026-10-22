@@ -44,6 +44,10 @@ internal class LibraryScanUseCase @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
+    // Broad catches are the contract here: any parser/IO surprise on one
+    // book counts it failed (scan) or cleans up and rethrows as IOException
+    // (import) instead of aborting the whole pass with a raw exception.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
     ): IndexReport = withContext(ioDispatcher) {
@@ -116,6 +120,7 @@ internal class LibraryScanUseCase @Inject constructor(
      * scan path, so imported books behave exactly like scanned ones. Prune
      * queries only touch `content://` rows, so imports survive rescans.
      */
+    @Suppress("TooGenericExceptionCaught") // Same contract as indexFilesystem above.
     suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String =
         withContext(ioDispatcher) {
             val name = sanitizeImportDisplayName(displayName)

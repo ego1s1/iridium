@@ -97,6 +97,9 @@ internal class SafLinkedTreeLister @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
 ) : LinkedTreeLister {
 
+    // SAF walk guards (unparseable URI, revoked grant, unreadable child)
+    // each skip the folder: several continues are the readable shape here.
+    @Suppress("LoopWithTooManyJumpStatements")
     override suspend fun listBooks(): LinkedTreeListResult = withContext(Dispatchers.IO) {
         val folders = preferences.linkedFolders.first()
         if (folders.isEmpty()) return@withContext LinkedTreeListResult(emptyList(), walkFailed = false)

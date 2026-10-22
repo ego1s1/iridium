@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -133,7 +134,7 @@ class HttpDictionaryLookup(
             Result.failure(e)
         } catch (e: IOException) {
             Result.failure(DictionaryNetworkException("You're offline — couldn't look up \"$query\"", e))
-        } catch (e: Exception) {
+        } catch (e: JSONException) {
             // org.json throws JSONException (a RuntimeException) on bad payloads.
             Result.failure(DictionaryParseException("Couldn't understand the dictionary response", e))
         }
@@ -181,6 +182,9 @@ internal fun parseWordDefinition(json: String, query: String): WordDefinition? {
 
 private fun parseMeanings(entries: JSONArray): List<WordMeaning> {
     val out = mutableListOf<WordMeaning>()
+    // Guard-per-line skips (cap, missing object, missing definitions, empty
+    // texts) keep malformed dictionary payloads from poisoning the popup.
+    @Suppress("LoopWithTooManyJumpStatements")
     for (i in 0 until entries.length()) {
         if (out.size >= MAX_MEANINGS) break
         val meaning = entries.optJSONObject(i) ?: continue

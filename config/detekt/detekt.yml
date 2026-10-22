@@ -33,10 +33,12 @@ style:
   # Byte/character scanners legitimately break out of the loop from several
   # guards (end of buffer, malformed structure, cap exceeded).
   LoopWithTooManyJumpStatements:
-    active: false
+    active: true
+    excludes: ['**/epub-engine/**', '**/epub-native/**', '**/epub-core/**']
   # Off by design: the ZIP/EPUB engines are full of format constants (0xFF,
   # 0xFFFFFFFF, signature values) where a named constant would add noise
-  # rather than clarity.
+  # rather than clarity. Assessed 2026-10: enabling flags 300+ sites, nearly
+  # all idiomatic Compose dp/sp values, so the rule stays off.
   MagicNumber:
     active: false
   ForbiddenComment:
@@ -68,10 +70,15 @@ naming:
 
 exceptions:
   # Defensive parsing: broad catches are the contract, not an oversight.
+  # Enabled globally; the EPUB engines (malformed files must never crash)
+  # are excluded, and the remaining scan/import/decode sites carry scoped
+  # @Suppress with their reason.
   TooGenericExceptionCaught:
-    active: false
+    active: true
+    excludes: ['**/epub-engine/**', '**/epub-native/**', '**/epub-core/**']
   SwallowedException:
-    active: false
+    active: true
+    excludes: ['**/epub-engine/**', '**/epub-native/**', '**/epub-core/**']
   InstanceOfCheckForException:
     active: false
   ThrowingExceptionsWithoutMessageOrCause:
