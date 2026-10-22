@@ -76,6 +76,17 @@ class BookDaoTest {
         assertEquals("{\"href\":\"ch1\"}", row?.lastLocator)
     }
 
+    @Test
+    fun `getUpdatedSince returns only rows touched after the snapshot`() = runTest {
+        dao.upsert(linkedBook("content://docs/old.epub").copy(updatedAt = 100L))
+        dao.upsert(linkedBook("content://docs/new.epub").copy(updatedAt = 300L))
+
+        val delta = dao.getUpdatedSince(sinceMs = 200L).map { it.id }.toSet()
+
+        assertTrue("content://docs/new.epub" in delta)
+        assertTrue("content://docs/old.epub" !in delta)
+    }
+
     private fun linkedBook(sourcePath: String, title: String = "Book") = BookEntity(
         id = sourcePath,
         title = title,

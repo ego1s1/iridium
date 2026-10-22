@@ -3,12 +3,13 @@ package com.iridium.core.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.iridium.core.common.IoDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 /**
@@ -19,9 +20,10 @@ import kotlinx.coroutines.withContext
 @Singleton
 internal class EpubCoverGenerator @Inject constructor(
     @ApplicationContext private val context: Context,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     suspend fun generate(coverBytes: ByteArray?, coverId: String): String? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (coverBytes == null || coverBytes.isEmpty()) return@withContext null
             val bitmap = runCatching {
                 decodeDownsampled(coverBytes, COVER_MAX_DIMENSION)

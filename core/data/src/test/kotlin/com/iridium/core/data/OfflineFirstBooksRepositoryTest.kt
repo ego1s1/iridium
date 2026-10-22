@@ -87,7 +87,7 @@ class OfflineFirstBooksRepositoryTest {
                 bookDao = database.bookDao(),
                 chapterTextDao = database.chapterTextDao(),
                 backend = IridiumEpubEngine(),
-                covers = EpubCoverGenerator(context),
+                covers = EpubCoverGenerator(context, UnconfinedTestDispatcher()),
                 treeLister = lister,
                 sourceFactory = EpubSourceFactory(context),
                 management = BookManagementUseCase(

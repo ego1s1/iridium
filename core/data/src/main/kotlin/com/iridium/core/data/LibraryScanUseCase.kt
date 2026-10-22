@@ -53,6 +53,7 @@ internal class LibraryScanUseCase @Inject constructor(
     ): IndexReport = withContext(ioDispatcher) {
         val (docs, walkFailed) = treeLister.listBooks()
         // Batch: one table fetch, one upsert, one emission.
+        val snapshotMs = clock.wallNow()
         val knownById = bookDao.getAll().associateBy { it.id }
         val rows = mutableListOf<BookEntity>()
         var failed = 0
@@ -81,10 +82,10 @@ internal class LibraryScanUseCase @Inject constructor(
             }
             onProgress(index + 1, docs.size)
         }
-        // Re-read before writing: a reader progress write may have landed
-        // after the snapshot above; last-writer-wins with stale rows would
-        // eat it.
-        val fresh = bookDao.getAll().associateBy { it.id }
+        // Re-read before writing — but only rows touched since the snapshot:
+        // a reader progress write may have landed after it, and last-writer-
+        // wins with stale rows would eat it. Untouched rows need no merge.
+        val fresh = bookDao.getUpdatedSince(snapshotMs).associateBy { it.id }
         val merged = rows.map { row ->
             val live = fresh[row.id]
             val snap = knownById[row.id]

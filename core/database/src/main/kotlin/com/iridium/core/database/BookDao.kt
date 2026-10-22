@@ -23,6 +23,14 @@ interface BookDao {
     @Query("SELECT * FROM books")
     suspend fun getAll(): List<BookEntity>
 
+    /**
+     * Rows touched since the scan snapshot (concurrent progress/bookmark
+     * writes bump updatedAt). The merge pass reads only these instead of
+     * re-scanning the whole table.
+     */
+    @Query("SELECT * FROM books WHERE updatedAt >= :sinceMs")
+    suspend fun getUpdatedSince(sinceMs: Long): List<BookEntity>
+
     @Query("SELECT id FROM books")
     suspend fun getIds(): List<String>
 

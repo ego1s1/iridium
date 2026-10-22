@@ -3,11 +3,12 @@ package com.iridium.core.data
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.iridium.core.common.IoDispatcher
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -95,12 +96,13 @@ internal fun collectLinkedBooks(
 internal class SafLinkedTreeLister @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferences: IridiumPreferencesDataSource,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : LinkedTreeLister {
 
     // SAF walk guards (unparseable URI, revoked grant, unreadable child)
     // each skip the folder: several continues are the readable shape here.
     @Suppress("LoopWithTooManyJumpStatements")
-    override suspend fun listBooks(): LinkedTreeListResult = withContext(Dispatchers.IO) {
+    override suspend fun listBooks(): LinkedTreeListResult = withContext(ioDispatcher) {
         val folders = preferences.linkedFolders.first()
         if (folders.isEmpty()) return@withContext LinkedTreeListResult(emptyList(), walkFailed = false)
         val persisted = context.contentResolver.persistedUriPermissions
@@ -153,7 +155,7 @@ internal class SafLinkedTreeLister @Inject constructor(
         LinkedTreeListResult(books, walkFailed)
     }
 
-    override suspend fun resolve(documentUri: Uri): LinkedDocument? = withContext(Dispatchers.IO) {
+    override suspend fun resolve(documentUri: Uri): LinkedDocument? = withContext(ioDispatcher) {
         val doc = runCatching { DocumentFile.fromSingleUri(context, documentUri) }.getOrNull()
             ?: return@withContext null
         if (doc.isDirectory || !doc.canRead()) return@withContext null
