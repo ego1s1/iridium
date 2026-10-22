@@ -1,0 +1,137 @@
+package com.iridium.feature.settings.impl
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.iridium.core.data.DriveSyncManager
+import com.iridium.core.designsystem.IridiumAlertDialog
+import com.iridium.core.designsystem.rememberLinkedFolderPicker
+import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumHaptic
+import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.IridiumSectionCard
+import com.iridium.core.designsystem.IridiumSettingRow
+import com.iridium.core.designsystem.IridiumSettingSwitch
+import com.iridium.core.designsystem.IridiumSliderRow
+import com.iridium.core.designsystem.IridiumTonalButton
+import com.iridium.core.designsystem.LocalAppFonts
+import com.iridium.core.designsystem.SchemePickerRow
+import com.iridium.core.designsystem.rememberIridiumHaptics
+import com.iridium.core.model.LibrarySortOrder
+import com.iridium.core.model.MotionStyle
+import kotlinx.coroutines.launch
+import com.iridium.core.model.ThemeMode
+
+/** Public tab content for the main viewport. */
+@Composable
+internal fun ReaderSection(
+    state: SettingsUiState,
+    onAction: (SettingsAction) -> Unit,
+) {
+        IridiumSectionCard(title = stringResource(R.string.settings_card_reading)) {
+            IridiumSliderRow(
+                label = stringResource(R.string.settings_reading_font_size),
+                value = state.reader.fontScale,
+                valueRange = 0.5f..2.5f,
+                valueText = "${(state.reader.fontScale * 100).toInt()}%",
+                onValueChange = { onAction(SettingsAction.SetFontSize(it)) },
+            )
+            Spacer(Modifier.height(8.dp))
+            IridiumSliderRow(
+                label = stringResource(R.string.settings_reading_margins),
+                value = state.reader.pageMargins,
+                valueRange = 0.5f..3.0f,
+                valueText = String.format(
+                    java.util.Locale.US,
+                    "%.1fx",
+                    state.reader.pageMargins,
+                ),
+                onValueChange = { onAction(SettingsAction.SetMargins(it)) },
+            )
+            Spacer(Modifier.height(8.dp))
+            IridiumSliderRow(
+                label = stringResource(R.string.settings_reading_line_height),
+                value = state.reader.lineHeight,
+                valueRange = 1.0f..2.5f,
+                valueText = String.format(
+                    java.util.Locale.US,
+                    "%.2f",
+                    state.reader.lineHeight,
+                ),
+                onValueChange = { onAction(SettingsAction.SetLineHeight(it)) },
+            )
+            Spacer(Modifier.height(8.dp))
+            IridiumSettingSwitch(
+                title = stringResource(R.string.settings_reading_keep_screen_on),
+                checked = state.reader.keepScreenOn,
+                onCheckedChange = { onAction(SettingsAction.SetKeepScreenOn(it)) },
+            )
+            IridiumSettingSwitch(
+                title = stringResource(R.string.settings_reading_page_counter),
+                checked = state.reader.showPageCounter,
+                onCheckedChange = { onAction(SettingsAction.SetShowPageCounter(it)) },
+            )
+            IridiumSettingSwitch(
+                title = stringResource(R.string.settings_reading_volume_keys),
+                checked = state.reader.volumeKeys,
+                onCheckedChange = { onAction(SettingsAction.SetVolumeKeys(it)) },
+            )
+        }
+}
