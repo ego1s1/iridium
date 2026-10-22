@@ -10,6 +10,7 @@ import com.iridium.core.data.ContentHit
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibraryQuery
+import kotlinx.collections.immutable.toImmutableList
 import com.iridium.core.testing.TestData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -41,12 +42,12 @@ class LibraryChromeParityTest2 {
         refreshing: Boolean = false,
         indexProgress: IndexProgress? = null,
     ) = LibraryUiState(
-        books = books,
+        books = books.toImmutableList(),
         query = LibraryQuery(text = text),
         refreshing = refreshing,
         filterOpen = false,
         indexProgress = indexProgress,
-        contentHits = contentHits,
+        contentHits = contentHits.toImmutableList(),
     )
 
     private fun setScreen(

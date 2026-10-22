@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -115,12 +117,12 @@ class LibraryViewModel @Inject constructor(
             shelf.books.firstOrNull { it.id == retained.id } ?: retained
         }
         LibraryUiState(
-            books = shelf.books,
+            books = shelf.books.toImmutableList(),
             query = shelf.query,
             refreshing = chrome.refreshing,
             filterOpen = chrome.filterOpen,
             indexProgress = indexing.progress,
-            contentHits = indexing.contentHits,
+            contentHits = indexing.contentHits.toImmutableList(),
             display = display,
             menuBook = menuBook,
             menuDeleteConfirm = menu.deleteConfirm,
@@ -129,7 +131,7 @@ class LibraryViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = LibraryUiState(
-            books = emptyList(),
+            books = persistentListOf(),
             query = LibraryQuery(),
             refreshing = false,
             filterOpen = false,

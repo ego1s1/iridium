@@ -1,5 +1,8 @@
 package com.iridium.core.model
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+
 /** Text alignment for reflowable EPUB content. */
 enum class TextAlign {
     ORIGINAL,
@@ -50,7 +53,7 @@ data class ReaderPreferences(
     val pageMargins: Float = 1f,
     val lineHeight: Float = 1.4f,
     /** User palettes; [customThemeId] selects the active one (null = preset). */
-    val customThemes: List<CustomReaderTheme> = emptyList(),
+    val customThemes: ImmutableList<CustomReaderTheme> = persistentListOf(),
     val customThemeId: String? = null,
 )
 

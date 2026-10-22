@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,7 @@ import com.iridium.core.designsystem.IridiumTonalButton
  * State driving [DictionaryPopup]: the selected [word], whether a lookup is
  * in flight, the resolved [definition], or a human-readable [error].
  */
+@Immutable
 data class DictionaryUiState(
     val word: String,
     val loading: Boolean = false,

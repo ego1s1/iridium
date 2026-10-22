@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * Live settings sheet coverage for tap inversion and night light: rows
@@ -131,7 +132,7 @@ class ReaderSettingsSheetTest {
             IridiumTheme(expressiveMotion = false) {
                 ReaderThemeSheetContent(
                     prefs = ReaderPreferences(
-                        customThemes = listOf(
+                        customThemes = persistentListOf(
                             CustomReaderTheme("c1", "Forest", 0xFF1B2A1B.toInt(), 0xFFE8F0E8.toInt()),
                         ),
                     ),

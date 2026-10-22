@@ -1,19 +1,22 @@
 package com.iridium.feature.reader.impl
 
+import androidx.compose.runtime.Immutable
 import com.iridium.core.model.Book
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TocEntry
+import kotlinx.collections.immutable.ImmutableList
 
+@Immutable
 sealed interface ReaderUiState {
     data object Loading : ReaderUiState
 
     data class Ready(
         val book: Book,
-        val toc: List<TocEntry>,
-        val highlights: List<Highlight>,
+        val toc: ImmutableList<TocEntry>,
+        val highlights: ImmutableList<Highlight>,
         val prefs: com.iridium.core.model.ReaderPreferences,
         val chromeVisible: Boolean,
         val settingsOpen: Boolean,

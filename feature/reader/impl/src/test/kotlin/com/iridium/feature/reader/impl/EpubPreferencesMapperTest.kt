@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.readium.r2.navigator.preferences.Theme as ReadiumTheme
+import kotlinx.collections.immutable.persistentListOf
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -83,15 +84,15 @@ class EpubPreferencesMapperTest {
         val black = CustomReaderTheme("b", "Black", 0xFF000000.toInt(), 0xFFFFFFFF.toInt())
         assertEquals(
             ReadiumTheme.LIGHT,
-            EpubPreferencesMapper.map(ReaderPreferences(customThemes = listOf(white), customThemeId = "w")).theme,
+            EpubPreferencesMapper.map(ReaderPreferences(customThemes = persistentListOf(white), customThemeId = "w")).theme,
         )
         assertEquals(
             ReadiumTheme.SEPIA,
-            EpubPreferencesMapper.map(ReaderPreferences(customThemes = listOf(mid), customThemeId = "m")).theme,
+            EpubPreferencesMapper.map(ReaderPreferences(customThemes = persistentListOf(mid), customThemeId = "m")).theme,
         )
         assertEquals(
             ReadiumTheme.DARK,
-            EpubPreferencesMapper.map(ReaderPreferences(customThemes = listOf(black), customThemeId = "b")).theme,
+            EpubPreferencesMapper.map(ReaderPreferences(customThemes = persistentListOf(black), customThemeId = "b")).theme,
         )
     }
 
@@ -99,7 +100,7 @@ class EpubPreferencesMapperTest {
     fun `dangling custom id falls back to the preset`() {
         val prefs = ReaderPreferences(
             theme = ColorSchemeChoice.SEPIA,
-            customThemes = emptyList(),
+            customThemes = persistentListOf(),
             customThemeId = "gone",
         )
         assertEquals(ReadiumTheme.SEPIA, EpubPreferencesMapper.map(prefs).theme)

@@ -1,10 +1,13 @@
 package com.iridium.feature.library.impl
 
+import androidx.compose.runtime.Immutable
 import com.iridium.core.data.ContentHit
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryFilter
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.LibrarySortOrder
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * No blocking Loading state: Room is local and emits its first list almost
@@ -12,15 +15,16 @@ import com.iridium.core.model.LibrarySortOrder
  * as rows arrive. Scanning surfaces as a thin progress bar, never a spinner
  * that hides content the user already has.
  */
+@Immutable
 data class LibraryUiState(
-    val books: List<Book>,
+    val books: ImmutableList<Book>,
     val query: LibraryQuery,
     val refreshing: Boolean,
     val filterOpen: Boolean,
     /** Determinate scan progress (done/total); null when idle. */
     val indexProgress: IndexProgress? = null,
     /** Full-text matches for the current query, newest-first. */
-    val contentHits: List<ContentHit> = emptyList(),
+    val contentHits: ImmutableList<ContentHit> = persistentListOf(),
     /** Persisted display options (card density, grid width). */
     val display: com.iridium.core.model.LibraryDisplay =
         com.iridium.core.model.LibraryDisplay(),

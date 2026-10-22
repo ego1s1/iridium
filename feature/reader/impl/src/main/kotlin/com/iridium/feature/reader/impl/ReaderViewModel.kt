@@ -20,6 +20,7 @@ import com.iridium.core.model.TocEntry
 import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
+import kotlinx.collections.immutable.toImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -151,8 +152,8 @@ class ReaderViewModel @Inject constructor(
                 val (positionIndex, positionCount) = positions.indexAndCount()
                 ReaderUiState.Ready(
                     book = c.book,
-                    toc = c.toc,
-                    highlights = c.highlights,
+                    toc = c.toc.toImmutableList(),
+                    highlights = c.highlights.toImmutableList(),
                     prefs = c.prefs,
                     chromeVisible = ch.chromeVisible,
                     settingsOpen = ch.settingsOpen,
@@ -261,11 +262,11 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetCustomTheme -> prefsApplier.updateReaderPrefs { it.copy(customThemeId = action.id) }
             is ReaderAction.SaveCustomTheme -> prefsApplier.updateReaderPrefs { prefs ->
                 val themes = prefs.customThemes.filterNot { it.id == action.theme.id } + action.theme
-                prefs.copy(customThemes = themes, customThemeId = action.theme.id)
+                prefs.copy(customThemes = themes.toImmutableList(), customThemeId = action.theme.id)
             }
             is ReaderAction.DeleteCustomTheme -> prefsApplier.updateReaderPrefs { prefs ->
                 prefs.copy(
-                    customThemes = prefs.customThemes.filterNot { it.id == action.id },
+                    customThemes = prefs.customThemes.filterNot { it.id == action.id }.toImmutableList(),
                     customThemeId = prefs.customThemeId?.takeUnless { it == action.id },
                 )
             }

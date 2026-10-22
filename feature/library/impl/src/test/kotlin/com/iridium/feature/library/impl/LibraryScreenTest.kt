@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.model.LibraryQuery
+import kotlinx.collections.immutable.toImmutableList
 import com.iridium.core.testing.TestData
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -25,7 +26,7 @@ class LibraryScreenTest {
         books: List<com.iridium.core.model.Book> = emptyList(),
         text: String = "",
     ) = LibraryUiState(
-        books = books,
+        books = books.toImmutableList(),
         query = LibraryQuery(text = text),
         refreshing = false,
         filterOpen = false,

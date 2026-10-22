@@ -23,6 +23,7 @@ import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -78,7 +79,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
             pageMargins = this[PAGE_MARGINS] ?: 1f,
             lineHeight = this[LINE_HEIGHT] ?: 1.4f,
-            customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme),
+            customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme).toImmutableList(),
             customThemeId = this[CUSTOM_THEME_ID],
         )
 

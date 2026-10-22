@@ -27,6 +27,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import kotlinx.collections.immutable.persistentListOf
 
 class DataStorePreferencesDataSourceTest {
 
@@ -62,7 +63,7 @@ class DataStorePreferencesDataSourceTest {
     fun `custom themes round-trip through the store`() = runTest {
         val custom = CustomReaderTheme("c1", "Forest", 0xFF1B2A1B.toInt(), 0xFFE8F0E8.toInt())
         source.updateReaderPreferences {
-            it.copy(customThemes = listOf(custom), customThemeId = "c1")
+            it.copy(customThemes = persistentListOf(custom), customThemeId = "c1")
         }
         val prefs = source.readerPreferences.first()
         assertEquals(listOf(custom), prefs.customThemes)

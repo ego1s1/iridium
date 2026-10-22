@@ -12,6 +12,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(libs.kotlinx.collections.immutable)
     implementation(project(":core:data"))
     implementation(project(":core:datastore"))
     implementation(libs.kotlinx.serialization.json)

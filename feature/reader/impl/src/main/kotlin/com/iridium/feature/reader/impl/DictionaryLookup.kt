@@ -1,5 +1,6 @@
 package com.iridium.feature.reader.impl
 
+import androidx.compose.runtime.Immutable
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -8,6 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -15,18 +19,20 @@ import org.json.JSONObject
 /**
  * A single dictionary meaning: a part of speech with short definitions.
  */
+@Immutable
 data class WordMeaning(
     val partOfSpeech: String,
-    val definitions: List<String>,
+    val definitions: ImmutableList<String>,
 )
 
 /**
  * A looked-up word with phonetic spelling and meanings.
  */
+@Immutable
 data class WordDefinition(
     val word: String,
     val phonetic: String? = null,
-    val meanings: List<WordMeaning> = emptyList(),
+    val meanings: ImmutableList<WordMeaning> = persistentListOf(),
     val sourceUrl: String? = null,
 )
 
@@ -180,7 +186,7 @@ internal fun parseWordDefinition(json: String, query: String): WordDefinition? {
     )
 }
 
-private fun parseMeanings(entries: JSONArray): List<WordMeaning> {
+private fun parseMeanings(entries: JSONArray): ImmutableList<WordMeaning> {
     val out = mutableListOf<WordMeaning>()
     // Guard-per-line skips (cap, missing object, missing definitions, empty
     // texts) keep malformed dictionary payloads from poisoning the popup.
@@ -198,11 +204,11 @@ private fun parseMeanings(entries: JSONArray): List<WordMeaning> {
         out.add(
             WordMeaning(
                 partOfSpeech = meaning.optString("partOfSpeech").ifBlank { PART_OF_SPEECH_FALLBACK },
-                definitions = texts,
+                definitions = texts.toImmutableList(),
             ),
         )
     }
-    return out
+    return out.toImmutableList()
 }
 
 /** Strips definition HTML (`<a>`, `<b>` links/emphasis) to plain text. */
