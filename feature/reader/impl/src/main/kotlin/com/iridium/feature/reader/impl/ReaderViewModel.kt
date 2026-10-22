@@ -20,17 +20,13 @@ import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import android.os.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -38,17 +34,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.Url
-import java.util.UUID
 
 @Suppress("TooManyFunctions") // Large host ViewModel; refactor deferred.
 @HiltViewModel
@@ -67,15 +60,11 @@ class ReaderViewModel @Inject constructor(
 
     private val chrome = ReaderChromeController(viewModelScope)
     private val dictionary = ReaderDictionaryController(viewModelScope, dictionaryLookup, store)
+    private val positions = ReaderPositionTracker(store)
+    private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store)
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private val openFileMissing = MutableStateFlow(false)
-
-    /**
-     * Suppresses locator-driven chrome hides right after programmatic
-     * navigation (open, seek, TOC jump): only user page turns hide chrome.
-     */
-    private var lastProgrammaticNavMs: Long = 0L
 
     /** Cached prefs for tap paths that must not suspend on DataStore IO. */
     private val prefsFlow: StateFlow<ReaderPreferences> =
@@ -84,16 +73,6 @@ class ReaderViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = ReaderPreferences(),
         )
-
-    /** Publication positions for the slider/position text (no fixed pages). */
-    private var positionsCache: List<Locator> = emptyList()
-
-    /**
-     * Bumped whenever [positionsCache] is (re)filled: the cache is a plain
-     * var outside every combine key, so without this the scrubber/counter
-     * would sit at zero until the next debounced progression tick.
-     */
-    private val positionsVersion = MutableStateFlow(0)
 
     private val messageChannel = Channel<ReaderMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
@@ -156,17 +135,17 @@ class ReaderViewModel @Inject constructor(
         )
 
     val uiState: StateFlow<ReaderUiState> = combine(
-        content, chromeBundle, navBundle, positionsVersion,
+        content, chromeBundle, navBundle, positions.positionsVersion,
     ) { c, ch, n, _,
         ->
-        // The version flow is a recombine trigger only (unused here): reading
-        // positionsCache keeps the scrubber/counter in sync when positions land.
+        // The version flow is a recombine trigger only (unused here): it
+        // re-emits whenever the tracker refills the positions table.
         when {
             c.book == null && n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
             c.book == null -> ReaderUiState.Gone
             n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
             else -> {
-                val (positionIndex, positionCount) = positionIndexAndCount()
+                val (positionIndex, positionCount) = positions.indexAndCount()
                 ReaderUiState.Ready(
                     book = c.book,
                     toc = c.toc,
@@ -177,7 +156,7 @@ class ReaderViewModel @Inject constructor(
                     tocOpen = ch.tocOpen,
                     highlightsOpen = ch.highlightsOpen,
                     progression = (c.book.progress.takeIf { n.progression == 0f } ?: n.progression),
-                    positionText = positionText(),
+                    positionText = positions.positionText(),
                     positionIndex = positionIndex,
                     positionCount = positionCount,
                     focusedHighlightId = n.focusedHighlightId,
@@ -187,6 +166,17 @@ class ReaderViewModel @Inject constructor(
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
+
+    private val annotations = ReaderAnnotationsController(
+        scope = viewModelScope,
+        repository = repository,
+        bookId = bookId,
+        store = store,
+        chrome = chrome,
+        uiState = uiState,
+        sendMessage = { messageChannel.send(it) },
+        highlights = highlights,
+    )
 
     init {
         viewModelScope.launch { openPublication() }
@@ -201,15 +191,11 @@ class ReaderViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            // Re-apply decorations whenever the highlight list changes.
-            highlights.collect { applyDecorations(it) }
-        }
-        viewModelScope.launch {
             // User page turns hide the chrome; programmatic jumps (open,
             // seek, TOC) and the initial publish must not.
             store.latestLocator.collect { locator ->
                 if (locator != null &&
-                    SystemClock.uptimeMillis() - lastProgrammaticNavMs > LOCATOR_HIDE_GRACE_MS
+                    !positions.withinNavGrace(LOCATOR_HIDE_GRACE_MS)
                 ) {
                     chrome.hideForPageTurn()
                 }
@@ -233,9 +219,9 @@ class ReaderViewModel @Inject constructor(
             ReaderAction.CloseHighlights -> chrome.close(chrome.highlightsOpen, clearHighlightFocus = true)
             ReaderAction.DismissDictionary -> dictionary.dismiss()
             ReaderAction.DismissImage -> store.dismissImage()
-            ReaderAction.ExportAnnotations -> exportAnnotations()
+            ReaderAction.ExportAnnotations -> annotations.export(viewModelScope)
             is ReaderAction.SeekTo -> {
-                seekTo(action.progression)
+                positions.seekTo(action.progression)
                 chrome.scheduleHide()
             }
             is ReaderAction.GoTocEntry -> goTocEntry(action.entry)
@@ -247,8 +233,8 @@ class ReaderViewModel @Inject constructor(
                 store.navigator?.goBackward(action.animated)
                 chrome.scheduleHide()
             }
-            is ReaderAction.AddHighlight -> addHighlight(action.color, action.note)
-            is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
+            is ReaderAction.AddHighlight -> annotations.addHighlight(action.color, action.note, viewModelScope)
+            is ReaderAction.DeleteHighlight -> annotations.deleteHighlight(action.id, viewModelScope)
             is ReaderAction.PrefsChange -> onPrefsAction(action)
         }
     }
@@ -256,51 +242,51 @@ class ReaderViewModel @Inject constructor(
     /** Reader-preference writes, split out so onAction stays under the complexity gate. */
     private fun onPrefsAction(action: ReaderAction.PrefsChange) {
         when (action) {
-            is ReaderAction.SetFlow -> updateReaderPrefs { it.copy(flow = action.flow) }
-            is ReaderAction.SetFontScale -> updateReaderPrefs {
+            is ReaderAction.SetFlow -> prefsApplier.updateReaderPrefs { it.copy(flow = action.flow) }
+            is ReaderAction.SetFontScale -> prefsApplier.updateReaderPrefs {
                 it.copy(fontScale = action.scale.coerceIn(0.5f, 3f))
             }
-            is ReaderAction.SetFontFamily -> updateReaderPrefs {
+            is ReaderAction.SetFontFamily -> prefsApplier.updateReaderPrefs {
                 it.copy(fontFamily = action.family)
             }
-            is ReaderAction.SetLineHeight -> updateReaderPrefs {
+            is ReaderAction.SetLineHeight -> prefsApplier.updateReaderPrefs {
                 it.copy(lineHeight = action.lineHeight.coerceIn(1f, 2.5f))
             }
-            is ReaderAction.SetTextAlign -> updateReaderPrefs { it.copy(textAlign = action.align) }
-            is ReaderAction.SetTheme -> updateReaderPrefs { it.copy(theme = action.theme, customThemeId = null) }
-            is ReaderAction.SetCustomTheme -> updateReaderPrefs { it.copy(customThemeId = action.id) }
-            is ReaderAction.SaveCustomTheme -> updateReaderPrefs { prefs ->
+            is ReaderAction.SetTextAlign -> prefsApplier.updateReaderPrefs { it.copy(textAlign = action.align) }
+            is ReaderAction.SetTheme -> prefsApplier.updateReaderPrefs { it.copy(theme = action.theme, customThemeId = null) }
+            is ReaderAction.SetCustomTheme -> prefsApplier.updateReaderPrefs { it.copy(customThemeId = action.id) }
+            is ReaderAction.SaveCustomTheme -> prefsApplier.updateReaderPrefs { prefs ->
                 val themes = prefs.customThemes.filterNot { it.id == action.theme.id } + action.theme
                 prefs.copy(customThemes = themes, customThemeId = action.theme.id)
             }
-            is ReaderAction.DeleteCustomTheme -> updateReaderPrefs { prefs ->
+            is ReaderAction.DeleteCustomTheme -> prefsApplier.updateReaderPrefs { prefs ->
                 prefs.copy(
                     customThemes = prefs.customThemes.filterNot { it.id == action.id },
                     customThemeId = prefs.customThemeId?.takeUnless { it == action.id },
                 )
             }
-            is ReaderAction.SetBrightness -> updateReaderPrefs {
+            is ReaderAction.SetBrightness -> prefsApplier.updateReaderPrefs {
                 it.copy(brightness = action.brightness.coerceIn(-1f, 1f))
             }
-            is ReaderAction.SetKeepScreenOn -> updateReaderPrefs {
+            is ReaderAction.SetKeepScreenOn -> prefsApplier.updateReaderPrefs {
                 it.copy(keepScreenOn = action.enabled)
             }
-            is ReaderAction.SetShowPageCounter -> updateReaderPrefs {
+            is ReaderAction.SetShowPageCounter -> prefsApplier.updateReaderPrefs {
                 it.copy(showPageCounter = action.enabled)
             }
-            is ReaderAction.SetVolumeKeys -> updateReaderPrefs {
+            is ReaderAction.SetVolumeKeys -> prefsApplier.updateReaderPrefs {
                 it.copy(volumeKeys = action.enabled)
             }
-            is ReaderAction.SetVolumeKeysInverted -> updateReaderPrefs {
+            is ReaderAction.SetVolumeKeysInverted -> prefsApplier.updateReaderPrefs {
                 it.copy(volumeKeysInverted = action.inverted)
             }
-            is ReaderAction.SetInvertTaps -> updateReaderPrefs {
+            is ReaderAction.SetInvertTaps -> prefsApplier.updateReaderPrefs {
                 it.copy(invertTaps = action.inverted)
             }
-            is ReaderAction.SetNightLight -> updateReaderPrefs {
+            is ReaderAction.SetNightLight -> prefsApplier.updateReaderPrefs {
                 it.copy(nightLight = action.enabled)
             }
-            is ReaderAction.SetNightLightIntensity -> updateReaderPrefs {
+            is ReaderAction.SetNightLightIntensity -> prefsApplier.updateReaderPrefs {
                 it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
             }
         }
@@ -331,9 +317,9 @@ class ReaderViewModel @Inject constructor(
                     }
                 val factory = EpubNavigatorFactory(result.publication)
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
-                positionsCache = runCatching { result.publication.positions() }
-                    .getOrDefault(emptyList())
-                positionsVersion.value += 1
+                positions.replaceAll(
+                    runCatching { result.publication.positions() }.getOrDefault(emptyList()),
+                )
                 indexContentIfNeeded()
             }
             OpenResult.FileMissing, OpenResult.ParseFailed -> {
@@ -390,12 +376,12 @@ class ReaderViewModel @Inject constructor(
                 handleZonedTap(event.fractionX, event.fractionY, event.dismissedPopup)
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
-                lastProgrammaticNavMs = SystemClock.uptimeMillis()
+                positions.markProgrammaticNav()
                 // Fresh navigator: submit current prefs + decorations.
                 val prefs = EpubPreferencesMapper.map(preferences.readerPreferences.first())
                 runCatching { store.navigator?.submitPreferences(prefs) }
-                applyThemeOverride()
-                applyDecorations(highlights.first())
+                prefsApplier.applyThemeOverride()
+                annotations.refreshDecorations(highlights.first())
                 // Image-showcase bridge: wire taps in the freshly loaded document.
                 runCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
             }
@@ -506,31 +492,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     /** Builds a Markdown + HTML export of the current book's highlights/notes. */
-    private fun exportAnnotations() {
-        viewModelScope.launch {
-            val ready = uiState.value as? ReaderUiState.Ready
-            val title = ready?.book?.title ?: return@launch
-            val hs = highlights.first()
-            messageChannel.send(
-                ReaderMessage.ShareExport(
-                    markdown = AnnotationExporter.markdown(title, hs),
-                    html = AnnotationExporter.html(title, hs),
-                    filename = title.replace(Regex("[^A-Za-z0-9]+"), "_"),
-                ),
-            )
-        }
-    }
-
-    // Navigation + annotations
-
-    private fun seekTo(progression: Float) {
-        val nav = store.navigator ?: return
-        val positions = positionsCache
-        if (positions.isEmpty()) return
-        lastProgrammaticNavMs = SystemClock.uptimeMillis()
-        val index = (progression * (positions.size - 1)).toInt().coerceIn(0, positions.size - 1)
-        nav.go(positions[index])
-    }
+    // Navigation
 
     private fun goTocEntry(entry: TocEntry) {
         val publication = store.publication ?: return
@@ -542,103 +504,8 @@ class ReaderViewModel @Inject constructor(
                 entry.href.substringBefore('#').endsWith(it.href.toString().substringBefore('#'))
         } ?: return
         val locator = runCatching { publication.locatorFromLink(link) }.getOrNull() ?: return
-        lastProgrammaticNavMs = SystemClock.uptimeMillis()
+        positions.markProgrammaticNav()
         nav.go(locator)
-    }
-
-    private fun addHighlight(color: HighlightColor, note: String?) {
-        viewModelScope.launch {
-            val nav = store.navigator
-            val selection = nav?.let {
-                runCatching { it.currentSelection() }.getOrNull()
-            }
-            if (selection == null) {
-                messageChannel.send(ReaderMessage.SelectTextFirst)
-                return@launch
-            }
-            val locatorJson = selection.locator.toJSON().toString()
-            val highlight = Highlight(
-                id = UUID.randomUUID().toString(),
-                bookId = bookId,
-                href = selection.locator.href.toString(),
-                startLocator = locatorJson,
-                endLocator = locatorJson,
-                selectedText = selection.locator.text.highlight.orEmpty(),
-                color = color,
-                note = note?.ifBlank { null },
-                createdAt = System.currentTimeMillis(),
-            )
-            repository.upsertHighlight(highlight)
-            nav.clearSelection()
-            messageChannel.send(ReaderMessage.HighlightSaved)
-        }
-    }
-
-    private fun deleteHighlight(id: String) {
-        viewModelScope.launch {
-            repository.deleteHighlight(id)
-            chrome.clearFocusIf(id)
-        }
-    }
-
-    private suspend fun applyDecorations(highlights: List<Highlight>) {
-        val nav = store.navigator ?: return
-        val decorations = highlights.mapNotNull { h ->
-            val locator = runCatching { Locator.fromJSON(JSONObject(h.startLocator)) }.getOrNull()
-                ?: return@mapNotNull null
-            Decoration(
-                id = h.id,
-                locator = locator,
-                style = Decoration.Style.Highlight(tint = highlightTint(h.color)),
-            )
-        }
-        runCatching { nav.applyDecorations(decorations, DECORATION_GROUP) }
-    }
-
-    private fun positionText(): String? {
-        val (index, count) = positionIndexAndCount()
-        if (count == 0) return null
-        return "${index + 1} / $count"
-    }
-
-    /** 0-based position index + total count from the cached positions table. */
-    private fun positionIndexAndCount(): Pair<Int, Int> {
-        val positions = positionsCache
-        if (positions.isEmpty()) return 0 to 0
-        val current = store.latestLocator.value ?: return 0 to positions.size
-        val index = positions.indexOfFirst { it.href == current.href }
-        // Fallback to nearest by total progression when hrefs diverge.
-        val pos = if (index >= 0) {
-            index
-        } else {
-            ((current.locations.totalProgression ?: 0.0) * positions.size).toInt()
-                .coerceIn(0, positions.size - 1)
-        }
-        return pos to positions.size
-    }
-
-    private fun updateReaderPrefs(transform: (ReaderPreferences) -> ReaderPreferences) {
-        viewModelScope.launch {
-            preferences.updateReaderPreferences(transform)
-            val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
-            runCatching { store.navigator?.submitPreferences(updated) }
-            // Forced-override theming: always (re)inject the
-            // theme stylesheet so exact colors win over the book's own CSS.
-            applyThemeOverride()
-        }
-    }
-
-    /** Forces the current theme's colors onto the book page via injected CSS. */
-    private suspend fun applyThemeOverride() {
-        val prefs = preferences.readerPreferences.first()
-        val (bg, fg) = prefs.resolvedColors()
-        val script = ReaderThemeOverride.injectOverrideScriptColors(
-            ReaderThemeOverride.hex(bg),
-            ReaderThemeOverride.hex(fg),
-        )
-        runCatching {
-            store.navigator?.evaluateJavascript(script)
-        }
     }
 
     override fun onCleared() {
