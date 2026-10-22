@@ -20,7 +20,8 @@ import javax.inject.Inject
 /**
  * Read-only library observation. Room re-emits on every write, so the
  * transforms ride [defaultDispatcher] and [distinctUntilChanged] drops equal
- * lists before they can recompose.
+ * lists before they can recompose. (Room does not dedupe mapped outputs:
+ * without this, every progress write would recompose the whole shelf.)
  */
 internal class LibraryObserver @Inject constructor(
     private val bookDao: BookDao,

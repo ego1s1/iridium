@@ -185,6 +185,9 @@ internal class ReaderPositionTracker(
     /** Last programmatic jump (open/seek/TOC): locator ticks inside the grace window are the jump's own echo, not user page turns. */
     private var lastProgrammaticNavMs: Long = 0L
 
+    /** Plain var, not a flow: every read and write happens on the Main thread
+     * (viewModelScope + combine), so no synchronization is needed; the version
+     * flow below drives recomposition. */
     private var positionsCache: List<Locator> = emptyList()
     val positionsVersion = MutableStateFlow(0)
 
@@ -304,6 +307,9 @@ internal class ReaderAnnotationsController(
         }
     }
 
+    /** Parsed decorations by highlight id: Room re-emits the whole list on every upsert, so only newly added highlights pay for parsing. */
+    private val decorationCache = mutableMapOf<String, Decoration>()
+
     /** Re-submits decorations for a fresh navigator (attach drops the old one). */
     suspend fun refreshDecorations(highlights: List<Highlight>) {
         applyDecorations(highlights)
@@ -311,14 +317,18 @@ internal class ReaderAnnotationsController(
 
     private suspend fun applyDecorations(highlights: List<Highlight>) {
         val nav = store.navigator ?: return
+        // Evict decorations whose highlights are gone before rebuilding.
+        decorationCache.keys.retainAll(highlights.mapTo(mutableSetOf()) { it.id })
         val decorations = highlights.mapNotNull { h ->
-            val locator = LocatorStrings.decode(h.startLocator)
-                ?: return@mapNotNull null
-            Decoration(
-                id = h.id,
-                locator = locator,
-                style = Decoration.Style.Highlight(tint = highlightTint(h.color)),
-            )
+            decorationCache.getOrPut(h.id) {
+                val locator = LocatorStrings.decode(h.startLocator)
+                    ?: return@mapNotNull null
+                Decoration(
+                    id = h.id,
+                    locator = locator,
+                    style = Decoration.Style.Highlight(tint = highlightTint(h.color)),
+                )
+            }
         }
         runCatching { nav.applyDecorations(decorations, DECORATION_GROUP) }
     }
