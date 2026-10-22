@@ -15,6 +15,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -61,6 +62,8 @@ class OfflineFirstBooksRepositoryTest {
             treeLister = lister,
             sourceFactory = EpubSourceFactory(context),
             chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
+            ioDispatcher = UnconfinedTestDispatcher(),
+            defaultDispatcher = UnconfinedTestDispatcher(),
         )
     }
 

@@ -81,7 +81,7 @@ coroutines:
   GlobalCoroutineUsage:
     active: true
   InjectDispatcher:
-    active: false
+    active: true
 
 performance:
   SpreadOperator:
