@@ -2,6 +2,7 @@ package com.iridium.core.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.iridium.core.common.AppClock
 import com.iridium.core.common.IoDispatcher
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.BookEntity
@@ -39,7 +40,7 @@ internal class LibraryScanUseCase @Inject constructor(
     private val treeLister: LinkedTreeLister,
     private val sourceFactory: EpubSourceFactory,
     private val management: BookManagementUseCase,
-    private val search: ContentSearchUseCase,
+    private val clock: AppClock,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
@@ -134,7 +135,7 @@ internal class LibraryScanUseCase @Inject constructor(
                 dest.delete()
                 throw e
             }
-            val now = System.currentTimeMillis()
+            val now = clock.wallNow()
             try {
                 val inspected = sourceFactory.open(dest.absolutePath, name)
                     .use { source -> backend.inspect(source, name.substringBeforeLast('.')) }
@@ -162,8 +163,6 @@ internal class LibraryScanUseCase @Inject constructor(
                         bookmarked = false,
                     ),
                 )
-                // Best-effort FTS like the scan's follow-up pass.
-                runCatching { search.indexBookContent(id) }
                 id
             } catch (e: CancellationException) {
                 throw e
@@ -212,7 +211,7 @@ internal class LibraryScanUseCase @Inject constructor(
      */
     private suspend fun indexDocument(doc: LinkedDocument, existing: BookEntity?): BookEntity {
         val uri = doc.uri.toString()
-        val now = System.currentTimeMillis()
+        val now = clock.wallNow()
         val coverId = linkedCoverId(uri)
         return try {
             val inspected = inspectDocument(doc)

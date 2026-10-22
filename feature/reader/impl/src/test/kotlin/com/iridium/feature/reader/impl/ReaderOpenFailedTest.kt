@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumTheme
+import com.iridium.core.fakes.FakeClock
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
@@ -115,6 +116,7 @@ class ReaderOpenFailedTest {
     fun `Back action dispatches pop`() = runTest {
         val viewModel = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
+            clock = FakeClock(),
             repository = TestBooksRepository(),
             preferences = TestPreferencesDataSource(),
             opener = FakeOpener(),

@@ -1,6 +1,6 @@
 package com.iridium.feature.reader.impl
 
-import android.os.SystemClock
+import com.iridium.core.common.AppClock
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Highlight
@@ -179,7 +179,7 @@ internal class ReaderDictionaryController(
  */
 internal class ReaderPositionTracker(
     private val store: ReaderSessionStore,
-    private val clock: () -> Long = { SystemClock.uptimeMillis() },
+    private val clock: AppClock,
 ) {
 
     /** Last programmatic jump (open/seek/TOC): locator ticks inside the grace window are the jump's own echo, not user page turns. */
@@ -194,11 +194,11 @@ internal class ReaderPositionTracker(
     }
 
     fun markProgrammaticNav() {
-        lastProgrammaticNavMs = clock()
+        lastProgrammaticNavMs = clock.uptimeNow()
     }
 
     fun withinNavGrace(windowMs: Long): Boolean =
-        clock() - lastProgrammaticNavMs <= windowMs
+        clock.uptimeNow() - lastProgrammaticNavMs <= windowMs
 
     fun positionText(): String? {
         val (index, count) = indexAndCount()
@@ -244,6 +244,7 @@ internal class ReaderAnnotationsController(
     private val bookId: String,
     private val store: ReaderSessionStore,
     private val chrome: ReaderChromeController,
+    private val clock: AppClock,
     private val uiState: StateFlow<ReaderUiState>,
     private val sendMessage: suspend (ReaderMessage) -> Unit,
     highlights: Flow<List<Highlight>>,
@@ -273,7 +274,7 @@ internal class ReaderAnnotationsController(
                 selectedText = selection.locator.text.highlight.orEmpty(),
                 color = color,
                 note = note?.ifBlank { null },
-                createdAt = System.currentTimeMillis(),
+                createdAt = clock.wallNow(),
             )
             repository.upsertHighlight(highlight)
             nav.clearSelection()

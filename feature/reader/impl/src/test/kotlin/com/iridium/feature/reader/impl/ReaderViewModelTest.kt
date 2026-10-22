@@ -2,6 +2,7 @@ package com.iridium.feature.reader.impl
 
 import androidx.lifecycle.SavedStateHandle
 import com.iridium.core.data.OpenResult
+import com.iridium.core.fakes.FakeClock
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
 import com.iridium.core.fakes.TestPreferencesDataSource
@@ -50,6 +51,7 @@ class ReaderViewModelTest {
         store = ReaderSessionStore()
         viewModel = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
+            clock = FakeClock(),
             repository = repository,
             preferences = preferences,
             opener = opener,
@@ -70,6 +72,7 @@ class ReaderViewModelTest {
         opener.failure = OpenResult.FileMissing
         val missing = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
+            clock = FakeClock(),
             repository = repository,
             preferences = preferences,
             opener = opener,
@@ -88,6 +91,7 @@ class ReaderViewModelTest {
         opener.failure = OpenResult.ParseFailed
         val broken = ReaderViewModel(
             savedStateHandle = SavedStateHandle(mapOf("bookId" to "book-1")),
+            clock = FakeClock(),
             repository = repository,
             preferences = preferences,
             opener = opener,

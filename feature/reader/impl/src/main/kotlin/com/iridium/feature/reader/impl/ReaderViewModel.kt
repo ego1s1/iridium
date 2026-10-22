@@ -47,6 +47,7 @@ import org.readium.r2.shared.util.Url
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val clock: com.iridium.core.common.AppClock,
     private val repository: BooksRepository,
     private val preferences: IridiumPreferencesDataSource,
     private val opener: BookOpener,
@@ -60,7 +61,7 @@ class ReaderViewModel @Inject constructor(
 
     private val chrome = ReaderChromeController(viewModelScope)
     private val dictionary = ReaderDictionaryController(viewModelScope, dictionaryLookup, store)
-    private val positions = ReaderPositionTracker(store)
+    private val positions = ReaderPositionTracker(store, clock)
     private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store)
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
@@ -173,6 +174,7 @@ class ReaderViewModel @Inject constructor(
         bookId = bookId,
         store = store,
         chrome = chrome,
+        clock = clock,
         uiState = uiState,
         sendMessage = { messageChannel.send(it) },
         highlights = highlights,

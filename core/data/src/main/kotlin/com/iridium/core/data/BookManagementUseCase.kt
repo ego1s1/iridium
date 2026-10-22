@@ -2,6 +2,7 @@ package com.iridium.core.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.iridium.core.common.AppClock
 import com.iridium.core.common.IoDispatcher
 import com.iridium.core.database.BookDao
 import com.iridium.core.database.ChapterTextDao
@@ -24,15 +25,16 @@ internal class BookManagementUseCase @Inject constructor(
     private val bookDao: BookDao,
     private val chapterTextDao: ChapterTextDao,
     private val annotations: AnnotationRepository,
+    private val clock: AppClock,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
     suspend fun updateProgress(id: String, progress: Float, locator: String?) {
-        bookDao.updateProgress(id, progress.coerceIn(0f, 1f), locator, System.currentTimeMillis())
+        bookDao.updateProgress(id, progress.coerceIn(0f, 1f), locator, clock.wallNow())
     }
 
     suspend fun setBookmarked(id: String, bookmarked: Boolean) {
-        bookDao.updateBookmark(id, bookmarked, System.currentTimeMillis())
+        bookDao.updateBookmark(id, bookmarked, clock.wallNow())
     }
 
     /** Unlinks a book: removes the row, thumbnail and search index. */

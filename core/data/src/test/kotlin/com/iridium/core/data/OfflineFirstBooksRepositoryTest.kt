@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.iridium.core.database.BookEntity
 import com.iridium.core.database.IridiumDatabase
+import com.iridium.core.fakes.FakeClock
 import com.iridium.core.model.BookError
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.LibraryQuery
@@ -68,6 +69,7 @@ class OfflineFirstBooksRepositoryTest {
                 bookmarkDao = database.bookmarkDao(),
             ),
             management = BookManagementUseCase(
+                clock = FakeClock(),
                 context = context,
                 database = database,
                 bookDao = database.bookDao(),
@@ -79,6 +81,7 @@ class OfflineFirstBooksRepositoryTest {
                 ioDispatcher = UnconfinedTestDispatcher(),
             ),
             scanner = LibraryScanUseCase(
+                clock = FakeClock(),
                 context = context,
                 database = database,
                 bookDao = database.bookDao(),
@@ -88,6 +91,7 @@ class OfflineFirstBooksRepositoryTest {
                 treeLister = lister,
                 sourceFactory = EpubSourceFactory(context),
                 management = BookManagementUseCase(
+                    clock = FakeClock(),
                     context = context,
                     database = database,
                     bookDao = database.bookDao(),
@@ -96,12 +100,6 @@ class OfflineFirstBooksRepositoryTest {
                         highlightDao = database.highlightDao(),
                         bookmarkDao = database.bookmarkDao(),
                     ),
-                    ioDispatcher = UnconfinedTestDispatcher(),
-                ),
-                search = ContentSearchUseCase(
-                    bookDao = database.bookDao(),
-                    chapterTextDao = database.chapterTextDao(),
-                    chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 ),
                 ioDispatcher = UnconfinedTestDispatcher(),

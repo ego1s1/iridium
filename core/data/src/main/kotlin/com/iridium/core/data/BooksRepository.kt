@@ -146,6 +146,9 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         management.removeBook(id)
 
     override suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String =
-        scanner.importEpub(displayName, openStream)
+        scanner.importEpub(displayName, openStream).also { id ->
+            // Best-effort FTS like the scan's follow-up pass.
+            runCatching { search.indexBookContent(id) }
+        }
 
 }
