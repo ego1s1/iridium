@@ -18,14 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,19 +33,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.iridium.core.designsystem.BookCoverArt
-import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.BookCoverArt
 import com.iridium.core.designsystem.IridiumMotion
-import com.iridium.core.designsystem.IridiumProgressBar
-import com.iridium.core.designsystem.IridiumScrimPill
-import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.designsystem.sharedCover
 import com.iridium.core.model.Book
+import com.iridium.feature.library.impl.components.BookCoverImage
+import com.iridium.feature.library.impl.components.BookProgressIndicator
+import com.iridium.feature.library.impl.components.bookCardClickable
+import com.iridium.feature.library.impl.components.rememberBookCardClicks
 
 /** Cached singleton brush for the book spine crease highlight along cover edges. */
 internal val BookSpineBrush = Brush.horizontalGradient(
@@ -75,19 +70,7 @@ internal fun BookCard(
     sharedCover: Boolean = true,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    // Handlers read the latest book at click time: keying only on
-    // click-relevant fields (identity, progress, error) avoids rebuilding on
-    // cover/metadata re-emissions, while title/author/bookmark/cover updates
-    // still reach the tap through latestBook.
-    val latestBook by rememberUpdatedState(book)
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
-    val haptics = rememberIridiumHaptics()
-    val longClick = remember(book.id, onDetails, haptics) {
-        {
-            haptics(IridiumHaptic.LongPress)
-            onDetails(latestBook)
-        }
-    }
+    val clicks = rememberBookCardClicks(book = book, onRead = onRead, onDetails = onDetails)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -95,7 +78,6 @@ internal fun BookCard(
         animationSpec = IridiumMotion.defaultSpatialSpec(),
         label = "bookCardScale",
     )
-    val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -109,65 +91,17 @@ internal fun BookCard(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
-                onClick = click,
-                onClickLabel = stringResource(R.string.library_card_read, book.title),
-                onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_more_actions),
+                onClick = clicks.click,
+                onClickLabel = clicks.readLabel,
+                onLongClick = clicks.longClick,
+                onLongClickLabel = clicks.moreLabel,
             ),
     ) {
         Column {
-            Box(
-                modifier = Modifier
-                    .aspectRatio(COVER_ASPECT)
-                    .then(if (sharedCover) Modifier.sharedCover(book.id) else Modifier),
-            ) {
-                BookCoverArt(
-                    coverPath = book.coverPath,
-                    contentDescription = null,
-                )
-
-                // Subtle physical book spine crease/highlight along the left edge.
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(BookSpineBrush),
-                )
-
-                if (book.error != null) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.library_card_unreadable),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-
-                // Bookmark badge marks favorites; same scrim language as the
-                // reader counter pill so it survives bright covers.
-                if (book.bookmarked) {
-                    IridiumScrimPill(
-                        text = "",
-                        icon = IridiumIcons.Bookmark,
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(6.dp),
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .semantics {
-                                stateDescription = bookmarkedLabel
-                            }
-                            .testTag(LibraryTestTags.bookmarkBadgeFor(book.id)),
-                    )
-                }
-            }
+            BookCoverImage(
+                book = book,
+                sharedCover = sharedCover,
+            )
 
             Column(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -193,14 +127,7 @@ internal fun BookCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (book.isInProgress || book.isFinished) {
-                    IridiumProgressBar(
-                        progress = { book.progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp),
-                    )
-                }
+                BookProgressIndicator(book = book)
             }
         }
     }
@@ -246,113 +173,46 @@ internal fun CoverOnlyBookCard(
     sharedCover: Boolean = true,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    // Latest-book reads at click time: metadata/bookmark updates must
-    // reach taps without rebuilding handlers on every re-emission.
-    val latestBook by rememberUpdatedState(book)
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
-    val haptics = rememberIridiumHaptics()
-    val longClick = remember(book.id, onDetails, haptics) {
-        {
-            haptics(IridiumHaptic.LongPress)
-            onDetails(latestBook)
-        }
-    }
-    val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
+    val clicks = rememberBookCardClicks(book = book, onRead = onRead, onDetails = onDetails)
 
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
             .testTag(cardTag)
-            .combinedClickable(
-                onClick = click,
-                onClickLabel = stringResource(R.string.library_card_read, book.title),
-                onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_more_actions),
-            ),
+            .bookCardClickable(clicks),
     ) {
-        Box(
-            modifier = Modifier
-                .aspectRatio(COVER_ASPECT)
-                .then(if (sharedCover) Modifier.sharedCover(book.id) else Modifier),
-        ) {
-            BookCoverArt(
-                coverPath = book.coverPath,
-                contentDescription = null,
-            )
-
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(BookSpineBrush),
-            )
-
-            // Bottom title overlay with gradient scrim.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.5f to Color.Black.copy(alpha = 0.5f),
-                            1f to Color.Black.copy(alpha = 0.85f),
-                        ),
-                    )
-                    .padding(8.dp),
-            ) {
-                Column {
-                    Text(
-                        text = book.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (book.isInProgress || book.isFinished) {
-                        IridiumProgressBar(
-                            progress = { book.progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
+        BookCoverImage(
+            book = book,
+            sharedCover = sharedCover,
+            overlay = {
+                // Bottom title overlay with gradient scrim.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.5f to Color.Black.copy(alpha = 0.5f),
+                                1f to Color.Black.copy(alpha = 0.85f),
+                            ),
                         )
+                        .padding(8.dp),
+                ) {
+                    Column {
+                        Text(
+                            text = book.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        BookProgressIndicator(book = book, topPadding = 4.dp)
                     }
                 }
-            }
-
-            if (book.error != null) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(6.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.library_card_unreadable),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            }
-
-            if (book.bookmarked) {
-                IridiumScrimPill(
-                    text = "",
-                    icon = IridiumIcons.Bookmark,
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(6.dp),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .semantics {
-                            stateDescription = bookmarkedLabel
-                        }
-                        .testTag(LibraryTestTags.bookmarkBadgeFor(book.id)),
-                )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -369,17 +229,7 @@ internal fun BookListRow(
     modifier: Modifier = Modifier,
     cardTag: String = LibraryTestTags.cardFor(book.id),
 ) {
-    // Latest-book reads at click time: metadata/bookmark updates must
-    // reach taps without rebuilding handlers on every re-emission.
-    val latestBook by rememberUpdatedState(book)
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
-    val haptics = rememberIridiumHaptics()
-    val longClick = remember(book.id, onDetails, haptics) {
-        {
-            haptics(IridiumHaptic.LongPress)
-            onDetails(latestBook)
-        }
-    }
+    val clicks = rememberBookCardClicks(book = book, onRead = onRead, onDetails = onDetails)
     val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
 
     Surface(
@@ -388,12 +238,7 @@ internal fun BookListRow(
         modifier = modifier
             .fillMaxWidth()
             .testTag(cardTag)
-            .combinedClickable(
-                onClick = click,
-                onClickLabel = stringResource(R.string.library_card_read, book.title),
-                onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_more_actions),
-            ),
+            .bookCardClickable(clicks),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -440,14 +285,7 @@ internal fun BookListRow(
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
-                if (book.isInProgress || book.isFinished) {
-                    IridiumProgressBar(
-                        progress = { book.progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp),
-                    )
-                }
+                BookProgressIndicator(book = book)
             }
 
             if (book.bookmarked) {
@@ -478,80 +316,19 @@ private fun BookCardChrome(
     titleMinLines: Int = 2,
     barTopPadding: androidx.compose.ui.unit.Dp = 6.dp,
 ) {
-    // Latest-book reads at click time: metadata/bookmark updates must
-    // reach taps without rebuilding handlers on every re-emission.
-    val latestBook by rememberUpdatedState(book)
-    val click = remember(book.id, book.progress, book.error, onRead) { { onRead(latestBook) } }
-    val haptics = rememberIridiumHaptics()
-    val longClick = remember(book.id, onDetails, haptics) {
-        {
-            haptics(IridiumHaptic.LongPress)
-            onDetails(latestBook)
-        }
-    }
-    val bookmarkedLabel = stringResource(R.string.library_card_bookmarked)
+    val clicks = rememberBookCardClicks(book = book, onRead = onRead, onDetails = onDetails)
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
             .testTag(cardTag)
-            .combinedClickable(
-                onClick = click,
-                onClickLabel = stringResource(R.string.library_card_read, book.title),
-                onLongClick = longClick,
-                onLongClickLabel = stringResource(R.string.library_card_more_actions),
-            ),
+            .bookCardClickable(clicks),
     ) {
         Column {
-            Box(
-                modifier = Modifier
-                    .aspectRatio(COVER_ASPECT)
-                    .then(if (sharedCover) Modifier.sharedCover(book.id) else Modifier),
-            ) {
-                BookCoverArt(
-                    coverPath = book.coverPath,
-                    contentDescription = null,
-                )
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(BookSpineBrush),
-                )
-
-                if (book.error != null) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.library_card_unreadable),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-
-                if (book.bookmarked) {
-                    IridiumScrimPill(
-                        text = "",
-                        icon = IridiumIcons.Bookmark,
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(6.dp),
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .semantics {
-                                stateDescription = bookmarkedLabel
-                            }
-                            .testTag(LibraryTestTags.bookmarkBadgeFor(book.id)),
-                    )
-                }
-            }
+            BookCoverImage(
+                book = book,
+                sharedCover = sharedCover,
+            )
 
             Column(
                 modifier = Modifier.padding(metaPadding),
@@ -574,14 +351,7 @@ private fun BookCardChrome(
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
-                if (book.isInProgress || book.isFinished) {
-                    IridiumProgressBar(
-                        progress = { book.progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = barTopPadding),
-                    )
-                }
+                BookProgressIndicator(book = book, topPadding = barTopPadding)
             }
         }
     }
