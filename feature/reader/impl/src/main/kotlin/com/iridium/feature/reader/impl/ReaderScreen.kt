@@ -63,7 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
-import androidx.fragment.app.FragmentActivity
+import com.iridium.core.designsystem.findActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -185,7 +185,7 @@ internal fun ReaderScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val activity = context as? FragmentActivity
+    val activity = context.findActivity()
     var showAddDialog by remember { mutableStateOf(false) }
     val haptics = rememberIridiumHaptics()
 
@@ -524,7 +524,7 @@ internal fun ColorSchemeChoice.lightSystemBars(): Boolean = isLightScheme()
 @Composable
 private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val activity = context as? FragmentActivity
+    val activity = context.findActivity()
     if (activity == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.reader_unavailable))
