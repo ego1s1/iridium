@@ -1,6 +1,7 @@
 package com.iridium.feature.reader.impl
 
 import com.iridium.core.common.AppClock
+import com.iridium.core.data.LocatorStrings
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.Highlight
@@ -19,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.shared.publication.Locator
 
@@ -264,7 +264,7 @@ internal class ReaderAnnotationsController(
                 sendMessage(ReaderMessage.SelectTextFirst)
                 return@launch
             }
-            val locatorJson = selection.locator.toJSON().toString()
+            val locatorJson = LocatorStrings.encode(selection.locator)
             val highlight = Highlight(
                 id = UUID.randomUUID().toString(),
                 bookId = bookId,
@@ -312,7 +312,7 @@ internal class ReaderAnnotationsController(
     private suspend fun applyDecorations(highlights: List<Highlight>) {
         val nav = store.navigator ?: return
         val decorations = highlights.mapNotNull { h ->
-            val locator = runCatching { Locator.fromJSON(JSONObject(h.startLocator)) }.getOrNull()
+            val locator = LocatorStrings.decode(h.startLocator)
                 ?: return@mapNotNull null
             Decoration(
                 id = h.id,

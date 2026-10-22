@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.iridium.core.data.LocatorStrings
 import com.iridium.core.data.BookOpener
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.data.OpenResult
@@ -35,7 +36,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
@@ -189,7 +189,7 @@ class ReaderViewModel @Inject constructor(
             // Persist progress on every debounced locator value.
             progression.collect { prog ->
                 val locator = store.latestLocator.value ?: return@collect
-                repository.updateProgress(bookId, prog, locator.toJSON().toString())
+                repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
             }
         }
         viewModelScope.launch {
@@ -315,7 +315,7 @@ class ReaderViewModel @Inject constructor(
                 val initialLocator = route.href
                     ?.let { locatorForHref(result.publication, it) }
                     ?: book.lastLocator?.let { raw ->
-                        runCatching { Locator.fromJSON(JSONObject(raw)) }.getOrNull()
+                        LocatorStrings.decode(raw)
                     }
                 val factory = EpubNavigatorFactory(result.publication)
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
@@ -520,7 +520,7 @@ class ReaderViewModel @Inject constructor(
                 val prog = locator.locations.totalProgression?.toFloat() ?: 0f
                 appScope.launch {
                     runCatching {
-                        repository.updateProgress(bookId, prog, locator.toJSON().toString())
+                        repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
                     }
                 }
             }
