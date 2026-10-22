@@ -65,17 +65,11 @@ class ReaderViewModel @Inject constructor(
     private val route: ReaderRoute = savedStateHandle.toRoute()
     private val bookId: String = route.bookId
 
-    private val chromeVisible = MutableStateFlow(true)
-    private val settingsOpen = MutableStateFlow(false)
-    private val themeSheetOpen = MutableStateFlow(false)
-    private val tocOpen = MutableStateFlow(false)
-    private val highlightsOpen = MutableStateFlow(false)
-    private val focusedHighlightId = MutableStateFlow<String?>(null)
+    private val chrome = ReaderChromeController(viewModelScope)
+    private val dictionary = ReaderDictionaryController(viewModelScope, dictionaryLookup, store)
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private val openFileMissing = MutableStateFlow(false)
-    private var chromeJob: Job? = null
-    private var dictionaryJob: Job? = null
 
     /**
      * Suppresses locator-driven chrome hides right after programmatic
@@ -151,10 +145,13 @@ class ReaderViewModel @Inject constructor(
     private val content: Flow<ReaderContent> =
         combine(book, toc, highlights, preferences.readerPreferences, ::ReaderContent)
     private val chromeBundle: Flow<ReaderChromeBundle> =
-        combine(chromeVisible, settingsOpen, tocOpen, highlightsOpen, themeSheetOpen, ::ReaderChromeBundle)
+        combine(
+            chrome.chromeVisible, chrome.settingsOpen, chrome.tocOpen,
+            chrome.highlightsOpen, chrome.themeSheetOpen, ::ReaderChromeBundle,
+        )
     private val navBundle: Flow<ReaderNavBundle> =
         combine(
-            focusedHighlightId, navigatorAttached, openFailed, progression,
+            chrome.focusedHighlightId, navigatorAttached, openFailed, progression,
             openFileMissing, ::ReaderNavBundle,
         )
 
@@ -214,56 +211,41 @@ class ReaderViewModel @Inject constructor(
                 if (locator != null &&
                     SystemClock.uptimeMillis() - lastProgrammaticNavMs > LOCATOR_HIDE_GRACE_MS
                 ) {
-                    chromeVisible.value = false
-                    chromeJob?.cancel()
+                    chrome.hideForPageTurn()
                 }
             }
         }
-        scheduleChromeHide()
+        chrome.scheduleHide()
     }
 
     // UI actions
 
-    /** Opens a sheet and holds chrome; TOC/highlights only cancel auto-hide. */
-    private fun openSheet(sheet: MutableStateFlow<Boolean>, pinChromeVisible: Boolean = false) {
-        sheet.value = true
-        if (pinChromeVisible) chromeVisible.value = true
-        chromeJob?.cancel()
-    }
-
-    /** Closes a sheet and resumes auto-hide; highlight sheets also clear focus. */
-    private fun closeSheet(sheet: MutableStateFlow<Boolean>, clearHighlightFocus: Boolean = false) {
-        sheet.value = false
-        if (clearHighlightFocus) focusedHighlightId.value = null
-        scheduleChromeHide()
-    }
-
     fun onAction(action: ReaderAction) {
         when (action) {
             ReaderAction.Back -> viewModelScope.launch { messageChannel.send(ReaderMessage.Pop) }
-            ReaderAction.OpenSettings -> openSheet(settingsOpen, pinChromeVisible = true)
-            ReaderAction.CloseSettings -> closeSheet(settingsOpen)
-            ReaderAction.OpenThemeSheet -> openSheet(themeSheetOpen, pinChromeVisible = true)
-            ReaderAction.CloseThemeSheet -> closeSheet(themeSheetOpen)
-            ReaderAction.OpenToc -> openSheet(tocOpen)
-            ReaderAction.CloseToc -> closeSheet(tocOpen)
-            ReaderAction.OpenHighlights -> openSheet(highlightsOpen)
-            ReaderAction.CloseHighlights -> closeSheet(highlightsOpen, clearHighlightFocus = true)
-            ReaderAction.DismissDictionary -> dismissDictionary()
+            ReaderAction.OpenSettings -> chrome.open(chrome.settingsOpen, pinChromeVisible = true)
+            ReaderAction.CloseSettings -> chrome.close(chrome.settingsOpen)
+            ReaderAction.OpenThemeSheet -> chrome.open(chrome.themeSheetOpen, pinChromeVisible = true)
+            ReaderAction.CloseThemeSheet -> chrome.close(chrome.themeSheetOpen)
+            ReaderAction.OpenToc -> chrome.open(chrome.tocOpen)
+            ReaderAction.CloseToc -> chrome.close(chrome.tocOpen)
+            ReaderAction.OpenHighlights -> chrome.open(chrome.highlightsOpen)
+            ReaderAction.CloseHighlights -> chrome.close(chrome.highlightsOpen, clearHighlightFocus = true)
+            ReaderAction.DismissDictionary -> dictionary.dismiss()
             ReaderAction.DismissImage -> store.dismissImage()
             ReaderAction.ExportAnnotations -> exportAnnotations()
             is ReaderAction.SeekTo -> {
                 seekTo(action.progression)
-                scheduleChromeHide()
+                chrome.scheduleHide()
             }
             is ReaderAction.GoTocEntry -> goTocEntry(action.entry)
             is ReaderAction.GoForward -> {
                 store.navigator?.goForward(action.animated)
-                scheduleChromeHide()
+                chrome.scheduleHide()
             }
             is ReaderAction.GoBackward -> {
                 store.navigator?.goBackward(action.animated)
-                scheduleChromeHide()
+                chrome.scheduleHide()
             }
             is ReaderAction.AddHighlight -> addHighlight(action.color, action.note)
             is ReaderAction.DeleteHighlight -> deleteHighlight(action.id)
@@ -398,12 +380,10 @@ class ReaderViewModel @Inject constructor(
                 // A content tap with the dictionary open dismisses the popup
                 // instead of toggling chrome; taps behind any sheet are the
                 // modal's, not the page's.
-                if (_dictionaryUi.value != null) {
-                    dismissDictionary()
-                } else if (!settingsOpen.value && !themeSheetOpen.value &&
-                    !tocOpen.value && !highlightsOpen.value
-                ) {
-                    toggleChrome()
+                if (dictionary.isOpen) {
+                    dictionary.dismiss()
+                } else if (!chrome.anySheetOpen()) {
+                    chrome.toggle()
                 }
             }
             is ReaderSessionEvent.ContentTappedAt ->
@@ -420,23 +400,15 @@ class ReaderViewModel @Inject constructor(
                 runCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
             }
             is ReaderSessionEvent.DecorationTapped -> {
-                focusedHighlightId.value = event.decorationId
-                highlightsOpen.value = true
-                chromeVisible.value = false
-                chromeJob?.cancel()
+                chrome.showHighlightsForDecoration(event.decorationId)
             }
             is ReaderSessionEvent.ExternalLink ->
                 messageChannel.send(ReaderMessage.OpenUrl(event.url))
             ReaderSessionEvent.ResourceFailed ->
                 messageChannel.send(ReaderMessage.ContentUnavailable)
-            is ReaderSessionEvent.SelectionChanged -> onSelectionChanged(event.text)
+            is ReaderSessionEvent.SelectionChanged -> dictionary.onSelectionChanged(event.text)
             else -> Unit
         }
-    }
-
-    private fun toggleChrome() {
-        chromeVisible.update { !it }
-        if (chromeVisible.value) scheduleChromeHide() else chromeJob?.cancel()
     }
 
     /**
@@ -448,13 +420,10 @@ class ReaderViewModel @Inject constructor(
      */
     private fun handleZonedTap(fractionX: Float, fractionY: Float, dismissedPopup: Boolean) {
         if (dismissedPopup) {
-            dismissDictionary()
+            dictionary.dismiss()
             return
         }
-        if (_dictionaryUi.value != null ||
-            settingsOpen.value || themeSheetOpen.value ||
-            tocOpen.value || highlightsOpen.value
-        ) {
+        if (dictionary.isOpen || chrome.anySheetOpen()) {
             return
         }
         when (
@@ -466,25 +435,13 @@ class ReaderViewModel @Inject constructor(
         ) {
             ChromeTapZone.PREV -> {
                 store.navigator?.goBackward(true)
-                scheduleChromeHide()
+                chrome.scheduleHide()
             }
             ChromeTapZone.NEXT -> {
                 store.navigator?.goForward(true)
-                scheduleChromeHide()
+                chrome.scheduleHide()
             }
-            ChromeTapZone.MENU -> toggleChrome()
-        }
-    }
-
-    private fun scheduleChromeHide() {
-        chromeJob?.cancel()
-        chromeJob = viewModelScope.launch {
-            delay(CHROME_AUTO_HIDE_MS)
-            if (!settingsOpen.value && !themeSheetOpen.value &&
-                !tocOpen.value && !highlightsOpen.value
-            ) {
-                chromeVisible.value = false
-            }
+            ChromeTapZone.MENU -> chrome.toggle()
         }
     }
 
@@ -533,8 +490,7 @@ class ReaderViewModel @Inject constructor(
         return true
     }
 
-    private val _dictionaryUi = MutableStateFlow<DictionaryUiState?>(null)
-    val dictionaryUi: StateFlow<DictionaryUiState?> = _dictionaryUi.asStateFlow()
+    val dictionaryUi: StateFlow<DictionaryUiState?> = dictionary.ui
 
     /** Href of the book `<img>` being showcased full-screen, or null. */
     val shownImage: StateFlow<String?> = store.shownImage
@@ -547,48 +503,6 @@ class ReaderViewModel @Inject constructor(
         val resource = publication.get(url) ?: return null
         val length = resource.length().getOrNull() ?: return null
         return runCatching { resource.read(0 until length).getOrNull() }.getOrNull()
-    }
-
-    private fun onSelectionChanged(text: String?) {
-        dictionaryJob?.cancel()
-        // Normalize first: punctuation-only or blank selections show no
-        // popup at all, and the popup titles the clean headword rather than
-        // the raw multi-word drag.
-        val query = text?.let(::normalizeLookupWord)
-        if (query.isNullOrEmpty()) {
-            _dictionaryUi.value = null
-            return
-        }
-        dictionaryJob = viewModelScope.launch {
-            // Debounce first: selection drags fire per word, and a blocking
-            // HTTP call cannot be cancelled mid-flight — superseded words
-            // must never reach the network.
-            delay(DICTIONARY_DEBOUNCE_MS)
-            val lookup = async { dictionaryLookup.define(query) }
-            // Reveal delay: cache hits resolve inside it (popup appears once,
-            // with content); slow lookups show a skeleton instead of flashing.
-            delay(DICTIONARY_REVEAL_DELAY_MS)
-            if (!lookup.isCompleted) {
-                _dictionaryUi.value = DictionaryUiState(word = query, loading = true)
-            }
-            val result = lookup.await()
-            _dictionaryUi.value = result.fold(
-                onSuccess = { DictionaryUiState(word = query, definition = it) },
-                onFailure = {
-                    DictionaryUiState(
-                        word = query,
-                        error = it.message ?: "Couldn't look up this word",
-                    )
-                },
-            )
-        }
-    }
-
-    private fun dismissDictionary() {
-        dictionaryJob?.cancel()
-        _dictionaryUi.value = null
-        store.clearSelection()
-        runCatching { store.navigator?.clearSelection() }
     }
 
     /** Builds a Markdown + HTML export of the current book's highlights/notes. */
@@ -621,8 +535,8 @@ class ReaderViewModel @Inject constructor(
     private fun goTocEntry(entry: TocEntry) {
         val publication = store.publication ?: return
         val nav = store.navigator ?: return
-        tocOpen.value = false
-        scheduleChromeHide()
+        chrome.tocOpen.value = false
+        chrome.scheduleHide()
         val link = publication.tableOfContents.firstOrNull {
             it.href.toString().substringBefore('#') == entry.href.substringBefore('#') ||
                 entry.href.substringBefore('#').endsWith(it.href.toString().substringBefore('#'))
@@ -663,7 +577,7 @@ class ReaderViewModel @Inject constructor(
     private fun deleteHighlight(id: String) {
         viewModelScope.launch {
             repository.deleteHighlight(id)
-            if (focusedHighlightId.value == id) focusedHighlightId.value = null
+            chrome.clearFocusIf(id)
         }
     }
 
@@ -747,8 +661,6 @@ class ReaderViewModel @Inject constructor(
     }
 
     private companion object {
-        const val CHROME_AUTO_HIDE_MS = 3000L
-
         /**
          * Locator changes inside this window after programmatic navigation
          * (open, seek, TOC jump) never hide the chrome: only user page turns
@@ -756,18 +668,6 @@ class ReaderViewModel @Inject constructor(
          */
         const val LOCATOR_HIDE_GRACE_MS = 750L
 
-        /**
-         * Selection debounce before the lookup starts: drags fire per word
-         * and a blocking HTTP call cannot be cancelled mid-flight, so
-         * superseded words must never reach the network.
-         */
-        const val DICTIONARY_DEBOUNCE_MS = 150L
-
-        /**
-         * Grace period before the dictionary popup reveals: lookups finishing
-         * inside it (cache hits) skip the loading skeleton entirely.
-         */
-        const val DICTIONARY_REVEAL_DELAY_MS = 150L
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
         const val DECORATION_GROUP = "highlights"
     }
