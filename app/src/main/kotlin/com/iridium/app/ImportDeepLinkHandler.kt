@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,7 +54,13 @@ class ImportDeepLinkHandler @Inject constructor(
         val request = parseIntent(intent) ?: return@withContext null
         val name = resolveDisplayName(request.uri) ?: request.uri.lastPathSegment
         importUri(name) {
-            runCatching { context.contentResolver.openInputStream(request.uri) }.getOrNull()
+            try {
+                context.contentResolver.openInputStream(request.uri)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -62,7 +69,13 @@ class ImportDeepLinkHandler @Inject constructor(
         displayName: String?,
         openStream: () -> java.io.InputStream?,
     ): String? = withContext(Dispatchers.IO) {
-        runCatching { repository.importEpub(displayName ?: "book.epub", openStream) }.getOrNull()
+        try {
+            repository.importEpub(displayName ?: "book.epub", openStream)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun isEpubIntent(mimeType: String?, uri: Uri?): Boolean {
@@ -73,12 +86,16 @@ class ImportDeepLinkHandler @Inject constructor(
     }
 
     private fun resolveDisplayName(uri: Uri): String? =
-        runCatching {
+        try {
             context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                 ?.use { cursor ->
                     if (cursor.moveToFirst()) cursor.getString(0) else null
                 }
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
 
     private companion object {
         const val EPUB_MIME = "application/epub+zip"

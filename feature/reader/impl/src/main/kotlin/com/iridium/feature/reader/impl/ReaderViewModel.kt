@@ -505,7 +505,8 @@ class ReaderViewModel @Inject constructor(
         val url = Url(src) ?: return null
         val resource = publication.get(url) ?: return null
         val length = resource.length().getOrNull() ?: return null
-        return runCatching { resource.read(0 until length).getOrNull() }.getOrNull()
+        if (length > MAX_SHOWCASE_BYTES) return null
+        return safeCatching { resource.read(0 until length).getOrNull() }.getOrNull()
     }
 
     /** Builds a Markdown + HTML export of the current book's highlights/notes. */
@@ -535,7 +536,7 @@ class ReaderViewModel @Inject constructor(
             store.latestLocator.value?.let { locator ->
                 val prog = locator.locations.totalProgression?.toFloat() ?: 0f
                 appScope.launch {
-                    runCatching {
+                    safeCatching {
                         repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
                     }
                 }
@@ -546,6 +547,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     private companion object {
+        const val MAX_SHOWCASE_BYTES = 32 * 1024 * 1024L
         /**
          * Locator changes inside this window after programmatic navigation
          * (open, seek, TOC jump) never hide the chrome: only user page turns

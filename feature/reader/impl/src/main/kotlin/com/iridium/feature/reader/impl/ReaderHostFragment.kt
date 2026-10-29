@@ -115,6 +115,8 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
     }
 
     override fun onDestroyView() {
+        selectionMode?.finish()
+        selectionMode = null
         navigator?.let {
             it.removeInputListener(chromeTapListener)
             it.removeDecorationListener(decorationListener)
@@ -191,7 +193,7 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
             // starts), publish to the store for the dictionary popup, then
             // finish the system bar — the popup is the UI, not the toolbar.
             selectionMode = mode
-            lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {
                 kotlinx.coroutines.delay(250)
                 fetchSelection()
             }
@@ -213,8 +215,8 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
     /** Reads the navigator's current selection into the session store. */
     private fun fetchSelection(retry: Boolean = true) {
         val nav = navigator ?: return
-        lifecycleScope.launch {
-            val highlight = runCatching { nav.currentSelection() }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val highlight = com.iridium.core.common.safeCatching { nav.currentSelection() }
                 .getOrNull()
                 ?.locator?.text?.highlight
             if (highlight.isNullOrBlank()) {

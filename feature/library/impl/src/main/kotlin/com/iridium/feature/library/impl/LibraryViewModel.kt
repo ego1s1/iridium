@@ -173,7 +173,13 @@ class LibraryViewModel @Inject constructor(
                     contentHits.value = if (text.length < MIN_CONTENT_QUERY) {
                         emptyList()
                     } else {
-                        runCatching { repository.searchContent(text) }.getOrDefault(emptyList())
+                        try {
+                            repository.searchContent(text)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
                     }
                 }
         }
@@ -209,8 +215,7 @@ class LibraryViewModel @Inject constructor(
             }
             LibraryAction.ToggleMenuBookmark -> {
                 val id = menuBook.value?.id ?: return
-                val current = books.value.firstOrNull { it.id == id }?.bookmarked ?: return
-                viewModelScope.launch { repository.setBookmarked(id, !current) }
+                viewModelScope.launch { repository.toggleBookmarked(id) }
             }
             LibraryAction.OpenMenuDelete -> menuDeleteConfirm.value = true
             LibraryAction.ConfirmMenuDelete -> {

@@ -101,6 +101,12 @@ class TestBooksRepository : BooksRepository {
         }
     }
 
+    override suspend fun toggleBookmarked(id: String) {
+        booksFlow.update { list ->
+            list.map { if (it.id == id) it.copy(bookmarked = !it.bookmarked) else it }
+        }
+    }
+
     override suspend fun upsertHighlight(highlight: Highlight) {
         // REPLACE semantics like Room: re-saving an id updates, not duplicates.
         highlightsFlow.update { list -> list.filterNot { it.id == highlight.id } + highlight }

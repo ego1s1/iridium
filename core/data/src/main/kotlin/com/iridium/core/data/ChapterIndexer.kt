@@ -1,5 +1,6 @@
 package com.iridium.core.data
 
+import com.iridium.core.common.safeCatching
 import com.iridium.core.database.ChapterTextEntity
 import com.iridium.core.model.TocEntry
 import com.iridium.epub.engine.HtmlText
@@ -30,11 +31,11 @@ internal class ChapterIndexer @Inject constructor(
         displayName: String,
         toc: List<TocEntry>,
     ): List<ChapterTextEntity> = withContext(Dispatchers.Default) {
-        val source = runCatching { sourceFactory.open(sourcePath, displayName) }.getOrNull()
+        val source = safeCatching { sourceFactory.open(sourcePath, displayName) }.getOrNull()
             ?: return@withContext emptyList()
 
         source.use { open ->
-            val book = runCatching { engine.open(open, displayName) }.getOrNull()
+            val book = safeCatching { engine.open(open, displayName) }.getOrNull()
                 ?: return@withContext emptyList()
             try {
                 val titlesByHref = toc.associate { it.href.substringBefore('#') to it.title }
@@ -48,11 +49,11 @@ internal class ChapterIndexer @Inject constructor(
                     // would otherwise stage ~200MB in one Room transaction.
                     if (totalChars >= MAX_TOTAL_CHARS) return@forEachIndexed
                     // One bad chapter must not abort the whole book's index.
-                    val bytes = runCatching { book.chapterBytes(href) }.getOrNull()
+                    val bytes = safeCatching { book.chapterBytes(href) }.getOrNull()
                         ?: return@forEachIndexed
                     if (bytes.size > MAX_CHAPTER_BYTES) return@forEachIndexed
 
-                    val text = runCatching { HtmlText.toPlainText(String(bytes, Charsets.UTF_8)) }
+                    val text = safeCatching { HtmlText.toPlainText(String(bytes, Charsets.UTF_8)) }
                         .getOrNull() ?: return@forEachIndexed
                     if (text.length < MIN_CHAPTER_CHARS) return@forEachIndexed
 
@@ -71,7 +72,7 @@ internal class ChapterIndexer @Inject constructor(
                 }
                 rows
             } finally {
-                runCatching { book.close() }
+                safeCatching { book.close() }
             }
         }
     }

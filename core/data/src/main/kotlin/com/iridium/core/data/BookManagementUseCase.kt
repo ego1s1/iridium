@@ -37,6 +37,10 @@ internal class BookManagementUseCase @Inject constructor(
         bookDao.updateBookmark(id, bookmarked, clock.wallNow())
     }
 
+    suspend fun toggleBookmarked(id: String) {
+        bookDao.toggleBookmark(id, clock.wallNow())
+    }
+
     /** Unlinks a book: removes the row, thumbnail and search index. */
     suspend fun removeBook(id: String) = withContext(ioDispatcher) {
         // Unlink only: the user's original file must survive removal.
@@ -63,10 +67,12 @@ internal class BookManagementUseCase @Inject constructor(
 
     /** Deletes an app-owned import copy; never touches linked originals. */
     private fun deleteImportedFile(sourcePath: String) {
-        val booksDir = File(context.filesDir, IMPORT_DIR).absolutePath
-        val file = File(sourcePath)
-        if (file.absolutePath.startsWith(booksDir + File.separator)) {
-            runCatching { file.delete() }
+        val booksDir = runCatching { File(context.filesDir, IMPORT_DIR).canonicalPath }.getOrNull()
+            ?: return
+        val filePath = runCatching { File(sourcePath).canonicalPath }.getOrNull()
+            ?: return
+        if (filePath.startsWith(booksDir + File.separator)) {
+            runCatching { File(filePath).delete() }
         }
     }
 }

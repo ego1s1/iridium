@@ -43,6 +43,9 @@ interface BookDao {
     @Query("UPDATE books SET bookmarked = :bookmarked, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateBookmark(id: String, bookmarked: Boolean, updatedAt: Long)
 
+    @Query("UPDATE books SET bookmarked = NOT bookmarked, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun toggleBookmark(id: String, updatedAt: Long)
+
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun deleteById(id: String)
 

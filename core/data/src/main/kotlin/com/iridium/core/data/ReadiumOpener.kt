@@ -51,9 +51,15 @@ class ReadiumOpener @Inject constructor(
             Retrieved.Gone -> OpenResult.FileMissing
             Retrieved.Unreadable -> OpenResult.ParseFailed
             is Retrieved.Found -> {
-                val result = safeCatching {
+                val result = try {
                     opener.open(retrieved.asset, allowUserInteraction = false)
-                }.getOrNull()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    runCatching { (retrieved.asset as? Closeable)?.close() }
+                    throw e
+                } catch (_: Exception) {
+                    runCatching { (retrieved.asset as? Closeable)?.close() }
+                    null
+                }
                 when (result) {
                     is Try.Success<*, *> -> {
                         // The publication borrows the asset's resources lazily:

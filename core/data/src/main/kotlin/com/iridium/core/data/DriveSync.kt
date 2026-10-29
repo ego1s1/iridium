@@ -12,6 +12,7 @@ import com.iridium.core.common.safeCatching
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Outcome of one [DriveSyncManager.syncNow]. */
@@ -60,11 +61,13 @@ class DriveSyncManager @Inject constructor(
     private val backup: LibraryBackupManager,
     private val gatewayFactory: DriveGatewayFactory,
 ) {
+    private val syncMutex = kotlinx.coroutines.sync.Mutex()
     /**
      * One manual sync for [accountEmail]: uploads when the local snapshot is
      * newer, downloads + restores when the remote wins, no-op on ties.
      */
-    suspend fun syncNow(accountEmail: String): DriveSyncResult = withContext(Dispatchers.IO) {
+    suspend fun syncNow(accountEmail: String): DriveSyncResult = syncMutex.withLock {
+        withContext(Dispatchers.IO) {
         if (accountEmail.isBlank()) return@withContext DriveSyncResult.SignedOut
         val gateway = safeCatching { gatewayFactory.create(accountEmail) }.getOrNull()
             ?: return@withContext DriveSyncResult.Failed("Drive unavailable")
@@ -90,6 +93,7 @@ class DriveSyncManager @Inject constructor(
                     ?: return@withContext DriveSyncResult.Failed("Invalid backup file")
                 DriveSyncResult.Downloaded(report.restored, report.skipped)
             }
+        }
         }
     }
 

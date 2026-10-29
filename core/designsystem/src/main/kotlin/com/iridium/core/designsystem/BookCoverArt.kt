@@ -60,10 +60,14 @@ fun BookCoverArt(
 
     if (coverPath != null) {
         val appContext = LocalContext.current.applicationContext
-        val request = remember(coverPath) {
+        val coverKey = remember(coverPath) {
+            val mtime = runCatching { File(coverPath).lastModified() }.getOrDefault(0L)
+            "$coverPath@$mtime"
+        }
+        val request = remember(coverKey) {
             ImageRequest.Builder(appContext)
                 .data(File(coverPath))
-                .memoryCacheKey(coverPath)
+                .memoryCacheKey(coverKey)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.DISABLED)
                 .crossfade(false)

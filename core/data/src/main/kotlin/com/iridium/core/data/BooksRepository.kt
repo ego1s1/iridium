@@ -1,5 +1,6 @@
 package com.iridium.core.data
 
+import com.iridium.core.common.safeCatching
 import com.iridium.core.model.Book
 import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
@@ -38,6 +39,7 @@ interface BooksRepository {
 
     suspend fun updateProgress(id: String, progress: Float, locator: String?)
     suspend fun setBookmarked(id: String, bookmarked: Boolean)
+    suspend fun toggleBookmarked(id: String)
     suspend fun upsertHighlight(highlight: Highlight)
     suspend fun deleteHighlight(id: String)
     suspend fun deleteAllHighlights(bookId: String)
@@ -115,6 +117,10 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         management.setBookmarked(id, bookmarked)
     }
 
+    override suspend fun toggleBookmarked(id: String) {
+        management.toggleBookmarked(id)
+    }
+
     override suspend fun upsertHighlight(highlight: Highlight) =
         annotations.upsertHighlight(highlight)
 
@@ -148,7 +154,7 @@ internal class OfflineFirstBooksRepository @Inject constructor(
     override suspend fun importEpub(displayName: String, openStream: () -> java.io.InputStream?): String =
         scanner.importEpub(displayName, openStream).also { id ->
             // Best-effort FTS like the scan's follow-up pass.
-            runCatching { search.indexBookContent(id) }
+            safeCatching { search.indexBookContent(id) }
         }
 
 }
