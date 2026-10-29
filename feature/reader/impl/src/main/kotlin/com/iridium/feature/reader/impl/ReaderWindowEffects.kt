@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.iridium.core.designsystem.findActivity
 import com.iridium.core.model.ColorSchemeChoice
 
@@ -45,20 +47,28 @@ internal fun ReaderWindowEffects(
         }
     }
 
-    // Immersive reading: hide system bars with the chrome.
+    // Immersive reading: the bars fade out with the chrome.
+    //
+    // Behaviour is BEHAVIOR_DEFAULT on purpose. The transient-swipe behaviour
+    // (BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE) turns the first edge swipe into
+    // "reveal the bars" instead of performing the gesture, which is why back
+    // needed two swipes and the swipe-up-to-home from the pill did nothing.
+    // With the default behaviour the bars fade away, the gesture pill
+    // disappears, and back/home still respond to the first swipe. The platform
+    // animates hide()/show() on Android 11+, so the bars fade rather than
+    // blink; a longer custom fade would need WindowInsetsAnimationController.
     DisposableEffect(chromeVisible) {
-        val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        val controller =
+            activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
         if (chromeVisible) {
-            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            controller?.show(WindowInsetsCompat.Type.systemBars())
         } else {
-            controller?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            controller?.systemBarsBehavior =
-                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
         }
-        // Leaving the reader with hidden chrome must not leave the library
-        // with hidden system bars.
+        // Leaving the reader must not leave the library without its bars.
         onDispose {
-            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
