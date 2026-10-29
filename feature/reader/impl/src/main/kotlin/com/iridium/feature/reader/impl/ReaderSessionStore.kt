@@ -4,6 +4,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -121,8 +122,8 @@ class ReaderSessionStore @Inject constructor() {
     private val _openInFlight = MutableStateFlow(false)
     val openInFlight: StateFlow<Boolean> = _openInFlight.asStateFlow()
 
-    private var _events = MutableSharedFlow<ReaderSessionEvent>(extraBufferCapacity = 64)
-    val events get() = _events.asSharedFlow()
+    private val _events = MutableSharedFlow<ReaderSessionEvent>(extraBufferCapacity = 64)
+    val events: SharedFlow<ReaderSessionEvent> = _events.asSharedFlow()
 
     /** Marks the start of an open: nothing may attach until [publish]. */
     fun beginOpen() {
@@ -194,9 +195,10 @@ class ReaderSessionStore @Inject constructor() {
         navigator = null
         _latestLocator.value = null
         _selectedText.value = null
-        // Drop buffered one-shot events so a stale tap/selection can never
-        // leak into the next book's session.
-        _events = MutableSharedFlow(extraBufferCapacity = 64)
+        // NOTE: [_events] is intentionally stable across sessions. Recreating
+        // the hub here would orphan the ViewModel's long-lived collector
+        // (it holds the original flow), silently dropping every tap,
+        // selection and attach event after the first open.
         runCatching { publication?.close() }
         publication = null
         navigatorFactory = null
