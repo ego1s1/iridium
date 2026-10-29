@@ -79,6 +79,8 @@ import com.iridium.core.model.MotionStyle
 import kotlinx.coroutines.launch
 import com.iridium.core.model.ThemeMode
 
+private const val MAX_BACKUP_IMPORT_CHARS = 8 * 1024 * 1024
+
 /** Public tab content for the main viewport. */
 @Composable
 fun SettingsTabContent(
@@ -122,11 +124,31 @@ internal fun SettingsRoute(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) scope.launch {
-            val json = context.contentResolver.openInputStream(uri)
-                ?.bufferedReader()?.readText() ?: return@launch
-            val report = runCatching { viewModel.importSnapshot(json) }.getOrNull()
+            val json = try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.bufferedReader().use { reader ->
+                        val capped = CharArray(MAX_BACKUP_IMPORT_CHARS)
+                        val read = reader.read(capped)
+                        if (read <= 0) return@launch
+                        String(capped, 0, read)
+                    }
+                } ?: return@launch
+            } catch (_: Exception) {
+                snackbarHost.showSnackbar(
+                    context.getString(R.string.settings_backup_import_failed),
+                )
+                return@launch
+            }
+            val report = try {
+                viewModel.importSnapshot(json)
+            } catch (_: Exception) {
+                snackbarHost.showSnackbar(
+                    context.getString(R.string.settings_backup_import_failed),
+                )
+                return@launch
+            }
             snackbarHost.showSnackbar(
-                context.getString(R.string.settings_backup_imported, report?.restored ?: 0),
+                context.getString(R.string.settings_backup_imported, report.restored),
             )
         }
     }
@@ -139,14 +161,25 @@ internal fun SettingsRoute(
         onAddFolder = launchPicker,
         onExportBackup = {
             scope.launch {
-                val json = runCatching { viewModel.exportSnapshot() }.getOrNull() ?: return@launch
+                val json = try {
+                    viewModel.exportSnapshot()
+                } catch (_: Exception) {
+                    snackbarHost.showSnackbar(
+                        context.getString(R.string.settings_backup_export_failed),
+                    )
+                    return@launch
+                }
                 val share = Intent(Intent.ACTION_SEND).apply {
                     type = "application/json"
                     putExtra(Intent.EXTRA_SUBJECT, "Iridium backup")
                     putExtra(Intent.EXTRA_TEXT, json)
                 }
-                runCatching {
+                try {
                     context.startActivity(Intent.createChooser(share, context.getString(R.string.settings_backup_export)))
+                } catch (_: Exception) {
+                    snackbarHost.showSnackbar(
+                        context.getString(R.string.settings_backup_export_failed),
+                    )
                 }
             }
         },

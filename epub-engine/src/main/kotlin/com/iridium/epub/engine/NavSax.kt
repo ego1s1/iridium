@@ -43,6 +43,9 @@ internal object NavSax {
         runCatching {
             setFeature("http://xml.org/sax/features/external-parameter-entities", false)
         }
+        runCatching {
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        }
     }.newSAXParser()
 
     private class NavHandler : DefaultHandler() {

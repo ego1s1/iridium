@@ -8,6 +8,7 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.iridium.core.common.safeCatching
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -65,25 +66,28 @@ class DriveSyncManager @Inject constructor(
      */
     suspend fun syncNow(accountEmail: String): DriveSyncResult = withContext(Dispatchers.IO) {
         if (accountEmail.isBlank()) return@withContext DriveSyncResult.SignedOut
-        val gateway = runCatching { gatewayFactory.create(accountEmail) }.getOrNull()
+        val gateway = safeCatching { gatewayFactory.create(accountEmail) }.getOrNull()
             ?: return@withContext DriveSyncResult.Failed("Drive unavailable")
         val localJson = backup.snapshot()
-        val localAt = runCatching { LibraryBackupCodec.decode(localJson).createdAt }.getOrDefault(0L)
-        val remote = runCatching { gateway.findBackup() }.getOrNull()
+        val localAt = safeCatching { LibraryBackupCodec.decode(localJson).createdAt }.getOrDefault(0L)
+        val remote = safeCatching { gateway.findBackup() }.getOrNull()
         return@withContext when (decideSync(localAt, remote?.createdAt)) {
             SyncDecision.UP_TO_DATE -> DriveSyncResult.UpToDate
             SyncDecision.UPLOAD -> {
-                val saved = runCatching {
+                val saved = safeCatching {
                     gateway.upload(BACKUP_FILENAME, localJson, remote?.fileId)
                 }.getOrNull() ?: return@withContext DriveSyncResult.Failed("Upload failed")
-                val count = runCatching { LibraryBackupCodec.decode(localJson).books.size }.getOrDefault(0)
+                val count = safeCatching { LibraryBackupCodec.decode(localJson).books.size }.getOrDefault(0)
                 if (saved.createdAt <= 0) DriveSyncResult.Failed("Upload failed")
                 else DriveSyncResult.Uploaded(count)
             }
             SyncDecision.DOWNLOAD -> {
-                val json = runCatching { gateway.download(remote!!.fileId) }.getOrNull()
+                val fileId = remote?.fileId
                     ?: return@withContext DriveSyncResult.Failed("Download failed")
-                val report = backup.restore(json)
+                val json = safeCatching { gateway.download(fileId) }.getOrNull()
+                    ?: return@withContext DriveSyncResult.Failed("Download failed")
+                val report = safeCatching { backup.restore(json) }.getOrNull()
+                    ?: return@withContext DriveSyncResult.Failed("Invalid backup file")
                 DriveSyncResult.Downloaded(report.restored, report.skipped)
             }
         }

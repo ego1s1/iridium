@@ -70,6 +70,10 @@ sealed interface ReaderSessionEvent {
 @Singleton
 class ReaderSessionStore @Inject constructor() {
 
+    private companion object {
+        const val MAX_IMAGE_SRC_CHARS = 4 * 1024
+    }
+
     var bookId: String? = null
         private set
     var publication: Publication? = null
@@ -101,7 +105,7 @@ class ReaderSessionStore @Inject constructor() {
     val shownImage: StateFlow<String?> = _shownImage.asStateFlow()
 
     fun showImage(src: String) {
-        _shownImage.value = src
+        _shownImage.value = if (src.length > MAX_IMAGE_SRC_CHARS) src.take(MAX_IMAGE_SRC_CHARS) else src
     }
 
     fun dismissImage() {

@@ -85,7 +85,11 @@ class UrlConnectionDictionaryHttpClient(
             } else {
                 connection.errorStream
             }
-            val body = stream?.bufferedReader()?.readText().orEmpty()
+            val body = stream?.bufferedReader()?.use { reader ->
+                val capped = CharArray(MAX_DICTIONARY_BODY_CHARS)
+                val read = reader.read(capped)
+                if (read <= 0) "" else String(capped, 0, read)
+            }.orEmpty()
             return HttpResult(code, body)
         } finally {
             connection.disconnect()
@@ -96,6 +100,7 @@ class UrlConnectionDictionaryHttpClient(
         const val HTTP_TIMEOUT_MS = 8_000
         const val HTTP_OK_MIN = 200
         const val HTTP_OK_MAX = 299
+        const val MAX_DICTIONARY_BODY_CHARS = 256 * 1024
     }
 }
 

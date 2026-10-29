@@ -79,4 +79,9 @@ class LibraryBackupManagerTest {
         assertEquals(0, report.restored)
         assertEquals(1, report.skipped)
     }
+
+    @Test(expected = java.io.IOException::class)
+    fun `restore throws IOException on corrupt json`() = runTest {
+        manager.restore("{not-json")
+    }
 }

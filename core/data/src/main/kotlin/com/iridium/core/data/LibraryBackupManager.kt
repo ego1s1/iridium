@@ -1,8 +1,10 @@
 package com.iridium.core.data
 
+import androidx.room.withTransaction
 import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.LibraryQuery
+import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 
 /** Result of a [LibraryBackupManager.restore]. */
@@ -14,8 +16,9 @@ data class RestoreReport(val restored: Int, val skipped: Int)
  * copied. Restore re-applies metadata only to books still present in the
  * library.
  */
-class LibraryBackupManager(
+class LibraryBackupManager @Inject constructor(
     private val repository: BooksRepository,
+    private val database: com.iridium.core.database.IridiumDatabase? = null,
 ) {
 
     /** Serializes the whole library's metadata to JSON. */
@@ -55,7 +58,12 @@ class LibraryBackupManager(
 
     /** Re-applies a backup's metadata to books still present. */
     suspend fun restore(json: String): RestoreReport {
-        val backup = LibraryBackupCodec.decode(json)
+        val backup = try {
+            LibraryBackupCodec.decode(json)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            throw java.io.IOException("Invalid backup file", e)
+        }
         val current = repository.observeLibrary(LibraryQuery()).first()
         val byPath = current.associateBy { it.sourcePath }
         var restored = 0
@@ -65,32 +73,41 @@ class LibraryBackupManager(
                 skipped++
                 return@forEach
             }
-            repository.updateProgress(book.id, bb.progress, bb.lastLocator)
-            repository.setBookmarked(book.id, bb.bookmarked)
-            repository.deleteAllHighlights(book.id)
-            bb.highlights.forEach { h ->
-                repository.upsertHighlight(
-                    Highlight(
-                        id = h.id,
-                        bookId = book.id,
-                        href = h.href,
-                        startLocator = h.startLocator,
-                        endLocator = h.endLocator,
-                        selectedText = h.selectedText,
-                        color = backupColor(h.color),
-                        note = h.note,
-                        createdAt = h.createdAt,
-                    ),
-                )
-            }
-            repository.deleteAllBookmarks(book.id)
-            bb.bookmarks.forEach { m ->
-                repository.upsertBookmark(
-                    Bookmark(id = m.id, bookId = book.id, locator = m.locator, label = m.label, createdAt = m.createdAt),
-                )
+            val db = database
+            if (db != null) {
+                db.withTransaction { restoreOne(book.id, bb) }
+            } else {
+                restoreOne(book.id, bb)
             }
             restored++
         }
         return RestoreReport(restored = restored, skipped = skipped)
+    }
+
+    private suspend fun restoreOne(bookId: String, bb: BackupBook) {
+        repository.updateProgress(bookId, bb.progress, bb.lastLocator)
+        repository.setBookmarked(bookId, bb.bookmarked)
+        repository.deleteAllHighlights(bookId)
+        bb.highlights.forEach { h ->
+            repository.upsertHighlight(
+                Highlight(
+                    id = h.id,
+                    bookId = bookId,
+                    href = h.href,
+                    startLocator = h.startLocator,
+                    endLocator = h.endLocator,
+                    selectedText = h.selectedText,
+                    color = backupColor(h.color),
+                    note = h.note,
+                    createdAt = h.createdAt,
+                ),
+            )
+        }
+        repository.deleteAllBookmarks(bookId)
+        bb.bookmarks.forEach { m ->
+            repository.upsertBookmark(
+                Bookmark(id = m.id, bookId = bookId, locator = m.locator, label = m.label, createdAt = m.createdAt),
+            )
+        }
     }
 }

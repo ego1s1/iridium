@@ -112,15 +112,30 @@ internal fun ReaderRoute(
             when (message) {
                 ReaderMessage.ContentUnavailable ->
                     snackbarHost.showSnackbar(context.getString(R.string.reader_content_unavailable))
-                is ReaderMessage.OpenUrl ->
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, message.url.toUri()))
+                is ReaderMessage.OpenUrl -> {
+                    val uri = runCatching { android.net.Uri.parse(message.url) }.getOrNull()
+                    val scheme = uri?.scheme?.lowercase()
+                    if (uri != null && (scheme == "http" || scheme == "https")) {
+                        val result = runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        }
+                        if (result.isFailure) {
+                            snackbarHost.showSnackbar(context.getString(R.string.reader_share_failed))
+                        }
+                    } else {
+                        snackbarHost.showSnackbar(context.getString(R.string.reader_link_blocked))
                     }
+                }
                 ReaderMessage.SelectTextFirst ->
                     snackbarHost.showSnackbar(context.getString(R.string.reader_select_text_first))
                 ReaderMessage.HighlightSaved ->
                     snackbarHost.showSnackbar(context.getString(R.string.reader_highlight_saved))
-                is ReaderMessage.ShareExport -> shareAnnotations(context, message)
+                is ReaderMessage.ShareExport -> {
+                    val shared = shareAnnotations(context, message)
+                    if (!shared) {
+                        snackbarHost.showSnackbar(context.getString(R.string.reader_share_failed))
+                    }
+                }
                 ReaderMessage.Pop -> onBackClick()
             }
         }
@@ -557,8 +572,8 @@ internal fun decodeShowcaseBitmap(bytes: ByteArray, context: Context): android.g
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
 }
 
-/** Shares an annotation export via Markdown + HTML intents (SAF/share). */
-private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport) {
+/** Shares an annotation export via Markdown + HTML intents (SAF/share). Returns false when undeliverable. */
+private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport): Boolean {
     val markdown = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_SUBJECT, msg.filename + ".md")
@@ -574,5 +589,5 @@ private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport) {
         context.getString(R.string.reader_highlights_export),
     )
     chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(html))
-    runCatching { context.startActivity(chooser) }
+    return runCatching { context.startActivity(chooser) }.isSuccess
 }

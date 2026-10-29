@@ -55,6 +55,8 @@
     <string name="settings_backup_sync">Sync now</string>
     <string name="settings_backup_sign_out">Sign out of Drive</string>
     <string name="settings_backup_imported">Restored %1$d book(s) from backup</string>
+    <string name="settings_backup_import_failed">Could not import backup file</string>
+    <string name="settings_backup_export_failed">Could not share backup file</string>
 
     <string name="settings_about_app">Iridium</string>
     <string name="settings_about_tagline">A calm, high-craft EPUB reader</string>

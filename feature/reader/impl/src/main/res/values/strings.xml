@@ -79,4 +79,6 @@
     <string name="reader_settings_label">Reader settings</string>
     <string name="reader_select_text_first">Long-press text to select it first</string>
     <string name="reader_highlight_saved">Highlight saved</string>
+    <string name="reader_share_failed">Couldn\'t share from here</string>
+    <string name="reader_link_blocked">This link type isn\'t supported</string>
 </resources>

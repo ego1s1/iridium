@@ -11,11 +11,14 @@ import dagger.hilt.components.SingletonComponent
 object BackupModule {
 
     @Provides
+    @javax.inject.Singleton
     fun provideLibraryBackupManager(
         repository: BooksRepository,
-    ): LibraryBackupManager = LibraryBackupManager(repository)
+        database: com.iridium.core.database.IridiumDatabase,
+    ): LibraryBackupManager = LibraryBackupManager(repository, database)
 
     @Provides
+    @javax.inject.Singleton
     fun provideDriveGatewayFactory(
         impl: GoogleDriveGatewayFactory,
     ): DriveGatewayFactory = impl
