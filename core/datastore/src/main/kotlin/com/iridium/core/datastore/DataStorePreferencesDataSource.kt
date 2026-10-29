@@ -54,7 +54,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             flow = this[READING_FLOW]?.let {
                 runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
             } ?: ReadingFlow.AUTO,
-            fontScale = this[FONT_SCALE] ?: 1.1f,
+            fontScale = this[FONT_SCALE] ?: 1.5f,
             fontFamily = this[FONT_FAMILY]?.let {
                 runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
             } ?: ReaderFontFamily.BOOK,
@@ -76,8 +76,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             },
             nightLight = this[NIGHT_LIGHT] ?: false,
             nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
-            pageMargins = this[PAGE_MARGINS] ?: 2f,
-            lineHeight = this[LINE_HEIGHT] ?: 1.6f,
+            pageMargins = this[PAGE_MARGINS] ?: 1f,
+            lineHeight = this[LINE_HEIGHT] ?: 1.55f,
             customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme).toImmutableList(),
             customThemeId = this[CUSTOM_THEME_ID],
         )

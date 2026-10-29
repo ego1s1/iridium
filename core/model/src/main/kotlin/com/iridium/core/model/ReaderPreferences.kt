@@ -37,7 +37,7 @@ data class CustomReaderTheme(
 /** Reader preferences persisted in DataStore. */
 data class ReaderPreferences(
     val flow: ReadingFlow = ReadingFlow.AUTO,
-    val fontScale: Float = 1.1f,
+    val fontScale: Float = 1.5f,
     val fontFamily: ReaderFontFamily = ReaderFontFamily.BOOK,
     val textAlign: TextAlign = TextAlign.JUSTIFY,
     val theme: ColorSchemeChoice = ColorSchemeChoice.SEPIA,
@@ -49,8 +49,8 @@ data class ReaderPreferences(
     val invertTaps: Boolean = false,
     val nightLight: Boolean = false,
     val nightLightIntensity: Float = 0.25f,
-    val pageMargins: Float = 2f,
-    val lineHeight: Float = 1.6f,
+    val pageMargins: Float = 1f,
+    val lineHeight: Float = 1.55f,
     /** User palettes; [customThemeId] selects the active one (null = preset). */
     val customThemes: ImmutableList<CustomReaderTheme> = persistentListOf(),
     val customThemeId: String? = null,
