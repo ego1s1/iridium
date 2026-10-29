@@ -23,6 +23,13 @@ sealed interface ReaderSessionEvent {
     /** The navigator fragment attached; (re-)apply prefs and decorations. */
     data object NavigatorAttached : ReaderSessionEvent
 
+    /**
+     * The first page has actually been laid out and painted by the WebView.
+     * Distinct from a locator tick, which Readium emits from a seeded state
+     * flow before the page exists.
+     */
+    data object PageLoaded : ReaderSessionEvent
+
     /** A tap on the content (chrome toggle). */
     data object ContentTapped : ReaderSessionEvent
 

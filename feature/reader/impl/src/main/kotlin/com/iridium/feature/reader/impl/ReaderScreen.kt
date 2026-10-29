@@ -29,7 +29,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -260,8 +259,8 @@ internal fun ReaderScreen(
         refreshSnapshot()
     }
 
-    LaunchedEffect(sessionReady, navigatorView, slideEnabled, state.prefs) {
-        if (sessionReady && slideEnabled && navigatorView != null) {
+    LaunchedEffect(sessionReady, navigatorView, slideEnabled, state.prefs, state.contentReady) {
+        if (sessionReady && slideEnabled && navigatorView != null && state.contentReady) {
             // Let the settled frame paint before capturing it.
             kotlinx.coroutines.delay(PageSnapshotSettleMs)
             refreshSnapshot()
@@ -331,18 +330,9 @@ internal fun ReaderScreen(
         // vanished. Cover that gap with the page colour and the loader so the
         // transition is spinner -> text, with nothing in between.
         //
-        // The locator arrives from the WebView's JS before the compositor has
-        // necessarily presented that content, so the loader is held for two
-        // more frames; dropping it on the locator alone still showed a blank
-        // page for a moment.
-        var loaderVisible by remember { mutableStateOf(true) }
-        LaunchedEffect(state.contentReady) {
-            if (!state.contentReady) return@LaunchedEffect
-            withFrameNanos { }
-            withFrameNanos { }
-            loaderVisible = false
-        }
-        if (loaderVisible) {
+        // contentReady is driven by the navigator's own onPageLoaded callback,
+        // so this is a real paint signal rather than a guessed delay.
+        if (!state.contentReady) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

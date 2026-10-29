@@ -73,6 +73,19 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
             initialLocator = store.initialLocator,
             initialPreferences = store.initialPreferences ?: EpubPreferences(),
             listener = this,
+            // The only honest "the page is on screen" signal: currentLocator is
+            // seeded at construction, so it fires before anything is painted.
+            paginationListener = object : EpubNavigatorFragment.PaginationListener {
+                override fun onPageChanged(
+                    pageIndex: Int,
+                    totalPages: Int,
+                    locator: org.readium.r2.shared.publication.Locator,
+                ) = Unit
+
+                override fun onPageLoaded() {
+                    store.tryEmit(ReaderSessionEvent.PageLoaded)
+                }
+            },
             configuration = config,
         )
         super.onCreate(savedInstanceState)

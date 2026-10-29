@@ -14,7 +14,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
-import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.findActivity
 
 /** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
@@ -48,10 +47,9 @@ internal fun NavigatorHost(
         modifier = modifier.fillMaxSize(),
     )
 
-    if (!sessionReady) {
-        IridiumLoading(modifier)
-        return
-    }
+    // No spinner here: ReaderScreen owns the single loading surface, and a
+    // second animating indicator froze along with the main thread during attach.
+    if (!sessionReady) return
 
     LaunchedEffect(bookId, containerId, sessionReady) {
         val fm = activity.supportFragmentManager

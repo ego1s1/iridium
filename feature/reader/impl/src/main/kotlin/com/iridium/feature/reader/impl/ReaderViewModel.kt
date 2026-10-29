@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -73,6 +74,9 @@ class ReaderViewModel @Inject constructor(
     private val positions = ReaderPositionTracker(store, clock)
     private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store, positions)
     private val navigatorAttached = MutableStateFlow(false)
+
+    /** True once the WebView has actually painted the first page. */
+    private val pageLoaded = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private val openFileMissing = MutableStateFlow(false)
 
@@ -191,7 +195,7 @@ class ReaderViewModel @Inject constructor(
                     chapterTitle = positions.chapterTitle(c.toc),
                     focusedHighlightId = n.focusedHighlightId,
                     navigatorAttached = n.navigatorAttached,
-                    contentReady = locator != null,
+                    contentReady = pageLoaded.value,
                     themeSheetOpen = ch.themeSheetOpen,
                 )
             }
@@ -380,14 +384,20 @@ class ReaderViewModel @Inject constructor(
      * page is no longer competing with them for CPU or disk.
      */
     private suspend fun loadSecondaryDataAfterFirstPage(result: OpenResult.Opened) {
-        // Bounded: a navigator that never reports must not strand this job.
+        // Wait for the real paint signal, not a locator tick: currentLocator is
+        // seeded at construction and fires before anything is on screen.
         withTimeoutOrNull(SECONDARY_DATA_WAIT_MS) {
-            store.latestLocator.first { it != null }
+            pageLoaded.first { it }
         }
         positions.replaceAll(
             safeCatching { result.publication.positions() }.getOrDefault(emptyList()),
         )
         positions.measurePagination()
+        // Content indexing parses every spine chapter (and spools the whole
+        // file for pipe-like providers). It is only needed for library search,
+        // so it runs once the page has settled instead of competing with the
+        // first paint.
+        delay(INDEX_IDLE_DELAY_MS)
         indexContentIfNeeded()
     }
 
@@ -420,12 +430,17 @@ class ReaderViewModel @Inject constructor(
             }
             is ReaderSessionEvent.ContentTappedAt ->
                 handleZonedTap(event.fractionX, event.fractionY, event.dismissedPopup)
+            ReaderSessionEvent.PageLoaded -> pageLoaded.value = true
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
                 positions.markProgrammaticNav()
-                // Fresh navigator: submit current prefs + decorations.
-                val prefs = EpubPreferencesMapper.map(preferences.readerPreferences.first())
-                runCatching { store.navigator?.submitPreferences(prefs) }
+                // The factory already applied the initial preferences, so only
+                // re-submit when they actually changed while the page was
+                // loading. A redundant submit repaginates right at first paint.
+                val prefs = EpubPreferencesMapper.map(prefsFlow.value)
+                if (prefs != store.initialPreferences) {
+                    runCatching { store.navigator?.submitPreferences(prefs) }
+                }
                 prefsApplier.applyThemeOverride()
                 annotations.refreshDecorations(highlights.first())
                 // Image-showcase bridge: wire taps in the freshly loaded document.
@@ -627,6 +642,9 @@ class ReaderViewModel @Inject constructor(
 
         /** Upper bound on waiting for the first page before loading the rest. */
         const val SECONDARY_DATA_WAIT_MS = 8_000L
+
+        /** Idle gap after the first paint before the book-wide index runs. */
+        const val INDEX_IDLE_DELAY_MS = 2_500L
 
 
     }
