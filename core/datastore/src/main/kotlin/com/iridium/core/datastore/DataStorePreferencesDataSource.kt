@@ -72,6 +72,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             },
             nightLight = this[NIGHT_LIGHT] ?: false,
             nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
+            extraDim = this[EXTRA_DIM] ?: false,
+            extraDimIntensity = this[EXTRA_DIM_INTENSITY] ?: 0.3f,
             pageMargins = this[PAGE_MARGINS] ?: 1f,
             lineHeight = this[LINE_HEIGHT] ?: 1.55f,
             customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme).toImmutableList(),
@@ -99,6 +101,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             prefs.remove(TAP_ZONE_INVERT)
             prefs[NIGHT_LIGHT] = updated.nightLight
             prefs[NIGHT_LIGHT_INTENSITY] = updated.nightLightIntensity
+            prefs[EXTRA_DIM] = updated.extraDim
+            prefs[EXTRA_DIM_INTENSITY] = updated.extraDimIntensity
             prefs[PAGE_MARGINS] = updated.pageMargins
             prefs[LINE_HEIGHT] = updated.lineHeight
             prefs[CUSTOM_THEMES] = updated.customThemes.map(::encodeCustomTheme).toSet()
@@ -250,6 +254,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         const val LEGACY_INVERT_HORIZONTAL = "HORIZONTAL"
         const val LEGACY_INVERT_BOTH = "BOTH"
         val NIGHT_LIGHT_INTENSITY = floatPreferencesKey("night_light_intensity")
+        val EXTRA_DIM = booleanPreferencesKey("extra_dim")
+        val EXTRA_DIM_INTENSITY = floatPreferencesKey("extra_dim_intensity")
         val PAGE_MARGINS = floatPreferencesKey("page_margins")
         val LINE_HEIGHT = floatPreferencesKey("line_height")
         val CUSTOM_THEMES = stringSetPreferencesKey("custom_themes")

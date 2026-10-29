@@ -12,6 +12,8 @@
     <string name="reader_add_highlight_save">Save</string>
     <string name="reader_dialog_cancel">Cancel</string>
     <string name="reader_settings_brightness_system">Match system brightness</string>
+    <string name="reader_settings_extra_dim">Extra dim</string>
+    <string name="reader_settings_extra_dim_body">Lowers the text itself, for reading in the dark</string>
     <string name="reader_settings_brightness">Brightness</string>
     <string name="reader_settings_theme">Theme</string>
     <string name="reader_settings_text_size">Text size</string>

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -31,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
@@ -78,6 +80,44 @@ internal fun ReaderSettingsContent(
             .padding(horizontal = 20.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.reader_settings_extra_dim), style = MaterialTheme.typography.titleSmall)
+            IridiumSettingSwitch(
+                title = stringResource(R.string.reader_settings_extra_dim),
+                subtitle = stringResource(R.string.reader_settings_extra_dim_body),
+                checked = prefs.extraDim,
+                onCheckedChange = { onAction(ReaderAction.SetExtraDim(it)) },
+            )
+            if (prefs.extraDim) {
+                var dimDraft by remember(prefs.extraDimIntensity) {
+                    mutableFloatStateOf(prefs.extraDimIntensity)
+                }
+                var dimDragging by remember { mutableStateOf(false) }
+                LaunchedEffect(prefs.extraDimIntensity) {
+                    if (!dimDragging) dimDraft = prefs.extraDimIntensity
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${(dimDraft * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Slider(
+                        value = dimDraft,
+                        onValueChange = {
+                            dimDragging = true
+                            dimDraft = it
+                            onAction(ReaderAction.SetExtraDimIntensity(it))
+                        },
+                        onValueChangeFinished = {
+                            dimDragging = false
+                            haptics(IridiumHaptic.Tick)
+                        },
+                        valueRange = 0f..1f,
+                        modifier = Modifier.weight(2f),
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.reader_settings_brightness), style = MaterialTheme.typography.titleSmall)
             // WindowManager only accepts -1 (system) or 0..1: a switch owns

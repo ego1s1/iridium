@@ -126,6 +126,8 @@ class DataStorePreferencesDataSourceTest {
                 invertTaps = true,
                 nightLight = true,
                 nightLightIntensity = 0.6f,
+                extraDim = true,
+                extraDimIntensity = 0.45f,
                 pageMargins = 1.5f,
                 lineHeight = 1.8f,
             )
@@ -141,6 +143,8 @@ class DataStorePreferencesDataSourceTest {
         assertTrue(reader.invertTaps)
         assertTrue(reader.nightLight)
         assertEquals(0.6f, reader.nightLightIntensity)
+        assertTrue(reader.extraDim)
+        assertEquals(0.45f, reader.extraDimIntensity)
         assertEquals(1.5f, reader.pageMargins)
         assertEquals(1.8f, reader.lineHeight)
     }

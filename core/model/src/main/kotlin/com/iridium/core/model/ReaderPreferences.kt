@@ -48,6 +48,9 @@ data class ReaderPreferences(
     val invertTaps: Boolean = false,
     val nightLight: Boolean = false,
     val nightLightIntensity: Float = 0.25f,
+    /** Dim the text itself (foreground alpha) for low-light reading. */
+    val extraDim: Boolean = false,
+    val extraDimIntensity: Float = 0.3f,
     val pageMargins: Float = 1f,
     val lineHeight: Float = 1.55f,
     /** User palettes; [customThemeId] selects the active one (null = preset). */

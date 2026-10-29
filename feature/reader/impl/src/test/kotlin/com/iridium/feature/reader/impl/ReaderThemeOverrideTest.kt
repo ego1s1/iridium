@@ -33,6 +33,41 @@ class ReaderThemeOverrideTest {
     }
 
     @Test
+    fun `dimForeground lowers alpha but keeps rgb and never goes transparent`() {
+        val dimmed = ReaderThemeOverride.dimForeground(0xFFFFFFFF.toInt(), 1f)
+        val alpha = (dimmed ushr 24) and 0xFF
+        assertTrue("alpha should drop", alpha < 0xFF)
+        assertTrue("alpha should stay legible", alpha >= 64)
+        assertEquals(0x00FFFFFF, dimmed and 0x00FFFFFF)
+
+        val untouched = ReaderThemeOverride.dimForeground(0xFFFFFFFF.toInt(), 0f)
+        assertEquals(0xFF, (untouched ushr 24) and 0xFF)
+    }
+
+    @Test
+    fun `light pages allow less dimming than dark ones`() {
+        val lightCap = ReaderThemeOverride.maxDimFor(0xFFFFFFFF.toInt())
+        val darkCap = ReaderThemeOverride.maxDimFor(0xFF000000.toInt())
+        assertTrue("light must be capped lower", lightCap < darkCap)
+        assertTrue(ReaderThemeOverride.isLightPage(0xFFF5E6C8.toInt()))
+        assertTrue(!ReaderThemeOverride.isLightPage(0xFF000000.toInt()))
+    }
+
+    @Test
+    fun `css carries the alpha channel when the foreground is dimmed`() {
+        val css = ReaderThemeOverride.overrideCssColors("000000", "ffffff80")
+        assertTrue(css.contains("#ffffff80"))
+        // currentcolor can drop the alpha on some WebView builds, so the fill
+        // colour must be the literal value.
+        assertTrue(css.contains("-webkit-text-fill-color: #ffffff80"))
+    }
+
+    @Test
+    fun `hexWithAlpha writes RRGGBBAA not AARRGGBB`() {
+        assertEquals("11223380", ReaderThemeOverride.hexWithAlpha(0x80112233.toInt()))
+    }
+
+    @Test
     fun `scrub helpers round-trip`() {
         assertEquals(0, scrubIndexForProgression(0f, 10))
         assertEquals(9, scrubIndexForProgression(1f, 10))

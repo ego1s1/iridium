@@ -106,6 +106,8 @@ sealed interface ReaderAction {
     data class SetInvertTaps(val inverted: Boolean) : ReaderAction, PrefsChange
     data class SetNightLight(val enabled: Boolean) : ReaderAction, PrefsChange
     data class SetNightLightIntensity(val intensity: Float) : ReaderAction, PrefsChange
+    data class SetExtraDim(val enabled: Boolean) : ReaderAction, PrefsChange
+    data class SetExtraDimIntensity(val intensity: Float) : ReaderAction, PrefsChange
 }
 
 /** One-shot UI messages. */

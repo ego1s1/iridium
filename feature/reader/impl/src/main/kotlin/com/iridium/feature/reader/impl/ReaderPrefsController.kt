@@ -47,14 +47,30 @@ internal class ReaderPrefsController(
         // so pure black stays #000000 with OLED pixels off). The Compose
         // scrim below handles non-black themes; see ReaderScreen night-light
         // gate which skips the scrim when the page is pure black.
+        // Order matters: warming rebuilds an opaque colour, so the dim alpha
+        // has to be applied after it or it would be erased.
         val warmedFg = if (prefs.nightLight) {
             ReaderThemeOverride.warmForeground(fg, prefs.nightLightIntensity)
         } else {
             fg
         }
+        val finalFg = if (prefs.extraDim) {
+            val capped = prefs.extraDimIntensity.coerceIn(
+                0f,
+                ReaderThemeOverride.maxDimFor(bg),
+            )
+            ReaderThemeOverride.dimForeground(warmedFg, capped)
+        } else {
+            warmedFg
+        }
+        val fgCss = if (((finalFg ushr 24) and 0xFF) != 0xFF) {
+            ReaderThemeOverride.hexWithAlpha(finalFg)
+        } else {
+            ReaderThemeOverride.hex(finalFg)
+        }
         val script = ReaderThemeOverride.injectOverrideScriptColors(
             ReaderThemeOverride.hex(bg),
-            ReaderThemeOverride.hex(warmedFg),
+            fgCss,
         )
         safeCatching {
             store.navigator?.evaluateJavascript(script)

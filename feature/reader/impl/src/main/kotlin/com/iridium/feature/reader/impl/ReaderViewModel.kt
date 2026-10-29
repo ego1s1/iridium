@@ -319,6 +319,12 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.SetNightLightIntensity -> prefsApplier.updateReaderPrefs {
                 it.copy(nightLightIntensity = action.intensity.coerceIn(0f, 1f))
             }
+            is ReaderAction.SetExtraDim -> prefsApplier.updateReaderPrefs {
+                it.copy(extraDim = action.enabled)
+            }
+            is ReaderAction.SetExtraDimIntensity -> prefsApplier.updateReaderPrefs {
+                it.copy(extraDimIntensity = action.intensity.coerceIn(0f, 1f))
+            }
         }
     }
 

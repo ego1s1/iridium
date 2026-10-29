@@ -49,10 +49,10 @@ internal object ReaderThemeOverride {
             append("$allSelector {")
             append(" background-color: transparent !important;\n")
             append(" color: $fg !important;\n")
-            append(" -webkit-text-fill-color: currentcolor !important;")
+            append(" -webkit-text-fill-color: $fg !important;")
             append(" }\n")
             append("a, a:link, a:visited, a:hover, a * {")
-            append(" color: $fg !important; -webkit-text-fill-color: currentcolor !important; }")
+            append(" color: $fg !important; -webkit-text-fill-color: $fg !important; }")
         }
     }
 
@@ -88,6 +88,47 @@ internal object ReaderThemeOverride {
     /** #RRGGBB from an ARGB int (alpha dropped for readability of page colors). */
     internal fun hex(argb: Int): String =
         Integer.toHexString(argb and 0x00FFFFFF).padStart(6, '0')
+
+    /**
+     * CSS `#RRGGBBAA` for an ARGB int. Note the channel order differs from
+     * ARGB: CSS puts alpha last.
+     */
+    internal fun hexWithAlpha(argb: Int): String =
+        hex(argb) + Integer.toHexString((argb ushr 24) and 0xFF).padStart(2, '0')
+
+    /**
+     * Drops the foreground alpha so the text itself reads dimmer. The
+     * background is untouched: on a pure-black page the pixels must stay off.
+     */
+    fun dimForeground(argb: Int, intensity: Float): Int {
+        val keep = 1f - intensity.coerceIn(0f, 1f) * MAX_DIM_ALPHA
+        val alpha = ((((argb ushr 24) and 0xFF) * keep).toInt()).coerceIn(MIN_TEXT_ALPHA, 255)
+        return (alpha shl 24) or (argb and 0x00FFFFFF)
+    }
+
+    /**
+     * Dimming dark text over a light page turns it grey and loses contrast
+     * fast, so light schemes get a much smaller budget than dark ones.
+     */
+    fun maxDimFor(backgroundArgb: Int): Float =
+        if (isLightPage(backgroundArgb)) LIGHT_MAX_DIM else MAX_DIM_ALPHA
+
+    /** True when [backgroundArgb] is a light page (dark text on it). */
+    fun isLightPage(backgroundArgb: Int): Boolean {
+        val r = (backgroundArgb shr 16) and 0xFF
+        val g = (backgroundArgb shr 8) and 0xFF
+        val b = backgroundArgb and 0xFF
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 127
+    }
+
+    /** Maximum extra dim as a fraction of the text's own alpha. */
+    private const val MAX_DIM_ALPHA = 0.6f
+
+    /** Light pages dim far less: grey-on-white loses legibility quickly. */
+    private const val LIGHT_MAX_DIM = 0.3f
+
+    /** Never fade text below a legible floor. */
+    private const val MIN_TEXT_ALPHA = 64
 
     /** True when [argb] is pure black: OLED pixels stay off, never warm it. */
     fun isPureBlack(argb: Int): Boolean = (argb and 0x00FFFFFF) == 0
