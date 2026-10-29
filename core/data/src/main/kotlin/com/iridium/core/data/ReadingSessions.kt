@@ -18,7 +18,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Day-bucketed reading-time log backing true stats durations.
  *
- * Mori's stats bento reads `observeReadingStats` / `observeReadingSessions`
+ * the reference's stats bento reads `observeReadingStats` / `observeReadingSessions`
  * (one row per session with `durationMs` and `pagesTurned`). EPUBs have no
  * fixed pages, so Iridium adapts the semantics instead of cloning them:
  * - sessions collapse to per-day minute buckets (`minutesByDay`), which is

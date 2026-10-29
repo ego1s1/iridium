@@ -41,7 +41,7 @@ fun Modifier.sharedCover(bookId: String): Modifier {
         sharedElement(
             rememberSharedContentState(key = bookCoverSharedKey(bookId)),
             animatedScope,
-            // 650ms emphasized glide so the book visibly travels (Mori
+            // 650ms emphasized glide so the book visibly travels (the reference
             // cover-morph timing on this Compose version's spec lambda).
             { _, _ ->
                 tween<Rect>(
@@ -58,7 +58,7 @@ fun screenEnter(expressive: Boolean = true): EnterTransition =
     if (!expressive) {
         fadeIn(animationSpec = IridiumMotion.calmFadeSpec())
     } else {
-        // Full-width slide-in over fade (Mori push personality): entering
+        // Full-width slide-in over fade (the reference push personality): entering
         // content travels the full width while the parent parallaxes out.
         fadeIn(animationSpec = IridiumMotion.screenEnterSpec()) + slideInHorizontally(
             animationSpec = IridiumMotion.screenEnterSpec(),

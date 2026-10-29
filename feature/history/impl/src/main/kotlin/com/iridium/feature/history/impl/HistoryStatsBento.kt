@@ -87,7 +87,7 @@ fun HistoryStatsBentoRoute(
 }
 
 /**
- * Mori §3.4 bento grid: hero card, companion cards, activity chart with
+ * the reference §3.4 bento grid: hero card, companion cards, activity chart with
  * range selector, streak card, top-books list.
  */
 @Composable
@@ -186,7 +186,7 @@ fun HistoryStatsBentoContent(
     }
 }
 
-/** Spotlight hero card for estimated reading time (Mori §3.4 primary hero). */
+/** Spotlight hero card for estimated reading time (the reference §3.4 primary hero). */
 @Composable
 private fun ReadingTimeHeroCard(
     durationMs: Long,

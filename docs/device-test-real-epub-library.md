@@ -8,7 +8,7 @@ Date: 2026-10-07. Tester: AgentCraft Juniper (task t21). No app-code changes (do
 |---|---|
 | Host | macOS arm64, `JAVA_HOME=/opt/homebrew/opt/openjdk@17` (17.0.20.1), `ANDROID_HOME=$HOME/Library/Android/sdk` |
 | Emulator binary | Android emulator 37.1.11.0 (build 15917651) |
-| AVD | `mori` (`~/.android/avd/mori.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
+| AVD | `reference` (`~/.android/avd/reference.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
 | System image | `system-images/android-35/google_apis/arm64-v8a`, Android 15 (SDK 35) |
 | Boot flags | AVD already booted headless (`sys.boot_completed=1`); `-no-snapshot` per harness |
 | Iridium APK | `:app:assembleDebug` built from this worktree, `com.iridium.reader` v0.1.63 (v63), 39MB |
@@ -63,7 +63,7 @@ Date: 2026-10-07. Tester: AgentCraft Juniper (task t21). No app-code changes (do
 - The pre-installed v0.1.28 build on the emulator showed stale library rows (Cyberpunk/Ghost, files
   no longer on device) and no working rescan affordance; the fresh v0.1.63 build's rescan-on-launch
   (`LibraryViewModel` init `scan()`) picked up `/sdcard/Books` contents without needing the SAF picker.
-- Emulator is shared: `com.mori.reader` was foregrounded by another session mid-run; Iridium
+- Emulator is shared: `the reference app package` was foregrounded by another session mid-run; Iridium
   verification steps are unaffected (fresh `am start` per pass), but device passes should stay
   serialized per the goal plan.
 - `docs/device-test/real-epub-lib-*` naming reserves `real-epub-reader-*` for t23 (Kit).

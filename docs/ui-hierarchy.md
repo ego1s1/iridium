@@ -1,6 +1,6 @@
 # Iridium UI Hierarchy & Design System
 
-Migrated from Mori (`../mori`, 10-agent audit, Wave 1). Rule: clone Mori *chrome*,
+Migrated from the reference (`the reference checkout 10-agent audit, Wave 1). Rule: clone the reference *chrome*,
 adapt *semantics* to books. Reader engine, page-count semantics, and the
 AppCompat theme parent are intentionally Iridium-only.
 
@@ -136,6 +136,6 @@ skipPartiallyExpanded for tall content, L3 group headings, test tags.
 
 ## 8. Changelog guide
 
-User-facing entries only. Never mention internal refactors, Mori, or
+User-facing entries only. Never mention internal refactors, the reference, or
 reference repos. One line per user-visible change, grouped: Added / Changed /
 Fixed.

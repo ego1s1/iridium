@@ -493,7 +493,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Volume-key paging gate (Mori parity): volume keys turn pages only while
+     * Volume-key paging gate (reference parity): volume keys turn pages only while
      * paging is enabled, the chrome is hidden, and no sheet is open — so
      * volume always works normally everywhere else. Single source of truth.
      */

@@ -1,4 +1,4 @@
-# Device smoke-test report — Iridium on the mori AVD
+# Device smoke-test report — Iridium on the reference AVD
 
 Date: 2026-10-06. Tester: AgentCraft Kit (task t5). No app-code changes.
 
@@ -8,11 +8,11 @@ Date: 2026-10-06. Tester: AgentCraft Kit (task t5). No app-code changes.
 |---|---|
 | Host | macOS arm64, Java `openjdk@17`, `ANDROID_HOME=$HOME/Library/Android/sdk` |
 | Emulator binary | Android emulator 37.1.11.0 (build 15917651) |
-| AVD | `mori` (`~/.android/avd/mori.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
+| AVD | `reference` (`~/.android/avd/reference.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
 | System image | `system-images/android-35/google_apis/arm64-v8a`, Android 15 (AE3A.240806.043, SDK 35) |
 | Boot flags | `-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot` |
 | Iridium APK | `:app:assembleDebug` from this worktree, `com.iridium.reader` v0.1.28 (v28), 41MB |
-| Mori APK | prebuilt `/Users/priyanshu/git/mori/app/build/.../app-debug.apk`, `com.mori.reader` v0.1.307 (v307) |
+| Reference APK | prebuilt reference build `app-debug.apk` v0.1.307 (v307) |
 | Test book | generated 3-chapter EPUB (`Smoke Test Book`, 2.2KB), pushed to `/sdcard/Books/` |
 | Crashes | none — `dumpsys dropbox` clean, no `AndroidRuntime` FATAL for either app |
 
@@ -32,7 +32,7 @@ Date: 2026-10-06. Tester: AgentCraft Kit (task t5). No app-code changes.
 | 10 | Progress persist + resume (exit on Ch3 → detail `66% read` + Resume; reopen restores Ch1 locator) | PASS | `iridium-10`; DB: `progress=0.667`, `lastLocator` Ch3 |
 | 11 | History tab records the read (`Today`, 66% bar) | PASS | `iridium-11` (after re-read ending on Ch3) |
 | 12 | Settings: theme switch to Dark applies; sliders/toggles render | PASS | `iridium-12`, `iridium-13` (Appearance/Motion/Library/Reading sections) |
-| 13 | Mori APK install + run (library/settings/stats reference shots) | PASS | `mori-01..03` |
+| 13 | Reference APK install + run (library/settings/stats reference shots) | PASS | `reference-01..03` |
 
 ## Notes / observations
 
@@ -53,26 +53,26 @@ Date: 2026-10-06. Tester: AgentCraft Kit (task t5). No app-code changes.
   content-descs inside the reader, so chrome taps used screenshot-derived
   coordinates — all key assertions (chapter text, counters) came from dumps.
 
-## Parity observations (Iridium vs Mori on the same device)
+## Parity observations (Iridium vs the reference on the same device)
 
 - **Bottom nav:** both use a floating pill + separate resume/action circle.
-  Mori's bar is filled primary-container with a distinct resume FAB; Iridium's
+  the reference's bar is filled primary-container with a distinct resume FAB; Iridium's
   is surface-container with an add (+) island. Same pattern, different dress.
-- **Library:** Mori has a centered title, full-width search island,
+- **Library:** the reference has a centered title, full-width search island,
   quick-filter chips (All/In progress/Unread/Favorites) and shelf carousels
-  with counts (`mori-01`). Iridium (t2 in review) shows a left-aligned
+  with counts (`reference-01`). Iridium (t2 in review) shows a left-aligned
   "My books" header, icon-only search/filter and a plain grid — structurally
-  behind Mori; expected until t2 lands.
+  behind the reference; expected until t2 lands.
 - **Reader chrome:** both show title/author top bar with ToC/settings/more
   actions and a bottom scrubber island with prev/next (`iridium-07`). Close.
 - **Reader settings:** both are bottom sheets with segmented Flow control,
   brightness slider, theme cards, text-size stepper (`iridium-08`). Close.
 - **History vs Stats:** Iridium History is a day-grouped list with progress
-  bars (`iridium-11`); Mori Stats is a bento (hero totals, 7D/30D/1Y chart,
-  streaks, top books — `mori-03`). This is the known t4 gap (cancelled).
-- **Settings:** Mori is a hub of sub-screen rows (Appearance, Reader defaults,
-  Shelves, Privacy, Storage, About — `mori-02`); Iridium is a single scrolling
+  bars (`iridium-11`); the reference Stats is a bento (hero totals, 7D/30D/1Y chart,
+  streaks, top books — `reference-03`). This is the known t4 gap (cancelled).
+- **Settings:** the reference is a hub of sub-screen rows (Appearance, Reader defaults,
+  Shelves, Privacy, Storage, About — `reference-02`); Iridium is a single scrolling
   page of section cards (`iridium-12/13`). Same controls, different IA.
 
-Screenshots: `docs/device-test/` (`iridium-01..13`, `mori-01..03`).
+Screenshots: `docs/device-test/` (`iridium-01..13`, `reference-01..03`).
 Unit tests: `./gradlew testDebugUnitTest` → BUILD SUCCESSFUL.

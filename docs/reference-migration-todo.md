@@ -1,6 +1,6 @@
-# Mori → Iridium UI/UX Migration — TODO
+# the reference → Iridium UI/UX Migration — TODO
 
-Source: 10-agent audit (../mori). Rule: clone Mori *chrome*, adapt *semantics* to books.
+Source: 10-agent audit (the reference checkout Rule: clone the reference *chrome*, adapt *semantics* to books.
 Reader engine, page-count semantics, AppCompat theme parent stay untouched.
 Pins: BOM 2025.06.00, AGP 8.7.3, M3E 1.4.0-alpha15, Kotlin 2.1.21, Hilt 2.57.2.
 Test device: virtual device only (Pixel 10a NOT used). Screenshot-verify every wave.
@@ -12,7 +12,7 @@ Test device: virtual device only (Pixel 10a NOT used). Screenshot-verify every w
 - [x] Keep History tab (stats bento layers into it)
 - [x] Shelves/collections: OUT of scope (derived shelves only)
 - [x] App lock / splash / share-a-book: DEFERRED
-- [x] Transition feel: MORI (full-slide + parallax + opaque pop-exit)
+- [x] Transition feel: REFERENCE (full-slide + parallax + opaque pop-exit)
 
 ## Wave 1 — Foundations (in progress)
 - [x] Tokens: 11 color presets (Iridium + Ocean/Forest/Sunset/Catppuccin/Nord/Gruvbox/Dracula/Tokyo Night/Everforest/Monochrome), surface ramps, containerFor, AMOLED, LocalAmoled, darkTheme default, hapticsEnabled param

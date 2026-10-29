@@ -47,14 +47,14 @@ import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.LibraryFilter
 
 /**
- * Mori-parity Library chrome for Iridium, adapted to EPUB semantics.
+ * Reference-parity Library chrome for Iridium, adapted to EPUB semantics.
  *
- * Ports section 3.1 of Mori's UI hierarchy (collapsing top bar with a 28sp
+ * Ports section 3.1 of the reference's UI hierarchy (collapsing top bar with a 28sp
  * title, search pill island, quick-filters) without touching the existing
  * [LibraryScreen]: these are standalone building blocks a future screen
  * revision can compose together.
  *
- * EPUB adaptations vs Mori (comic reader):
+ * EPUB adaptations vs the reference (comic reader):
  * - Progress is a 0f..1f locator fraction, never a page index.
  * - Iridium has no user collections and no shelves carousel: filtering is
  *   the quick-filter row plus the sort/filter sheet.
@@ -184,7 +184,7 @@ fun LibrarySearchIsland(
     }
 }
 
-/** Quick-filter options in display order: Mori parity plus Finished. */
+/** Quick-filter options in display order: reference parity plus Finished. */
 private val QuickFilterOptions = listOf(
     LibraryFilter.ALL,
     LibraryFilter.IN_PROGRESS,
@@ -205,7 +205,7 @@ private fun quickFilterLabel(filter: LibraryFilter): String = when (filter) {
 /**
  * Segmented quick-filters: one-touch reading-state filtering without opening
  * the sort/filter sheet. The selected chip carries a bookmark glyph only for
- * Favorites, mirroring Mori.
+ * Favorites, mirroring the reference.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

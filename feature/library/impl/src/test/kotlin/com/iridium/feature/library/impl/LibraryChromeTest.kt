@@ -28,7 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Chrome parity tests: Mori section 3.1 building blocks adapted to EPUBs.
+ * Chrome parity tests: the reference section 3.1 building blocks adapted to EPUBs.
  * Covers one UI test per chrome island (top bar, search, quick filters).
  */
 @RunWith(RobolectricTestRunner::class)

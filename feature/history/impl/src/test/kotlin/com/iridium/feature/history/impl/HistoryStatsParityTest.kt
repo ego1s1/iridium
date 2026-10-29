@@ -192,7 +192,7 @@ class HistoryStatsParityTest {
     }
 
     @Test
-    fun `range lengths match the mori week month year windows`() {
+    fun `range lengths match the reference week month year windows`() {
         assertEquals(7, HistoryStatsRange.WEEK.days())
         assertEquals(30, HistoryStatsRange.MONTH.days())
         assertEquals(365, HistoryStatsRange.YEAR.days())

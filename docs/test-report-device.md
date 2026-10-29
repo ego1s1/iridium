@@ -9,11 +9,11 @@ Scope: consolidation only — no new emulator run, no app-code changes.
 |---|---|
 | Host | macOS arm64, `openjdk@17`, `ANDROID_HOME=$HOME/Library/Android/sdk` |
 | Emulator | Android emulator 37.1.11.0 (build 15917651) |
-| AVD | `mori` (`~/.android/avd/mori.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
+| AVD | `reference` (`~/.android/avd/reference.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
 | System image | `system-images/android-35/google_apis/arm64-v8a`, Android 15 (AE3A.240806.043, SDK 35) |
 | Boot flags | `-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot` |
 | Iridium APK | `:app:assembleDebug`, `com.iridium.reader` v0.1.28 (v28), 41MB |
-| Mori reference APK | prebuilt `app-debug.apk`, `com.mori.reader` v0.1.307 (v307) |
+| Reference APK | prebuilt `app-debug.apk`, `the reference app package` v0.1.307 (v307) |
 | Test book | Generated 3-chapter EPUB (`Smoke Test Book`, 2.2KB) in `/sdcard/Books/` |
 | Crashes | None — `dumpsys dropbox` clean, no `AndroidRuntime` FATAL for either app |
 | Unit-test note (source) | `./gradlew testDebugUnitTest` → BUILD SUCCESSFUL at time of device run |
@@ -34,7 +34,7 @@ Scope: consolidation only — no new emulator run, no app-code changes.
 | 10 | Progress persist + resume (exit on Ch3 → detail `66% read` + Resume; reopen restores locator) | PASS | `iridium-10-detail-progress.png` — DB verified `progress=0.667`, `lastLocator` Ch3 |
 | 11 | History tab records the read (`Today`, 66% bar) | PASS | `iridium-11-history-with-book.png` (after re-read ending on Ch3) |
 | 12 | Settings: theme switch to Dark applies; sliders/toggles render | PASS | `iridium-12-settings-appearance.png`, `iridium-13-settings-reading.png` (Appearance/Motion/Library/Reading sections) |
-| 13 | Mori APK install + run (library/settings/stats reference shots) | PASS | `mori-01-library.png`, `mori-02-settings.png`, `mori-03-stats.png` |
+| 13 | Reference APK install + run (library/settings/stats reference shots) | PASS | `reference-01-library.png`, `reference-02-settings.png`, `reference-03-stats.png` |
 
 Supplementary evidence (no flow number, supports flow 5 diagnosis): `iridium-05-reader-malformed-epub.png` — WebView XML-error banner on malformed EPUB.
 
@@ -46,22 +46,22 @@ Supplementary evidence (no flow number, supports flow 5 diagnosis): `iridium-05-
 - Reader chrome auto-hides (immersive); a center tap reliably toggles it.
 - `uiautomator dump` sees the Readium WebView as text but no Compose content-descs inside the reader, so chrome taps used screenshot-derived coordinates; key assertions (chapter text, counters) came from dumps.
 
-## Parity gaps vs Mori (from source report, same device)
+## Parity gaps vs the reference (from source report, same device)
 
-- **Library:** Mori has centered title, full-width search island, quick-filter chips (All/In progress/Unread/Favorites), shelf carousels with counts (`mori-01-library.png`). Iridium shows left-aligned "My books" header, icon-only search/filter, plain grid — structurally behind Mori (t2 in review at the time).
-- **History vs Stats:** Iridium History is a day-grouped list with progress bars (`iridium-11-history-with-book.png`); Mori Stats is a bento (hero totals, 7D/30D/1Y chart, streaks, top books — `mori-03-stats.png`). Known t4 gap (cancelled at the time).
-- **Settings IA:** Mori is a hub of sub-screen rows (Appearance, Reader defaults, Shelves, Privacy, Storage, About — `mori-02-settings.png`); Iridium is a single scrolling page of section cards (`iridium-12/13`). Same controls, different IA.
+- **Library:** the reference has centered title, full-width search island, quick-filter chips (All/In progress/Unread/Favorites), shelf carousels with counts (`reference-01-library.png`). Iridium shows left-aligned "My books" header, icon-only search/filter, plain grid — structurally behind the reference (t2 in review at the time).
+- **History vs Stats:** Iridium History is a day-grouped list with progress bars (`iridium-11-history-with-book.png`); the reference Stats is a bento (hero totals, 7D/30D/1Y chart, streaks, top books — `reference-03-stats.png`). Known t4 gap (cancelled at the time).
+- **Settings IA:** the reference is a hub of sub-screen rows (Appearance, Reader defaults, Shelves, Privacy, Storage, About — `reference-02-settings.png`); Iridium is a single scrolling page of section cards (`iridium-12/13`). Same controls, different IA.
 - **Close parity:** floating-pill bottom nav + resume/action circle, reader chrome (title/author top bar, ToC/settings/more, bottom scrubber island), reader settings bottom sheet (segmented Flow, brightness slider, theme cards, text-size stepper).
 
 ## Manual / coverage gaps
 
 1. **No automated on-device UI/instrumentation tests:** repo has zero `src/androidTest/` files (verified). Compose UI tests (`createComposeRule`) exist but run as local JVM unit tests under `src/test/` with Robolectric, not on an emulator/device. The 13 device flows above were manual + `uiautomator dump`, not repeatable CI tests.
 2. **Release build and signing untested:** device run used `:app:assembleDebug` only. `app/build.gradle.kts` defines a `release` build type with no `signingConfig`, no minify/shrink; no release APK/AAB was built, signed, or smoke-tested.
-3. **Single-device coverage only:** one emulator (mori AVD, Android 15, arm64, 1080x2400) — no physical device, no other API levels / screen sizes / foldables / locales / dark-mode-first boot tested.
+3. **Single-device coverage only:** one emulator (reference AVD, Android 15, arm64, 1080x2400) — no physical device, no other API levels / screen sizes / foldables / locales / dark-mode-first boot tested.
 4. **Reader accessibility and input gaps:** `uiautomator` sees no Compose content-descriptions inside the Readium WebView; TalkBack traversal, font-scale extremes, and keyboard/D-pad navigation were not exercised.
 5. **No performance / resource evidence:** cold-start time, library scan time on large collections, memory/battery under long reads, and rotation/process-death restore were not measured or tested.
 6. **Edge-case library/import flows untested on device:** malformed-EPUB only incidentally (see note); DRM/large-file imports, permission-deny and folder-unlink paths, and interrupted-copy behaviour have no device evidence.
 
 ## Evidence index
 
-`docs/device-test/`: `iridium-01-onboarding-welcome.png`, `iridium-02-onboarding-folder.png`, `iridium-03-library-loaded.png`, `iridium-04-detail-screen.png`, `iridium-05-reader-malformed-epub.png`, `iridium-06-reader-chapter.png`, `iridium-07-reader-chrome.png`, `iridium-08-reader-settings-sheet.png`, `iridium-09-reader-toc.png`, `iridium-10-detail-progress.png`, `iridium-11-history-with-book.png`, `iridium-12-settings-appearance.png`, `iridium-13-settings-reading.png`, `mori-01-library.png`, `mori-02-settings.png`, `mori-03-stats.png` (16 files, all present).
+`docs/device-test/`: `iridium-01-onboarding-welcome.png`, `iridium-02-onboarding-folder.png`, `iridium-03-library-loaded.png`, `iridium-04-detail-screen.png`, `iridium-05-reader-malformed-epub.png`, `iridium-06-reader-chapter.png`, `iridium-07-reader-chrome.png`, `iridium-08-reader-settings-sheet.png`, `iridium-09-reader-toc.png`, `iridium-10-detail-progress.png`, `iridium-11-history-with-book.png`, `iridium-12-settings-appearance.png`, `iridium-13-settings-reading.png`, `reference-01-library.png`, `reference-02-settings.png`, `reference-03-stats.png` (16 files, all present).

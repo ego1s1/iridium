@@ -8,7 +8,7 @@ Date: 2026-10-07. Tester: AgentCraft Kit (task t24, retry of t23). No app-code c
 |---|---|
 | Host | macOS arm64, `JAVA_HOME=/opt/homebrew/opt/openjdk@17`, `ANDROID_HOME=$HOME/Library/Android/sdk` |
 | Emulator binary | Android emulator 37.1.11.0 (build 15917651) |
-| AVD | `mori` (`~/.android/avd/mori.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
+| AVD | `reference` (`~/.android/avd/reference.avd`), arm64-v8a, 1080x2400 @420dpi, 1536MB RAM |
 | System image | `system-images/android-35/google_apis/arm64-v8a`, Android 15 (SDK 35) |
 | Boot | fresh `adb reboot`, `sys.boot_completed=1` before install |
 | Iridium APK | `:app:assembleDebug` built from this worktree, `com.iridium.reader` v0.1.67 (v67), 39MB |

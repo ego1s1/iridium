@@ -14,7 +14,7 @@ Scope: consolidation only — no app-code changes. Detail in the three part file
 | Unit (`testDebugUnitTest` + JVM `test`) | PASS, BUILD SUCCESSFUL | 14 modules, 31 classes, 178 tests, 0 fail / 0 error / 0 skipped |
 | Static: detekt (`./gradlew detekt`) | PASS, BUILD SUCCESSFUL | 0 warnings / 0 errors across 21 module reports |
 | Static: Android lint (`:app:lintDebug`) | PASS, BUILD SUCCESSFUL | 0 errors / 94 warnings (84 dependency-update, 9 AGP-update, 1 benign manifest) |
-| Device / manual (emulator `mori`, Android 15) | 13 / 13 flows PASS | 0 crashes; 16 screenshots in `docs/device-test/` |
+| Device / manual (emulator `reference`, Android 15) | 13 / 13 flows PASS | 0 crashes; 16 screenshots in `docs/device-test/` |
 
 Totals: 178 unit tests green, both static gates green, 13/13 manual flows green.
 

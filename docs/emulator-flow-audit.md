@@ -8,7 +8,7 @@ Method: scripted `adb` driving — `am start`, `input tap`/`swipe`/`text`,
 `uiautomator dump` for hierarchy assertions, `screencap` for visual review,
 `logcat` scanned for `FATAL EXCEPTION`. (AppleScript cannot drive an Android
 emulator; `adb` + uiautomator is the scriptable equivalent. No VM was spun
-up — the existing `mori` AVD was reused.)
+up — the existing `reference` AVD was reused.)
 
 ## Unit tests
 

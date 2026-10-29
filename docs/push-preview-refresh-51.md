@@ -24,14 +24,14 @@
 | 2 | e32b0e4 | e32b0e49368f6d98094b0e43fb59ee597154d63a | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t1-expressive-design-system into main |
 | 3 | 2325662 | 232566243cee97220e70fb9f9036ef7dab71d83d | 2026-10-06 | AgentCraft Kit | t4: Settings Expressive Sliders & Modular Sections |
 | 4 | 76aca71 | 76aca71748db81ecc240035ab88541ffc7ba1135 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t4-settings-expressive into main |
-| 5 | 1ab8e4f | 1ab8e4fc73167ed9ab117d7ee88684fe396e39fa | 2026-10-06 | AgentCraft Juniper | t1: Parity-gap audit vs Mori UI hierarchy |
-| 6 | a93767f | a93767f9be58b7f7156cc37feadc8cc32b9c9f9e | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/juniper/t1-parity-gap-audit-vs-mori into main |
-| 7 | 4ee7b3d | 4ee7b3d729f0c4826a52e5759c6942a6fb280fc6 | 2026-10-06 | AgentCraft Juniper | t4: History-to-Stats bento parity with Mori |
+| 5 | 1ab8e4f | 1ab8e4fc73167ed9ab117d7ee88684fe396e39fa | 2026-10-06 | AgentCraft Juniper | t1: Parity-gap audit vs the reference UI hierarchy |
+| 6 | a93767f | a93767f9be58b7f7156cc37feadc8cc32b9c9f9e | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/juniper/t1-parity-gap-audit-vs-reference into main |
+| 7 | 4ee7b3d | 4ee7b3d729f0c4826a52e5759c6942a6fb280fc6 | 2026-10-06 | AgentCraft Juniper | t4: History-to-Stats bento parity with the reference |
 | 8 | 67f37cb | 67f37cb8c919bdcca1e2109ae7fcf61e5a0fb005 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/juniper/t4-history-to-stats-bento into main |
-| 9 | 3951a02 | 3951a02e973852a73031af96e91a61fbd6288b9d | 2026-10-06 | AgentCraft Wren | t3: Mori reader-chrome parity (scrubber island, action dock, settings sheet) |
+| 9 | 3951a02 | 3951a02e973852a73031af96e91a61fbd6288b9d | 2026-10-06 | AgentCraft Wren | t3: the reference reader-chrome parity (scrubber island, action dock, settings sheet) |
 | 10 | f336989 | f3369895d151a25b36d806fe357e9d64a1c53c96 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/wren/t3-reader-chrome-parity into main |
-| 11 | 62ba9fb | 62ba9fb2ad353985d8254ce79d4262ba7a68a05f | 2026-10-06 | AgentCraft Kit | t2: Library chrome parity with Mori (new composables + tests) |
-| 12 | 666bf70 | 666bf70c86c25a38ce8acf358b07a35e91c58867 | 2026-10-06 | AgentCraft Kit | t5: Smoke-test Iridium on mori virtual device (report + screenshots) |
+| 11 | 62ba9fb | 62ba9fb2ad353985d8254ce79d4262ba7a68a05f | 2026-10-06 | AgentCraft Kit | t2: Library chrome parity with the reference (new composables + tests) |
+| 12 | 666bf70 | 666bf70c86c25a38ce8acf358b07a35e91c58867 | 2026-10-06 | AgentCraft Kit | t5: Smoke-test Iridium on reference virtual device (report + screenshots) |
 | 13 | 6c12bc5 | 6c12bc5c4e528259434a96102e53e52ba0493605 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t2-library-chrome-parity into main |
 | 14 | a9f1dc5 | a9f1dc54d12954ac3d0d6ae0cb731ca8110526eb | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t5-smoke-test-iridium into main |
 | 15 | b6af51f | b6af51f9f593d7ee59c40bf1938555bc5840a2aa | 2026-10-06 | AgentCraft Juniper | t6: Push preview audit vs origin/main |
@@ -59,9 +59,9 @@
 | 37 | ae8f5b0 | ae8f5b06a84555c77de856e382e02778fce1beea | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/wren/t20-adopt-newer-expressive into main |
 | 38 | bd0ceaa | bd0ceaaa661c04efc0e6b43ccf0006e3e3abcd99 | 2026-10-06 | AgentCraft Kit | t15: Collect static checks and CI gate status |
 | 39 | 7f96c31 | 7f96c3187435389a226ba124ba26c692dfdb92ee | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t15-collect-static-checks into main |
-| 40 | 32e24bf | 32e24bfa6d452c05fd99cb4c46c76f29c938ae5c | 2026-10-06 | AgentCraft Kit | t19: Harden Pulsar haptics to Mori parity |
+| 40 | 32e24bf | 32e24bfa6d452c05fd99cb4c46c76f29c938ae5c | 2026-10-06 | AgentCraft Kit | t19: Harden Pulsar haptics to reference parity |
 | 41 | 31317d6 | 31317d62543d5cb257f838bd7e6a2f48460d26b7 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/kit/t19-harden-pulsar-haptics into main |
-| 42 | 75123d0 | 75123d0358b6953d99801b2335e3149b91244d06 | 2026-10-06 | AgentCraft Juniper | t18: Align M3 Expressive SDK baseline to Mori |
+| 42 | 75123d0 | 75123d0358b6953d99801b2335e3149b91244d06 | 2026-10-06 | AgentCraft Juniper | t18: Align M3 Expressive SDK baseline to the reference |
 | 43 | 27428bd | 27428bd81087ed2c9b9451fcb9a6e74e0e619ae1 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/juniper/t18-align-m3-expressive-sdk into main |
 | 44 | cc7e5d2 | cc7e5d2afc6748f30a3994aba1944db6e0321e8a | 2026-10-06 | AgentCraft Juniper | t17: Assemble consolidated test report |
 | 45 | 7fa8fde | 7fa8fdef57861ba41a794550205f1bc4e30e8a28 | 2026-10-06 | Priyanshu Sharma | Merge agentcraft/juniper/t17-assemble-consolidated into main |
@@ -115,9 +115,9 @@ Composition: 25 non-merge feature/report commits (Kit 10, Juniper 7 + 1 branch-i
  docs/device-test/iridium-11-history-with-book.png  | Bin 0 -> 76138 bytes
  .../device-test/iridium-12-settings-appearance.png | Bin 0 -> 174506 bytes
  docs/device-test/iridium-13-settings-reading.png   | Bin 0 -> 169655 bytes
- docs/device-test/mori-01-library.png               | Bin 0 -> 151167 bytes
- docs/device-test/mori-02-settings.png              | Bin 0 -> 178492 bytes
- docs/device-test/mori-03-stats.png                 | Bin 0 -> 147884 bytes
+ docs/device-test/reference-01-library.png               | Bin 0 -> 151167 bytes
+ docs/device-test/reference-02-settings.png              | Bin 0 -> 178492 bytes
+ docs/device-test/reference-03-stats.png                 | Bin 0 -> 147884 bytes
  docs/device-test/real-epub-lib-01-library.png      | Bin 0 -> 599547 bytes
  docs/device-test/real-epub-lib-01-library.xml      |   1 +
  docs/device-test/real-epub-lib-02-crash-log.txt    |  23 +
@@ -200,9 +200,9 @@ Binary = `git diff --numstat --diff-filter=A` shows `- -` (all 30 are new `A`, n
 | docs/device-test/iridium-11-history-with-book.png | 76138 | 74.4 KB |
 | docs/device-test/iridium-12-settings-appearance.png | 174506 | 170.4 KB |
 | docs/device-test/iridium-13-settings-reading.png | 169655 | 165.7 KB |
-| docs/device-test/mori-01-library.png | 151167 | 147.6 KB |
-| docs/device-test/mori-02-settings.png | 178492 | 174.3 KB |
-| docs/device-test/mori-03-stats.png | 147884 | 144.4 KB |
+| docs/device-test/reference-01-library.png | 151167 | 147.6 KB |
+| docs/device-test/reference-02-settings.png | 178492 | 174.3 KB |
+| docs/device-test/reference-03-stats.png | 147884 | 144.4 KB |
 | docs/device-test/real-epub-lib-01-library.png | 599547 | 585.5 KB — NEW since 14-ahead audit |
 | docs/device-test/real-epub-lib-02-crash.png | 138930 | 135.7 KB — NEW since 14-ahead audit |
 | docs/device-test/real-epub-reader-retry-01-library.png | 516116 | 504.0 KB — NEW since 14-ahead audit |
@@ -219,7 +219,7 @@ Binary = `git diff --numstat --diff-filter=A` shows `- -` (all 30 are new `A`, n
 
 - Delta vs 14-ahead audit: 17 → 30 binaries (+13: 2 real-epub-lib + 11 real-epub-reader-retry screenshots); total 7,465,897 → 13,024,709 bytes (+5,558,812 bytes, ~5.30 MiB).
 - FLAG: `google_sans_flex.ttf` (4.1 MB) still dominates; confirm intentional font bundling.
-- FLAG: 29 screenshots (`docs/device-test/*.png`, 13 iridium + 3 mori + 15 real-epub) total ~8.9 MB; confirm docs screenshots should ship on main.
+- FLAG: 29 screenshots (`docs/device-test/*.png`, 13 iridium + 3 reference + 15 real-epub) total ~8.9 MB; confirm docs screenshots should ship on main.
 - All 30 binaries are new (`A` in `git diff --name-status origin/main..main`); no binary modifications/deletions.
 - Companion text evidence (not binary, counted in 80 added files): 13 `.xml` UI dumps + 3 crash/toc `.txt` logs under `docs/device-test/real-epub-*`.
 

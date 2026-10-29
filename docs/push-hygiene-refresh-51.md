@@ -73,7 +73,7 @@ Scope: files changed in `origin/main..main` (95 files), sizes from working tree.
 
 ### 3b. Further PNGs in the push (all < 1 MiB each)
 
-27 further PNGs under `docs/device-test/` (t5 smoke-test evidence + Mori baselines + t21/t24 real-EPUB library/reader shots). None individually exceeds 1 MiB:
+27 further PNGs under `docs/device-test/` (t5 smoke-test evidence + the reference baselines + t21/t24 real-EPUB library/reader shots). None individually exceeds 1 MiB:
 
 | size | file | keep / prune |
 |------|------|--------------|
@@ -89,14 +89,14 @@ Scope: files changed in `origin/main..main` (95 files), sizes from working tree.
 | 361,199 bytes (352 KiB) | `docs/device-test/iridium-09-reader-toc.png` | KEEP — smoke-test evidence |
 | 285,144 bytes (278 KiB) | `docs/device-test/iridium-08-reader-settings-sheet.png` | KEEP — smoke-test evidence |
 | 178,575 bytes (174 KiB) | `docs/device-test/real-epub-reader-retry-08-toc.png` | KEEP — reader-retry evidence |
-| 178,492 bytes (174 KiB) | `docs/device-test/mori-02-settings.png` | KEEP — Mori baseline reference |
+| 178,492 bytes (174 KiB) | `docs/device-test/reference-02-settings.png` | KEEP — reference baseline reference |
 | 176,793 bytes (172 KiB) | `docs/device-test/real-epub-reader-retry-06-chrome.png` | KEEP — reader-retry evidence |
 | 174,506 bytes (170 KiB) | `docs/device-test/iridium-12-settings-appearance.png` | KEEP — smoke-test evidence |
 | 169,655 bytes (165 KiB) | `docs/device-test/iridium-13-settings-reading.png` | KEEP — smoke-test evidence |
 | 157,051 bytes (153 KiB) | `docs/device-test/real-epub-reader-retry-11-history.png` | KEEP — reader-retry evidence |
 | 152,575 bytes (149 KiB) | `docs/device-test/real-epub-reader-retry-04-paging.png` | KEEP — reader-retry evidence |
-| 151,167 bytes (147 KiB) | `docs/device-test/mori-01-library.png` | KEEP — Mori baseline reference |
-| 147,884 bytes (144 KiB) | `docs/device-test/mori-03-stats.png` | KEEP — Mori baseline reference |
+| 151,167 bytes (147 KiB) | `docs/device-test/reference-01-library.png` | KEEP — reference baseline reference |
+| 147,884 bytes (144 KiB) | `docs/device-test/reference-03-stats.png` | KEEP — reference baseline reference |
 | 138,930 bytes (135 KiB) | `docs/device-test/real-epub-lib-02-crash.png` | KEEP — library-load evidence |
 | 131,685 bytes (128 KiB) | `docs/device-test/real-epub-reader-retry-07-settings.png` | KEEP — reader-retry evidence |
 | 111,180 bytes (108 KiB) | `docs/device-test/iridium-02-onboarding-folder.png` | KEEP — smoke-test evidence |
@@ -106,7 +106,7 @@ Scope: files changed in `origin/main..main` (95 files), sizes from working tree.
 | 76,138 bytes (74 KiB) | `docs/device-test/iridium-11-history-with-book.png` | KEEP — smoke-test evidence |
 | 72,457 bytes (70 KiB) | `docs/device-test/iridium-03-library-loaded.png` | KEEP — smoke-test evidence |
 
-Recommendation: **keep all 29 PNGs + the font** — they are t5/t21/t24 device-test attachments and Mori baselines. Optional future saving (not this task): recompress PNGs; saves are marginal (~10–20%) and would rewrite evidence files, so don't.
+Recommendation: **keep all 29 PNGs + the font** — they are t5/t21/t24 device-test attachments and the reference baselines. Optional future saving (not this task): recompress PNGs; saves are marginal (~10–20%) and would rewrite evidence files, so don't.
 
 ### 3c. Everything else in the push (for completeness)
 
