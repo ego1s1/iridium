@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
@@ -157,7 +158,7 @@ class ReaderViewModel @Inject constructor(
 
     val uiState: StateFlow<ReaderUiState> = combine(
         content, chromeBundle, navBundle, positions.positionsVersion, store.latestLocator,
-    ) { c, ch, n, _, _,
+    ) { c, ch, n, _, locator,
         ->
         // positionsVersion + latestLocator are recombine triggers: the
         // tracker reads latestLocator synchronously, but combine only
@@ -190,6 +191,7 @@ class ReaderViewModel @Inject constructor(
                     chapterTitle = positions.chapterTitle(c.toc),
                     focusedHighlightId = n.focusedHighlightId,
                     navigatorAttached = n.navigatorAttached,
+                    contentReady = locator != null,
                     themeSheetOpen = ch.themeSheetOpen,
                 )
             }
@@ -342,10 +344,12 @@ class ReaderViewModel @Inject constructor(
                     }
                 val factory = EpubNavigatorFactory(result.publication)
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
-                positions.replaceAll(
-                    safeCatching { result.publication.positions() }.getOrDefault(emptyList()),
-                )
-                indexContentIfNeeded()
+                // Positions and content indexing both walk the whole book. They
+                // used to run immediately after publishing, exactly while the
+                // navigator was laying out the first page — that contention is
+                // what produced a multi-second black screen before the text
+                // appeared. Both are now deferred until the first page is up.
+                viewModelScope.launch { loadSecondaryDataAfterFirstPage(result) }
             }
             OpenResult.FileMissing, OpenResult.ParseFailed -> {
                 store.failOpen()
@@ -368,6 +372,24 @@ class ReaderViewModel @Inject constructor(
             it.href.toString().substringAfterLast('/').substringBefore('#') == target
         } ?: return null
         return runCatching { publication.locatorFromLink(link) }.getOrNull()
+    }
+
+    /**
+     * Runs the expensive book-wide work once the first page has actually
+     * painted: the position table (needed for the scrubber) and the content
+     * index (needed for search). Waiting on the first locator means the first
+     * page is no longer competing with them for CPU or disk.
+     */
+    private suspend fun loadSecondaryDataAfterFirstPage(result: OpenResult.Opened) {
+        // Bounded: a navigator that never reports must not strand this job.
+        withTimeoutOrNull(SECONDARY_DATA_WAIT_MS) {
+            store.latestLocator.first { it != null }
+        }
+        positions.replaceAll(
+            safeCatching { result.publication.positions() }.getOrDefault(emptyList()),
+        )
+        positions.measurePagination()
+        indexContentIfNeeded()
     }
 
     /** Indexes chapter text once per book so content search has data. */
@@ -603,6 +625,9 @@ class ReaderViewModel @Inject constructor(
 
         /** Lets the freshly attached navigator lay out before measuring pages. */
         const val ATTACH_PAGINATION_DELAY_MS = 600L
+
+        /** Upper bound on waiting for the first page before loading the rest. */
+        const val SECONDARY_DATA_WAIT_MS = 8_000L
 
 
     }

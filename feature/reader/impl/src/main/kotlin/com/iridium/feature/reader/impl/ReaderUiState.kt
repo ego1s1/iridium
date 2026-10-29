@@ -36,6 +36,12 @@ sealed interface ReaderUiState {
         val chapterTitle: String? = null,
         /** True once the navigator fragment attached (content visible). */
         val navigatorAttached: Boolean = false,
+        /**
+         * True once the navigator has reported a position, which means the
+         * first page is laid out and painted. Used to keep the loading state
+         * on screen instead of showing an empty page while the WebView works.
+         */
+        val contentReady: Boolean = false,
         /** Theme chooser sheet (dock colorscheme button) is open. */
         val themeSheetOpen: Boolean = false,
     ) : ReaderUiState

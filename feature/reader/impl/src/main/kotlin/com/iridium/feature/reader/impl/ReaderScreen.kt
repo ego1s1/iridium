@@ -29,6 +29,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -324,6 +326,33 @@ internal fun ReaderScreen(
                     .graphicsLayer { translationX = slideShift.value - slideDir * screenWidthPx },
             )
         }
+        // Until the navigator reports its first position the WebView has not
+        // painted yet, which used to show as a blank page after the spinner
+        // vanished. Cover that gap with the page colour and the loader so the
+        // transition is spinner -> text, with nothing in between.
+        //
+        // The locator arrives from the WebView's JS before the compositor has
+        // necessarily presented that content, so the loader is held for two
+        // more frames; dropping it on the locator alone still showed a blank
+        // page for a moment.
+        var loaderVisible by remember { mutableStateOf(true) }
+        LaunchedEffect(state.contentReady) {
+            if (!state.contentReady) return@LaunchedEffect
+            withFrameNanos { }
+            withFrameNanos { }
+            loaderVisible = false
+        }
+        if (loaderVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageBg)
+                    .testTag(ReaderChromeTestTags.PageLoading),
+                contentAlignment = Alignment.Center,
+            ) {
+                IridiumLoading()
+            }
+        }
         // Layer 1: night-light tint. Visual only, taps fall through to the book.
         // (The position counter lives only in the chrome scrubber island:
         // nothing overlays the page while chrome is hidden.)
@@ -412,10 +441,11 @@ internal fun ReaderScreen(
         )
     }
     dictionaryState?.let { dict ->
-        // Crisp Pulsar tick the moment a word is selected. This fires from
-        // the user's selection gesture (not idle composition); the framework
-        // fallback guarantees feedback even where Pulsar can't play.
-        LaunchedEffect(dict.word) { haptics(IridiumHaptic.Tick) }
+        // Crisp buzzy tick the moment a word is selected. Keyed on the word,
+        // so it fires once per new selection as the hold snaps to a word, not
+        // on every recomposition; the framework fallback guarantees feedback
+        // even where Pulsar cannot play.
+        LaunchedEffect(dict.word) { haptics(IridiumHaptic.TextSelect) }
         // Keyed by word so each fresh selection replays the popup's
         // entrance after the lookup grace period.
         key(dict.word) {
