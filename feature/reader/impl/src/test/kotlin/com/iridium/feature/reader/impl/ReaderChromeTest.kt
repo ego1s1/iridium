@@ -106,29 +106,6 @@ class ReaderChromeTest {
 
     // Composables
 
-    @Test
-    fun `epub dock exposes flow theme toc highlights and settings`() {
-        var themeClicks = 0
-        var settingsClicks = 0
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderEpubDock(
-                    onFlowCycle = {},
-                    onThemeClick = { themeClicks++ },
-                    onTocClick = {},
-                    onHighlightsClick = {},
-                    onSettingsClick = { settingsClicks++ },
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubDock).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubFlowButton).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubThemeButton).performClick()
-        assertEquals(1, themeClicks)
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubTocButton).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubHighlightsButton).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.EpubSettingsButton).performClick()
-        assertEquals(1, settingsClicks)
-    }
+    // NOTE: no dock test — the bottom dock was removed; its actions live in
+    // the top bar overflow menu (covered by menu tests).
 }

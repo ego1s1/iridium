@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -70,6 +73,7 @@ import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumScrimPill
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.resolvedColors
@@ -236,17 +240,17 @@ internal fun ReaderScreen(
             .fillMaxSize()
             .background(pageBg),
     ) {
-        // Readium content fills the whole area; chrome overlays it.
-        // The container is stable across chrome toggles: ignoring-visibility
-        // insets never change when the system bars show/hide, so the WebView
-        // keeps its size and the text never repaginates on tap.
+        // Readium content fills the entire window with zero reserved insets:
+        // chrome (top bar, scrubber) is a pure overlay and may cover text.
+        // No insets are applied here so toggling chrome can never resize the
+        // WebView or repaginate the book; page margins come from the book's
+        // own CSS/Readium preferences, not the container.
         NavigatorHost(
             bookId = state.book.id,
             sessionReady = sessionReady,
-            modifier = Modifier.fillMaxSize()
-                .windowInsetsPadding(topSafeInsets)
-                .windowInsetsPadding(bottomSafeInsets),
+            modifier = Modifier.fillMaxSize(),
         )
+        // Layer 1: position pill, only while chrome is hidden (pure overlay).
         if (!state.chromeVisible && state.prefs.showPageCounter) {
             state.positionText?.let {
                 IridiumScrimPill(
@@ -255,9 +259,7 @@ internal fun ReaderScreen(
                 )
             }
         }
-        // Night light: warm scrim above the page, below the chrome. Purely
-        // visual — it never resizes or repaginates content, and it carries
-        // no touch handling so taps fall through to the book.
+        // Layer 2: night-light tint. Visual only, taps fall through to the book.
         if (state.prefs.nightLight) {
             Box(
                 modifier = Modifier
@@ -265,117 +267,41 @@ internal fun ReaderScreen(
                     .background(nightLightColor(state.prefs.nightLightIntensity)),
             )
         }
-        AnimatedVisibility(
+        // Layer 3: the chrome — one overlay, top bar + bottom scrubber, both
+        // sliding/fading together. Never affects layout: the navigator behind
+        // it is full-window with zero insets, so text is static on every tap.
+        ReaderChromeOverlay(
             visible = state.chromeVisible,
-            enter = IridiumEnter.enter(IridiumEnterKind.CHROME_TOP),
-            exit = IridiumEnter.exit(IridiumEnterKind.CHROME_TOP),
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) {
-                TopAppBar(
-                    // Stable top offset: ignoring-visibility insets never change
-                    // when the system bars show/hide, so the slide/fade toggle
-                    // animation never jumps mid-flight (was: statusBarsPadding).
-                    // Opaque surface: no blur means text must not show through.
-                    modifier = Modifier.windowInsetsPadding(topSafeInsets),
-                    title = {
-                        Column {
-                            Text(
-                                text = state.book.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            state.book.author?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+            topBar = {
+                ReaderTopBar(
+                    title = state.book.title,
+                    author = state.book.author,
+                    onBackClick = onBackClick,
+                    onAction = onAction,
+                    onAddHighlight = { showAddDialog = true },
+                    flowLabel = when (state.prefs.flow) {
+                        ReadingFlow.AUTO -> stringResource(R.string.reader_settings_flow_auto)
+                        ReadingFlow.PAGED -> stringResource(R.string.reader_settings_flow_paged)
+                        ReadingFlow.SCROLLED -> stringResource(R.string.reader_settings_flow_scrolled)
                     },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onBackClick()
-                        }) {
-                            Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.reader_action_back))
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onAction(ReaderAction.OpenToc)
-                        }) {
-                            Icon(IridiumIcons.List, contentDescription = stringResource(R.string.reader_toc_title))
-                        }
-                        IconButton(onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onAction(ReaderAction.OpenHighlights)
-                        }) {
-                            Icon(
-                                IridiumIcons.Highlight,
-                                contentDescription = stringResource(R.string.reader_action_highlights),
-                            )
-                        }
-                        IconButton(onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onAction(ReaderAction.OpenSettings)
-                        }) {
-                            Icon(
-                                IridiumIcons.Settings,
-                                contentDescription = stringResource(R.string.reader_action_settings),
-                            )
-                        }
-                        var menuOpen by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(IridiumIcons.More, contentDescription = stringResource(R.string.reader_action_more))
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.reader_action_highlight_selection)) },
-                                onClick = {
-                                    menuOpen = false
-                                    showAddDialog = true
-                                },
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
+                    onCycleFlow = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(topSafeInsets),
                 )
-        }
-        AnimatedVisibility(
-            visible = state.chromeVisible,
-            enter = IridiumEnter.enter(IridiumEnterKind.CHROME_BOTTOM),
-            exit = IridiumEnter.exit(IridiumEnterKind.CHROME_BOTTOM),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                // Stable bottom offset for the same reason as the top bar.
-                // The pills themselves are opaque surfaces; no blur needed.
-                modifier = Modifier.windowInsetsPadding(bottomSafeInsets)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
+            },
+            bottomBar = {
                 ReaderScrubberIsland(
                     positionIndex = state.positionIndex,
                     positionCount = state.positionCount,
                     onSeek = { onAction(ReaderAction.SeekTo(it)) },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(bottomSafeInsets)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
-                ReaderEpubDock(
-                    onFlowCycle = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
-                    onThemeClick = { onAction(ReaderAction.OpenThemeSheet) },
-                    onTocClick = { onAction(ReaderAction.OpenToc) },
-                    onHighlightsClick = { onAction(ReaderAction.OpenHighlights) },
-                    onSettingsClick = { onAction(ReaderAction.OpenSettings) },
-                )
-            }
-        }
+            },
+        )
         SnackbarHost(
             hostState = snackbarHost,
             modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
@@ -469,6 +395,33 @@ private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
     ]
 
 /**
+ * One overflow-menu row: leading icon is decorative (the screen reader uses
+ * the label), an optional trailing value shows the cycle target, and every
+ * tap plays the standard select haptic.
+ */
+@Composable
+private fun ReaderMenuItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    testTag: String,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: String? = null,
+) {
+    val haptics = rememberIridiumHaptics()
+    DropdownMenuItem(
+        text = { Text(label) },
+        trailingIcon = trailing?.let { { Text(text = it, style = MaterialTheme.typography.labelMedium) } },
+        leadingIcon = { Icon(icon, contentDescription = null) },
+        onClick = {
+            haptics(IridiumHaptic.Select)
+            onSelect()
+        },
+        modifier = modifier.testTag(testTag),
+    )
+}
+
+/**
  * Page background per reader theme (mirrors the settings swatches): system
  * bars tint to this so they read as a seamless frame around the page.
  */
@@ -477,8 +430,178 @@ internal fun ColorSchemeChoice.pageBackground(): Color = Color(pageBackgroundArg
 /** Dark status/nav icons on the light page themes, light icons otherwise. */
 internal fun ColorSchemeChoice.lightSystemBars(): Boolean = isLightScheme()
 
-/** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
+/**
+ * The chrome overlay: top bar + bottom scrubber animated as one unit over a
+ * static page. Both bars float above the WebView and never participate in
+ * layout, so tapping can neither resize content nor repaginate the book.
+ */
 @Composable
+private fun BoxScope.ReaderChromeOverlay(
+    visible: Boolean,
+    topBar: @Composable () -> Unit,
+    bottomBar: @Composable () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = IridiumEnter.enter(IridiumEnterKind.CHROME_TOP),
+        exit = IridiumEnter.exit(IridiumEnterKind.CHROME_TOP),
+        modifier = Modifier.align(Alignment.TopCenter),
+    ) {
+        topBar()
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = IridiumEnter.enter(IridiumEnterKind.CHROME_BOTTOM),
+        exit = IridiumEnter.exit(IridiumEnterKind.CHROME_BOTTOM),
+        modifier = Modifier.align(Alignment.BottomCenter),
+    ) {
+        bottomBar()
+    }
+}
+
+/** Opaque top bar: title + quick actions + overflow menu. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderTopBar(
+    title: String,
+    author: String?,
+    flowLabel: String,
+    onBackClick: () -> Unit,
+    onAction: (ReaderAction) -> Unit,
+    onAddHighlight: () -> Unit,
+    onCycleFlow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberIridiumHaptics()
+    // Opaque surface: no blur means text must not show through.
+    TopAppBar(
+        modifier = modifier,
+        title = {
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                author?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Select)
+                onBackClick()
+            }) {
+                Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.reader_action_back))
+            }
+        },
+        actions = {
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Select)
+                onAction(ReaderAction.OpenToc)
+            }) {
+                Icon(IridiumIcons.List, contentDescription = stringResource(R.string.reader_toc_title))
+            }
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Select)
+                onAction(ReaderAction.OpenHighlights)
+            }) {
+                Icon(
+                    IridiumIcons.Highlight,
+                    contentDescription = stringResource(R.string.reader_action_highlights),
+                )
+            }
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Select)
+                onAction(ReaderAction.OpenSettings)
+            }) {
+                Icon(
+                    IridiumIcons.Settings,
+                    contentDescription = stringResource(R.string.reader_action_settings),
+                )
+            }
+            var menuOpen by remember { mutableStateOf(false) }
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Select)
+                menuOpen = true
+            }) {
+                Icon(IridiumIcons.More, contentDescription = stringResource(R.string.reader_action_more))
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                ReaderMenuItem(
+                    icon = IridiumIcons.List,
+                    label = stringResource(R.string.reader_toc_title),
+                    testTag = "readerMenuToc",
+                    onSelect = {
+                        menuOpen = false
+                        onAction(ReaderAction.OpenToc)
+                    },
+                )
+                ReaderMenuItem(
+                    icon = IridiumIcons.Edit,
+                    label = stringResource(R.string.reader_action_highlight_selection),
+                    testTag = "readerMenuHighlightSelection",
+                    onSelect = {
+                        menuOpen = false
+                        onAddHighlight()
+                    },
+                )
+                ReaderMenuItem(
+                    icon = IridiumIcons.Highlight,
+                    label = stringResource(R.string.reader_action_highlights),
+                    testTag = "readerMenuHighlights",
+                    onSelect = {
+                        menuOpen = false
+                        onAction(ReaderAction.OpenHighlights)
+                    },
+                )
+                HorizontalDivider()
+                ReaderMenuItem(
+                    icon = IridiumIcons.ViewAgenda,
+                    label = stringResource(R.string.reader_settings_flow),
+                    trailing = flowLabel,
+                    testTag = "readerMenuFlow",
+                    onSelect = {
+                        menuOpen = false
+                        onCycleFlow()
+                    },
+                )
+                ReaderMenuItem(
+                    icon = IridiumIcons.Contrast,
+                    label = stringResource(R.string.reader_settings_theme),
+                    testTag = "readerMenuTheme",
+                    onSelect = {
+                        menuOpen = false
+                        onAction(ReaderAction.OpenThemeSheet)
+                    },
+                )
+                HorizontalDivider()
+                ReaderMenuItem(
+                    icon = IridiumIcons.Settings,
+                    label = stringResource(R.string.reader_action_settings),
+                    testTag = "readerMenuSettings",
+                    onSelect = {
+                        menuOpen = false
+                        onAction(ReaderAction.OpenSettings)
+                    },
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+    )
+}
+
+/** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */@Composable
 private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val activity = context.findActivity()

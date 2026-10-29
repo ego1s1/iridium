@@ -2,42 +2,28 @@ package com.iridium.feature.reader.impl
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,61 +31,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
-import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumSquigglySliderThumb
 import com.iridium.core.designsystem.IridiumSquigglyTrack
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import kotlin.math.roundToInt
 
-/**
- * Press squash for chrome icon buttons (androidify ScaleIndication idiom):
- * the button shrinks to 96% on a spatial spring while held. Callers pass
- * the same [MutableInteractionSource] to the button's `interactionSource`
- * so the pressed state is observed, not assumed.
- */
-@Composable
-private fun pressScale(interaction: MutableInteractionSource): Modifier {
-    val pressed by interaction.collectIsPressedAsState()
-    // No bounce: a press affordance must land exactly on rest, never overshoot.
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = spring(
-            stiffness = Spring.StiffnessMedium,
-            dampingRatio = Spring.DampingRatioNoBouncy,
-        ),
-        label = "chromePressScale",
-    )
-    return Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
-}
-
-/**
- * Mori reader-chrome parity for Iridium's EPUB reader (UI hierarchy.md §3.3).
- *
- * New chrome only: floating scrubber island with tooltip, floating EPUB
- * action dock (flow / theme / contents / highlights / settings). The existing
- * reader engine ([ReaderScreen], [ReaderViewModel]) is untouched; the chrome
- * is stateless and driven by callbacks so the host adopts it without
- * rewiring Readium plumbing.
- *
- * EPUB adaptation notes (comic pages -> reflowable positions):
- * - Mori's page index/count becomes the EPUB position index/count.
- * - Reading direction stays LTR; the invert-taps switch mirrors the tap
- *   zones for reachability only (left forward / right back).
- */
 /** Tap-zone outcome for a tap inside the reading surface. */
 enum class ChromeTapZone {
     PREV,
@@ -107,17 +52,11 @@ enum class ChromeTapZone {
     NEXT,
 }
 
-/** Test tags for the Mori-parity reader chrome. */
+/** Test tags for the reader chrome. */
 internal object ReaderChromeTestTags {
     const val ScrubberIsland = "chromeScrubberIsland"
     const val ScrubTooltip = "chromeScrubTooltip"
     const val ScrubSlider = "chromeScrubSlider"
-    const val EpubDock = "chromeEpubDock"
-    const val EpubFlowButton = "chromeEpubFlow"
-    const val EpubThemeButton = "chromeEpubTheme"
-    const val EpubTocButton = "chromeEpubToc"
-    const val EpubHighlightsButton = "chromeEpubHighlights"
-    const val EpubSettingsButton = "chromeEpubSettings"
     const val TapZoneInvertSwitch = "tapZoneInvertSwitch"
 }
 
@@ -176,9 +115,10 @@ internal fun chromeZoneForTap(
 // Composables
 
 /**
- * Floating scrubber island: prev/next steppers flanking a pill with the
- * position counter + slider, with a live tooltip bubble while scrubbing.
- * Row order mirrors [direction] so "forward" follows the reading direction.
+ * Floating scrubber island: position counter + full-width slider, with a
+ * live tooltip bubble while scrubbing. Stateless and driven by callbacks;
+ * the value domain (first -> last position) never mirrors with layout
+ * direction, so the whole island is pinned to LTR.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -242,6 +182,8 @@ fun ReaderScrubberIsland(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
                     ) {
+                        // Fixed-width slot keeps the slider from shifting as
+                        // the counter ticks; width is hidden from semantics.
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = positionCount.coerceAtLeast(1).toString(),
@@ -266,40 +208,34 @@ fun ReaderScrubberIsland(
                                 )
                             }
                         }
-                        // Keep the slider geometry LTR regardless of any
-                        // surrounding layout direction:
-                        // the value domain (first -> last position) must
-                        // not flip with layout direction.
-                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                            val scrubInteraction = remember { MutableInteractionSource() }
-                            Slider(
-                                value = shownIndex.toFloat(),
-                                onValueChange = { raw ->
-                                    val next = raw.roundToInt()
-                                    if (next != scrub) haptics(IridiumHaptic.FrequentTick)
-                                    scrub = next
-                                },
-                                onValueChangeFinished = {
-                                    haptics(IridiumHaptic.Select)
-                                    scrub?.let { onSeek(progressionForIndex(it, positionCount)) }
-                                    scrub = null
-                                },
-                                valueRange = 0f..(positionCount - 1).toFloat(),
-                                interactionSource = scrubInteraction,
-                                thumb = { state ->
-                                    IridiumSquigglySliderThumb(
-                                        sliderState = state,
-                                        interactionSource = scrubInteraction,
-                                    )
-                                },
-                                track = { state ->
-                                    IridiumSquigglyTrack(sliderState = state)
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag(ReaderChromeTestTags.ScrubSlider),
-                            )
-                        }
+                        val scrubInteraction = remember { MutableInteractionSource() }
+                        Slider(
+                            value = shownIndex.toFloat(),
+                            onValueChange = { raw ->
+                                val next = raw.roundToInt()
+                                if (next != scrub) haptics(IridiumHaptic.FrequentTick)
+                                scrub = next
+                            },
+                            onValueChangeFinished = {
+                                haptics(IridiumHaptic.Select)
+                                scrub?.let { onSeek(progressionForIndex(it, positionCount)) }
+                                scrub = null
+                            },
+                            valueRange = 0f..(positionCount - 1).toFloat(),
+                            interactionSource = scrubInteraction,
+                            thumb = { state ->
+                                IridiumSquigglySliderThumb(
+                                    sliderState = state,
+                                    interactionSource = scrubInteraction,
+                                )
+                            },
+                            track = { state ->
+                                IridiumSquigglyTrack(sliderState = state)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(ReaderChromeTestTags.ScrubSlider),
+                        )
                         Text(
                             text = positionCount.toString(),
                             style = MaterialTheme.typography.bodyMedium,
@@ -307,191 +243,6 @@ fun ReaderScrubberIsland(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DockDivider() {
-    Box(
-        modifier = Modifier
-            .width(1.dp)
-            .height(20.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
-    )
-}
-
-/**
- * EPUB bottom dock: flow / theme / TOC / highlights / settings in one
- * elevated segmented pill. Stateless; the host owns wiring into
- * [ReaderScreen] (a parallel worker owns that call site).
- */
-@Composable
-fun ReaderEpubDock(
-    onFlowCycle: () -> Unit,
-    onThemeClick: () -> Unit,
-    onTocClick: () -> Unit,
-    onHighlightsClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = rememberIridiumHaptics()
-    val flowLabel = stringResource(R.string.reader_flow_label)
-    val themeLabel = stringResource(R.string.reader_theme_label)
-    val tocLabel = stringResource(R.string.reader_toc_label)
-    val highlightsLabel = stringResource(R.string.reader_action_highlights)
-    val settingsLabel = stringResource(R.string.reader_settings_label)
-    val segmentShape = RoundedCornerShape(14.dp)
-
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-        ),
-        modifier = modifier
-            .widthIn(max = 480.dp)
-            .fillMaxWidth()
-            .testTag(ReaderChromeTestTags.EpubDock),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            val flowInteraction = remember { MutableInteractionSource() }
-            val themeInteraction = remember { MutableInteractionSource() }
-            val tocInteraction = remember { MutableInteractionSource() }
-            val highlightsInteraction = remember { MutableInteractionSource() }
-            val settingsInteraction = remember { MutableInteractionSource() }
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onFlowCycle()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                interactionSource = flowInteraction,
-                modifier = Modifier
-                    .size(44.dp)
-                    .then(pressScale(flowInteraction))
-                    .testTag(ReaderChromeTestTags.EpubFlowButton)
-                    .semantics {
-                        onClick(label = flowLabel, action = null)
-                        stateDescription = flowLabel
-                    },
-            ) {
-                Icon(IridiumIcons.ViewAgenda, contentDescription = flowLabel)
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onThemeClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                interactionSource = themeInteraction,
-                modifier = Modifier
-                    .size(44.dp)
-                    .then(pressScale(themeInteraction))
-                    .testTag(ReaderChromeTestTags.EpubThemeButton)
-                    .semantics {
-                        onClick(label = themeLabel, action = null)
-                        stateDescription = themeLabel
-                    },
-            ) {
-                Icon(IridiumIcons.Contrast, contentDescription = themeLabel)
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onTocClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                interactionSource = tocInteraction,
-                modifier = Modifier
-                    .size(44.dp)
-                    .then(pressScale(tocInteraction))
-                    .testTag(ReaderChromeTestTags.EpubTocButton)
-                    .semantics {
-                        onClick(label = tocLabel, action = null)
-                        stateDescription = tocLabel
-                    },
-            ) {
-                Icon(IridiumIcons.MenuBook, contentDescription = tocLabel)
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onHighlightsClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                interactionSource = highlightsInteraction,
-                modifier = Modifier
-                    .size(44.dp)
-                    .then(pressScale(highlightsInteraction))
-                    .testTag(ReaderChromeTestTags.EpubHighlightsButton)
-                    .semantics {
-                        onClick(label = highlightsLabel, action = null)
-                        stateDescription = highlightsLabel
-                    },
-            ) {
-                Icon(IridiumIcons.Highlight, contentDescription = highlightsLabel)
-            }
-
-            DockDivider()
-
-            FilledTonalIconButton(
-                onClick = {
-                    haptics(IridiumHaptic.Select)
-                    onSettingsClick()
-                },
-                shape = segmentShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                interactionSource = settingsInteraction,
-                modifier = Modifier
-                    .size(44.dp)
-                    .then(pressScale(settingsInteraction))
-                    .testTag(ReaderChromeTestTags.EpubSettingsButton)
-                    .semantics {
-                        onClick(label = settingsLabel, action = null)
-                        stateDescription = settingsLabel
-                    },
-            ) {
-                Icon(IridiumIcons.Settings, contentDescription = settingsLabel)
             }
         }
     }
