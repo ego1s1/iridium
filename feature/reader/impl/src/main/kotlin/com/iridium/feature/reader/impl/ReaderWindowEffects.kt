@@ -6,6 +6,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -58,17 +59,42 @@ internal fun ReaderWindowEffects(
     // animates hide()/show() on Android 11+, so the bars fade rather than
     // blink; a longer custom fade would need WindowInsetsAnimationController.
     DisposableEffect(chromeVisible) {
-        val controller =
-            activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
-        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-        if (chromeVisible) {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+        val window = activity?.window
+        val decor = window?.decorView
+        // `decor` is only non-null when `window` is, but the compiler cannot
+        // see through the smart cast across the nullable pair.
+        val controller = if (window != null && decor != null) {
+            WindowCompat.getInsetsController(window, decor)
         } else {
-            controller?.hide(WindowInsetsCompat.Type.systemBars())
+            null
         }
+        if (window == null || decor == null || controller == null) {
+            return@DisposableEffect onDispose { }
+        }
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+        if (chromeVisible) {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+
+        // The system brings the bars back on its own in several cases — a
+        // predictive-back preview shows the destination with its bars, and
+        // cancelling that gesture leaves them visible even though the chrome is
+        // still hidden. Re-assert the requested state whenever the insets
+        // change, instead of only when the chrome toggles. Returning the insets
+        // unmodified keeps them flowing to the content below.
+        ViewCompat.setOnApplyWindowInsetsListener(decor) { _, insets ->
+            if (!chromeVisible && insets.isVisible(WindowInsetsCompat.Type.systemBars())) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            }
+            insets
+        }
+
         // Leaving the reader must not leave the library without its bars.
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            ViewCompat.setOnApplyWindowInsetsListener(decor, null)
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
