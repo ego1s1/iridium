@@ -62,8 +62,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.JUSTIFY)
             } ?: TextAlign.JUSTIFY,
             theme = this[READER_THEME]?.let {
-                runCatching { ColorSchemeChoice.valueOf(it) }.getOrDefault(ColorSchemeChoice.SEPIA)
-            } ?: ColorSchemeChoice.SEPIA,
+                runCatching { ColorSchemeChoice.valueOf(it) }.getOrDefault(ColorSchemeChoice.BLACK)
+            } ?: ColorSchemeChoice.BLACK,
             brightness = this[BRIGHTNESS] ?: -1f,
             keepScreenOn = this[KEEP_SCREEN_ON] ?: true,
             volumeKeys = this[VOLUME_KEYS] ?: false,

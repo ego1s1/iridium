@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -64,6 +65,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -86,6 +88,8 @@ import com.iridium.core.designsystem.LocalExpressiveMotionEnabled
 import com.iridium.core.designsystem.SchemePickerRow
 import com.iridium.core.designsystem.topSheet
 import com.iridium.core.model.ColorSchemeChoice
+import com.iridium.core.model.ReaderFontFamily
+import com.iridium.core.model.resolvedColors
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.ReaderPreferences
@@ -411,8 +415,58 @@ internal fun ReadingOptions(
             selected = prefs.theme,
             onSelect = { onAction(OnboardingAction.SetReaderTheme(it)) },
         )
+        ReadingPreview(prefs = prefs)
     }
 }
+
+/**
+ * A live sample of the reading page, styled with the exact values chosen
+ * above: the page colours come from the resolved palette, and the type uses
+ * the same scale and leading as the reader. Seeing the settings applied beats
+ * reading percentages.
+ */
+@Composable
+private fun ReadingPreview(prefs: ReaderPreferences, modifier: Modifier = Modifier) {
+    val (backgroundArgb, foregroundArgb) = prefs.resolvedColors()
+    val sampleSize = ReadingPreviewBaseSize * prefs.fontScale
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.onboarding_reading_preview),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = Color(backgroundArgb),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_reading_preview_text),
+                color = Color(foregroundArgb),
+                fontSize = sampleSize,
+                lineHeight = sampleSize * prefs.lineHeight,
+                fontFamily = prefs.fontFamily.previewFontFamily(),
+                textAlign = TextAlign.Justify,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            )
+        }
+    }
+}
+
+/** Reader font selection mapped onto the closest platform family. */
+private fun ReaderFontFamily.previewFontFamily(): FontFamily = when (this) {
+    ReaderFontFamily.SERIF -> FontFamily.Serif
+    ReaderFontFamily.SANS_SERIF -> FontFamily.SansSerif
+    ReaderFontFamily.MONOSPACE -> FontFamily.Monospace
+    ReaderFontFamily.BOOK -> FontFamily.Serif
+}
+
+/** Base size of the preview sample; the user's scale multiplies it. */
+private val ReadingPreviewBaseSize = 15.sp
 
 @Composable
 internal fun ReaderThemeSwatches(

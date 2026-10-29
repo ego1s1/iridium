@@ -40,7 +40,7 @@ data class ReaderPreferences(
     val fontScale: Float = 1.4f,
     val fontFamily: ReaderFontFamily = ReaderFontFamily.BOOK,
     val textAlign: TextAlign = TextAlign.JUSTIFY,
-    val theme: ColorSchemeChoice = ColorSchemeChoice.SEPIA,
+    val theme: ColorSchemeChoice = ColorSchemeChoice.BLACK,
     val brightness: Float = -1f,
     val keepScreenOn: Boolean = true,
     val volumeKeys: Boolean = false,

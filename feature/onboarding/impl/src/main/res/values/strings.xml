@@ -27,6 +27,8 @@
     <string name="onboarding_reading_text_size">Text size</string>
     <string name="onboarding_reading_line_spacing">Line spacing</string>
     <string name="onboarding_reading_colors">Book colors</string>
+    <string name="onboarding_reading_preview">Preview</string>
+    <string name="onboarding_reading_preview_text">The wind came off the hills and the long grass bent before it. He read on, unhurried, the way the evening asked.</string>
     <string name="onboarding_text_smaller">Smaller text</string>
     <string name="onboarding_text_larger">Larger text</string>
 
