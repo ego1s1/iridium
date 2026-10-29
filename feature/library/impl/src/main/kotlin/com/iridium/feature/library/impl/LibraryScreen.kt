@@ -347,9 +347,10 @@ private fun LibraryContent(
                             books,
                             key = { it.id },
                             contentType = { book ->
-                                (if (book.error != null) 4 else 0) +
-                                    (if (book.isInProgress) 2 else 0) +
-                                    (if (book.isFinished) 1 else 0)
+                                // Stable across progress writes: only layout-affecting
+                                // state (display mode + error) changes type.
+                                // Progress/error badges render inside the card.
+                                if (book.error != null) 1 else 0
                             },
                         ) { book ->
                             val cardSharedCover = launchingId == book.id
