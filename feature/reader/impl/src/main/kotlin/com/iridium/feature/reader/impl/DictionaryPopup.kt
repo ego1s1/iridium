@@ -27,8 +27,10 @@ import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.IridiumEnter
 import com.iridium.core.designsystem.IridiumEnterKind
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumPrimaryButton
 import com.iridium.core.designsystem.IridiumTonalButton
+import com.iridium.core.designsystem.rememberIridiumHaptics
 
 /**
  * State driving [DictionaryPopup]: the selected [word], whether a lookup is
@@ -64,6 +66,7 @@ fun DictionaryPopup(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
+    val haptics = rememberIridiumHaptics()
     // Scale/fade entrance: the host keys this popup by word, so every fresh
     // selection replays the hero pop once the lookup grace period elapses.
     var entered by remember { mutableStateOf(false) }
@@ -89,7 +92,10 @@ fun DictionaryPopup(
             },
             confirmButton = {
                 IridiumPrimaryButton(
-                    onClick = { clipboard.setText(AnnotatedString(state.word)) },
+                    onClick = {
+                        haptics(IridiumHaptic.Confirm)
+                        clipboard.setText(AnnotatedString(state.word))
+                    },
                     modifier = Modifier.testTag(DictionaryTestTags.CopyButton),
                 ) {
                     Text(stringResource(R.string.reader_dictionary_copy))
@@ -97,7 +103,10 @@ fun DictionaryPopup(
             },
             dismissButton = {
                 IridiumTonalButton(
-                    onClick = onDismiss,
+                    onClick = {
+                        haptics(IridiumHaptic.Tick)
+                        onDismiss()
+                    },
                     modifier = Modifier.testTag(DictionaryTestTags.CloseButton),
                 ) {
                     Text(stringResource(R.string.reader_dictionary_close))

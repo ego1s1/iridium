@@ -71,6 +71,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumHaptic
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import kotlin.math.roundToInt
 import com.iridium.core.designsystem.IridiumEnter
@@ -106,6 +108,7 @@ internal fun WizardStep(
     content: @Composable () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        val haptics = rememberIridiumHaptics()
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -113,7 +116,10 @@ internal fun WizardStep(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 8.dp),
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = {
+                haptics(IridiumHaptic.Tick)
+                onBack()
+            }) {
                 Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.onboarding_back))
             }
             Text(
@@ -124,7 +130,10 @@ internal fun WizardStep(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onSkip) {
+            TextButton(onClick = {
+                haptics(IridiumHaptic.Tick)
+                onSkip()
+            }) {
                 Text(stringResource(R.string.onboarding_skip))
             }
         }
@@ -187,7 +196,10 @@ internal fun WizardStep(
                         .windowInsetsPadding(WindowInsets.navigationBars),
                 ) {
                     Button(
-                        onClick = onContinue,
+                        onClick = {
+                            haptics(IridiumHaptic.PrimaryAction)
+                            onContinue()
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp)
                             .testTag(OnboardingTestTags.ContinueButton),
                     ) {

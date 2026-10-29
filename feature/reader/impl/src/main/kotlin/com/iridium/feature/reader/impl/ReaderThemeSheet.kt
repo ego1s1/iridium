@@ -34,8 +34,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumAlertDialog
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSheet
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.ReaderPreferences
@@ -71,6 +73,7 @@ internal fun ReaderThemeSheetContent(
 ) {
     var editing by remember { mutableStateOf<CustomReaderTheme?>(null) }
     val customActive = prefs.isCustomThemeActive()
+    val haptics = rememberIridiumHaptics()
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = modifier
@@ -88,7 +91,10 @@ internal fun ReaderThemeSheetContent(
             ThemePreviewCard(
                 scheme = scheme,
                 selected = scheme == prefs.theme && !customActive,
-                onSelect = { onAction(ReaderAction.SetTheme(scheme)) },
+                onSelect = {
+                    haptics(IridiumHaptic.Select)
+                    onAction(ReaderAction.SetTheme(scheme))
+                },
             )
         }
         if (prefs.customThemes.isNotEmpty()) {
@@ -103,8 +109,14 @@ internal fun ReaderThemeSheetContent(
             CustomThemePreviewCard(
                 custom = custom,
                 selected = custom.id == prefs.customThemeId,
-                onSelect = { onAction(ReaderAction.SetCustomTheme(custom.id)) },
-                onDelete = { onAction(ReaderAction.DeleteCustomTheme(custom.id)) },
+                onSelect = {
+                    haptics(IridiumHaptic.Select)
+                    onAction(ReaderAction.SetCustomTheme(custom.id))
+                },
+                onDelete = {
+                    haptics(IridiumHaptic.Warning)
+                    onAction(ReaderAction.DeleteCustomTheme(custom.id))
+                },
             )
         }
         TextButton(
@@ -125,6 +137,7 @@ internal fun ReaderThemeSheetContent(
         CustomThemeEditorDialog(
             draft = draft,
             onSave = {
+                haptics(IridiumHaptic.Confirm)
                 onAction(ReaderAction.SaveCustomTheme(it))
                 editing = null
             },

@@ -32,10 +32,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSettingSwitch
 import com.iridium.core.designsystem.IridiumSheet
 import com.iridium.core.designsystem.IridiumThemeSwatch
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
@@ -69,6 +71,7 @@ internal fun ReaderSettingsContent(
     onAction: (ReaderAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberIridiumHaptics()
     Column(
         modifier
             .fillMaxWidth()
@@ -81,17 +84,26 @@ internal fun ReaderSettingsContent(
             ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.AUTO,
-                    onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.AUTO)) },
+                    onCheckedChange = {
+                        haptics(IridiumHaptic.Select)
+                        onAction(ReaderAction.SetFlow(ReadingFlow.AUTO))
+                    },
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.reader_settings_flow_auto)) }
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.PAGED,
-                    onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.PAGED)) },
+                    onCheckedChange = {
+                        haptics(IridiumHaptic.Select)
+                        onAction(ReaderAction.SetFlow(ReadingFlow.PAGED))
+                    },
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.reader_settings_flow_paged)) }
                 ToggleButton(
                     checked = prefs.flow == ReadingFlow.SCROLLED,
-                    onCheckedChange = { onAction(ReaderAction.SetFlow(ReadingFlow.SCROLLED)) },
+                    onCheckedChange = {
+                        haptics(IridiumHaptic.Select)
+                        onAction(ReaderAction.SetFlow(ReadingFlow.SCROLLED))
+                    },
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.reader_settings_flow_scrolled)) }
             }
@@ -122,6 +134,7 @@ internal fun ReaderSettingsContent(
                         value = draft,
                         onValueChange = { draft = it },
                         onValueChangeFinished = {
+                            haptics(IridiumHaptic.Tick)
                             onAction(ReaderAction.SetBrightness(draft.coerceIn(0f, 1f)))
                         },
                         valueRange = 0f..1f,
@@ -159,10 +172,16 @@ internal fun ReaderSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { onAction(ReaderAction.SetFontScale(prefs.fontScale - 0.1f)) }) {
+                IconButton(onClick = {
+                    haptics(IridiumHaptic.Tick)
+                    onAction(ReaderAction.SetFontScale(prefs.fontScale - 0.1f))
+                }) {
                     Icon(IridiumIcons.Remove, contentDescription = stringResource(R.string.reader_settings_text_smaller))
                 }
-                IconButton(onClick = { onAction(ReaderAction.SetFontScale(prefs.fontScale + 0.1f)) }) {
+                IconButton(onClick = {
+                    haptics(IridiumHaptic.Tick)
+                    onAction(ReaderAction.SetFontScale(prefs.fontScale + 0.1f))
+                }) {
                     Icon(IridiumIcons.Add, contentDescription = stringResource(R.string.reader_settings_text_larger))
                 }
             }
@@ -179,6 +198,7 @@ internal fun ReaderSettingsContent(
                 }
                 IconButton(
                     onClick = {
+                        haptics(IridiumHaptic.Tick)
                         onAction(ReaderAction.SetFontFamily(prefs.fontFamily.previous()))
                     },
                 ) {
@@ -186,6 +206,7 @@ internal fun ReaderSettingsContent(
                 }
                 IconButton(
                     onClick = {
+                        haptics(IridiumHaptic.Tick)
                         onAction(ReaderAction.SetFontFamily(prefs.fontFamily.next()))
                     },
                 ) {
@@ -210,6 +231,7 @@ internal fun ReaderSettingsContent(
                     value = lineHeightDraft,
                     onValueChange = { lineHeightDraft = it },
                     onValueChangeFinished = {
+                        haptics(IridiumHaptic.Tick)
                         onAction(ReaderAction.SetLineHeight(lineHeightDraft.coerceIn(1f, 2.5f)))
                     },
                     valueRange = 1f..2.5f,
@@ -234,17 +256,26 @@ internal fun ReaderSettingsContent(
                 ButtonGroup(modifier = Modifier.weight(1.4f)) {
                     ToggleButton(
                         checked = prefs.textAlign == TextAlign.LEFT,
-                        onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.LEFT)) },
+                        onCheckedChange = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.SetTextAlign(TextAlign.LEFT))
+                        },
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(R.string.reader_settings_align_left), style = MaterialTheme.typography.labelSmall) }
                     ToggleButton(
                         checked = prefs.textAlign == TextAlign.JUSTIFY,
-                        onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.JUSTIFY)) },
+                        onCheckedChange = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.SetTextAlign(TextAlign.JUSTIFY))
+                        },
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(R.string.reader_settings_align_full), style = MaterialTheme.typography.labelSmall) }
                     ToggleButton(
                         checked = prefs.textAlign == TextAlign.ORIGINAL,
-                        onCheckedChange = { onAction(ReaderAction.SetTextAlign(TextAlign.ORIGINAL)) },
+                        onCheckedChange = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.SetTextAlign(TextAlign.ORIGINAL))
+                        },
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(R.string.reader_settings_align_auto), style = MaterialTheme.typography.labelSmall) }
                 }
@@ -286,6 +317,7 @@ internal fun ReaderSettingsContent(
                         value = warmthDraft,
                         onValueChange = { warmthDraft = it },
                         onValueChangeFinished = {
+                            haptics(IridiumHaptic.Tick)
                             onAction(ReaderAction.SetNightLightIntensity(warmthDraft.coerceIn(0f, 1f)))
                         },
                         valueRange = 0f..1f,

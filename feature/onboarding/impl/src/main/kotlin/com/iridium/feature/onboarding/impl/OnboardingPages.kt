@@ -346,6 +346,7 @@ internal fun ReadingOptions(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
+        val haptics = rememberIridiumHaptics()
         Text(stringResource(R.string.onboarding_reading_text_size), style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -357,6 +358,7 @@ internal fun ReadingOptions(
             // and the buttons park at the clamps instead of overshooting.
             IconButton(
                 onClick = {
+                    haptics(IridiumHaptic.Tick)
                     val stepped = ((prefs.fontScale * 10).roundToInt() - 1) / 10f
                     onAction(OnboardingAction.SetFontScale(stepped))
                 },
@@ -366,6 +368,7 @@ internal fun ReadingOptions(
             }
             IconButton(
                 onClick = {
+                    haptics(IridiumHaptic.Tick)
                     val stepped = ((prefs.fontScale * 10).roundToInt() + 1) / 10f
                     onAction(OnboardingAction.SetFontScale(stepped))
                 },
@@ -395,7 +398,10 @@ internal fun ReadingOptions(
                     lineHeightDraft = it
                     onAction(OnboardingAction.SetLineHeight(it))
                 },
-                onValueChangeFinished = { lineHeightDragging = false },
+                onValueChangeFinished = {
+                    lineHeightDragging = false
+                    haptics(IridiumHaptic.Tick)
+                },
                 valueRange = 1f..2.5f,
                 modifier = Modifier.weight(2f),
             )

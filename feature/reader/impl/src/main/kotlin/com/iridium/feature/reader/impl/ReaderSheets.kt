@@ -38,8 +38,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSheet
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.TocEntry
@@ -93,6 +95,7 @@ internal fun ReaderHighlightsSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberIridiumHaptics()
     IridiumSheet(onDismiss = onDismiss, modifier = modifier) {
         Text(
             pluralStringResource(R.plurals.reader_highlights_title, highlights.size, highlights.size),
@@ -123,7 +126,10 @@ internal fun ReaderHighlightsSheet(
             }
         }
         TextButton(
-            onClick = onExport,
+            onClick = {
+                haptics(IridiumHaptic.Select)
+                onExport()
+            },
             modifier = Modifier.align(Alignment.End).padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
             Text(stringResource(R.string.reader_highlights_export))
@@ -150,6 +156,7 @@ private fun HighlightRow(
             )
             .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
+        val haptics = rememberIridiumHaptics()
         Box(
             Modifier.size(16.dp)
                 .clip(CircleShape)
@@ -178,7 +185,10 @@ private fun HighlightRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = {
+            haptics(IridiumHaptic.Warning)
+            onDelete()
+        }) {
             Icon(IridiumIcons.Delete, contentDescription = stringResource(R.string.reader_highlight_delete))
         }
     }
@@ -196,6 +206,7 @@ internal fun AddHighlightDialog(
 ) {
     var color by remember { mutableStateOf(HighlightColor.YELLOW) }
     var note by remember { mutableStateOf("") }
+    val haptics = rememberIridiumHaptics()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.reader_add_highlight_title)) },
@@ -209,7 +220,10 @@ internal fun AddHighlightDialog(
                         ColorDot(
                             color = candidate,
                             selected = candidate == color,
-                            onClick = { color = candidate },
+                            onClick = {
+                                haptics(IridiumHaptic.Select)
+                                color = candidate
+                            },
                         )
                     }
                 }

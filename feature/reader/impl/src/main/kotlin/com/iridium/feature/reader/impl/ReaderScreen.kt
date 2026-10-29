@@ -104,12 +104,15 @@ internal fun ReaderRoute(
     val shownImage by viewModel.shownImage.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val haptics = rememberIridiumHaptics()
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
             when (message) {
-                ReaderMessage.ContentUnavailable ->
+                ReaderMessage.ContentUnavailable -> {
+                    haptics(IridiumHaptic.Reject)
                     snackbarHost.showSnackbar(context.getString(R.string.reader_content_unavailable))
+                }
                 is ReaderMessage.OpenUrl -> {
                     val uri = runCatching { android.net.Uri.parse(message.url) }.getOrNull()
                     val scheme = uri?.scheme?.lowercase()
@@ -118,19 +121,28 @@ internal fun ReaderRoute(
                             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                         }
                         if (result.isFailure) {
+                            haptics(IridiumHaptic.Reject)
                             snackbarHost.showSnackbar(context.getString(R.string.reader_share_failed))
                         }
                     } else {
+                        haptics(IridiumHaptic.Reject)
                         snackbarHost.showSnackbar(context.getString(R.string.reader_link_blocked))
                     }
                 }
-                ReaderMessage.SelectTextFirst ->
+                ReaderMessage.SelectTextFirst -> {
+                    haptics(IridiumHaptic.Reject)
                     snackbarHost.showSnackbar(context.getString(R.string.reader_select_text_first))
-                ReaderMessage.HighlightSaved ->
+                }
+                ReaderMessage.HighlightSaved -> {
+                    haptics(IridiumHaptic.Confirm)
                     snackbarHost.showSnackbar(context.getString(R.string.reader_highlight_saved))
+                }
                 is ReaderMessage.ShareExport -> {
                     val shared = shareAnnotations(context, message)
-                    if (!shared) {
+                    if (shared) {
+                        haptics(IridiumHaptic.Confirm)
+                    } else {
+                        haptics(IridiumHaptic.Reject)
                         snackbarHost.showSnackbar(context.getString(R.string.reader_share_failed))
                     }
                 }
@@ -276,21 +288,33 @@ internal fun ReaderScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBackClick) {
+                        IconButton(onClick = {
+                            haptics(IridiumHaptic.Select)
+                            onBackClick()
+                        }) {
                             Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.reader_action_back))
                         }
                     },
                     actions = {
-                        IconButton(onClick = { onAction(ReaderAction.OpenToc) }) {
+                        IconButton(onClick = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.OpenToc)
+                        }) {
                             Icon(IridiumIcons.List, contentDescription = stringResource(R.string.reader_toc_title))
                         }
-                        IconButton(onClick = { onAction(ReaderAction.OpenHighlights) }) {
+                        IconButton(onClick = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.OpenHighlights)
+                        }) {
                             Icon(
                                 IridiumIcons.Highlight,
                                 contentDescription = stringResource(R.string.reader_action_highlights),
                             )
                         }
-                        IconButton(onClick = { onAction(ReaderAction.OpenSettings) }) {
+                        IconButton(onClick = {
+                            haptics(IridiumHaptic.Select)
+                            onAction(ReaderAction.OpenSettings)
+                        }) {
                             Icon(
                                 IridiumIcons.Settings,
                                 contentDescription = stringResource(R.string.reader_action_settings),
