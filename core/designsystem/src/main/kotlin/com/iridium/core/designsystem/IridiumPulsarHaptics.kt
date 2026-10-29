@@ -34,6 +34,7 @@ val LocalHapticsEnabled = staticCompositionLocalOf { true }
  * | PrimaryAction | systemImpactMedium | firm CTA thud |
  * | Reject | systemNotificationError | error buzz |
  * | LongPress | systemLongPress | deep press |
+ * | TextSelect | systemTextHandleMove | crisp buzzy selection tick |
  *
  * `Tap` is a semantic alias of `Select` and `Warning` maps to the warning
  * preset; both keep Iridium framework-mapping semantics
@@ -115,5 +116,8 @@ private fun IridiumHaptic.playWith(presets: PresetsWrapper) {
         IridiumHaptic.PrimaryAction -> presets.systemImpactMedium()
         IridiumHaptic.Reject -> presets.systemNotificationError()
         IridiumHaptic.LongPress -> presets.systemLongPress()
+        // Native text-selection cue: short, textured and crisp, which reads as
+        // "buzzy" on a good actuator without being a long alarm-like vibration.
+        IridiumHaptic.TextSelect -> presets.systemTextHandleMove()
     }
 }

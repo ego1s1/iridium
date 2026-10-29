@@ -49,6 +49,13 @@ enum class IridiumHaptic {
 
     /** Long-press that opens an action (menus, reordering). */
     LongPress,
+
+    /**
+     * A word or phrase just became the active text selection. Crisp and
+     * slightly textured rather than a soft blip, so the moment the selection
+     * snaps to a word is felt without looking at the screen.
+     */
+    TextSelect,
 }
 
 /**
@@ -67,6 +74,8 @@ fun IridiumHaptic.type(): HapticFeedbackType = when (this) {
     IridiumHaptic.PrimaryAction -> HapticFeedbackType.Confirm
     IridiumHaptic.Reject -> HapticFeedbackType.Reject
     IridiumHaptic.LongPress -> HapticFeedbackType.LongPress
+    // Framework text-selection feedback: the platform's own handle-move cue.
+    IridiumHaptic.TextSelect -> HapticFeedbackType.TextHandleMove
 }
 
 /** Performs the semantic event on this [HapticFeedback] channel. */

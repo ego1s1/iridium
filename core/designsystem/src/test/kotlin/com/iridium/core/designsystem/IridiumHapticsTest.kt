@@ -49,5 +49,6 @@ class IridiumHapticsTest {
     @Test
     fun longPressMapsThrough() {
         assertEquals(HapticFeedbackType.LongPress, IridiumHaptic.LongPress.type())
+        assertEquals(HapticFeedbackType.TextHandleMove, IridiumHaptic.TextSelect.type())
     }
 }
