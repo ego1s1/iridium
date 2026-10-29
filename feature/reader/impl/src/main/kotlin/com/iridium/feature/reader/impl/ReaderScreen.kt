@@ -302,10 +302,10 @@ internal fun ReaderScreen(
         }
     }
 
-    // Book text always stays clear of the status and navigation zones, even
-    // in immersive mode: visibility-ignoring insets are stable, so toggling
-    // the chrome never resizes the navigator (no repagination).
-    val topSafeInsets = WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)
+    // The bottom chrome stays clear of the navigation zone even in immersive
+    // mode: visibility-ignoring insets are stable, so toggling the chrome
+    // never resizes the navigator (no repagination). The top bar needs no
+    // equivalent — it is full-bleed and pads its own content itself.
     val bottomSafeInsets =
         WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)
 
@@ -393,13 +393,11 @@ internal fun ReaderScreen(
                         ReadingFlow.SCROLLED -> stringResource(R.string.reader_settings_flow_scrolled)
                     },
                     onCycleFlow = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
-                    // Symmetric with the bottom island: system inset plus the
-                    // same 12dp breathing room, so the top bar sits as far
-                    // below the status bar as the island floats above nav.
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .windowInsetsPadding(topSafeInsets)
-                        .padding(vertical = 12.dp),
+                    // Full-bleed to the top: the bar's surface paints behind
+                    // the status bar/cutout so the chrome reads as one piece,
+                    // and the bar's own inset pads its content. Adding outer
+                    // inset padding here left a tall empty band above it.
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
             bottomBar = {
