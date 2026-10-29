@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
  * In-memory [BooksRepository] for tests. Exposes hooks to push data and
  * inspect writes without a database or content provider.
  */
+@Suppress("TooManyFunctions") // Fake mirrors BooksRepository 1:1 by design.
 class TestBooksRepository : BooksRepository {
 
     private val booksFlow = MutableStateFlow<List<Book>>(emptyList())

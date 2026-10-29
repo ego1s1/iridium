@@ -57,6 +57,7 @@ class LibraryBackupManager @Inject constructor(
     }
 
     /** Re-applies a backup's metadata to books still present. */
+    @Suppress("TooGenericExceptionCaught") // decode throws SerializationException/IllegalArgument on corrupt JSON
     suspend fun restore(json: String): RestoreReport {
         val backup = try {
             LibraryBackupCodec.decode(json)

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
  * a cancelled coroutine keeps running and the caller's cancellation is
  * lost. Use this in any suspend context.
  */
+@Suppress("TooGenericExceptionCaught")
 inline fun <T> safeCatching(block: () -> T): Result<T> = try {
     Result.success(block())
 } catch (e: CancellationException) {
