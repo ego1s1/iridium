@@ -54,7 +54,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             flow = this[READING_FLOW]?.let {
                 runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
             } ?: ReadingFlow.AUTO,
-            fontScale = this[FONT_SCALE] ?: 1f,
+            fontScale = this[FONT_SCALE] ?: 1.1f,
             fontFamily = this[FONT_FAMILY]?.let {
                 runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
             } ?: ReaderFontFamily.BOOK,
@@ -66,7 +66,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             } ?: ColorSchemeChoice.SEPIA,
             brightness = this[BRIGHTNESS] ?: -1f,
             keepScreenOn = this[KEEP_SCREEN_ON] ?: true,
-            showPageCounter = this[SHOW_PAGE_COUNTER] ?: true,
             volumeKeys = this[VOLUME_KEYS] ?: false,
             volumeKeysInverted = this[VOLUME_KEYS_INVERTED] ?: false,
             // Single-switch era: legacy four-way invert maps to mirrored
@@ -77,8 +76,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             },
             nightLight = this[NIGHT_LIGHT] ?: false,
             nightLightIntensity = this[NIGHT_LIGHT_INTENSITY] ?: 0.25f,
-            pageMargins = this[PAGE_MARGINS] ?: 1f,
-            lineHeight = this[LINE_HEIGHT] ?: 1.4f,
+            pageMargins = this[PAGE_MARGINS] ?: 2f,
+            lineHeight = this[LINE_HEIGHT] ?: 1.6f,
             customThemes = this[CUSTOM_THEMES].orEmpty().mapNotNull(::decodeCustomTheme).toImmutableList(),
             customThemeId = this[CUSTOM_THEME_ID],
         )
@@ -98,7 +97,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             prefs[READER_THEME] = updated.theme.name
             prefs[BRIGHTNESS] = updated.brightness
             prefs[KEEP_SCREEN_ON] = updated.keepScreenOn
-            prefs[SHOW_PAGE_COUNTER] = updated.showPageCounter
             prefs[VOLUME_KEYS] = updated.volumeKeys
             prefs[VOLUME_KEYS_INVERTED] = updated.volumeKeysInverted
             prefs[TAP_INVERT] = updated.invertTaps
@@ -240,7 +238,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val READER_THEME = stringPreferencesKey("reader_theme")
         val BRIGHTNESS = floatPreferencesKey("brightness")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
-        val SHOW_PAGE_COUNTER = booleanPreferencesKey("show_page_counter")
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
         val VOLUME_KEYS_INVERTED = booleanPreferencesKey("volume_keys_inverted")
         val TAP_INVERT = booleanPreferencesKey("tap_invert")

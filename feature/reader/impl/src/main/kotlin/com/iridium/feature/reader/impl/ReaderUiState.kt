@@ -92,7 +92,8 @@ sealed interface ReaderAction {
     data class SetTheme(val theme: com.iridium.core.model.ColorSchemeChoice) : ReaderAction, PrefsChange
     data class SetBrightness(val brightness: Float) : ReaderAction, PrefsChange
     data class SetKeepScreenOn(val enabled: Boolean) : ReaderAction, PrefsChange
-    data class SetShowPageCounter(val enabled: Boolean) : ReaderAction, PrefsChange
+    data object ScrubStarted : ReaderAction
+    data class ScrubFinished(val progression: Float) : ReaderAction
     data class SetVolumeKeys(val enabled: Boolean) : ReaderAction, PrefsChange
     data class SetVolumeKeysInverted(val inverted: Boolean) : ReaderAction, PrefsChange
     data class SetInvertTaps(val inverted: Boolean) : ReaderAction, PrefsChange

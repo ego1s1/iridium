@@ -88,4 +88,23 @@ internal object ReaderThemeOverride {
     /** #RRGGBB from an ARGB int (alpha dropped for readability of page colors). */
     internal fun hex(argb: Int): String =
         Integer.toHexString(argb and 0x00FFFFFF).padStart(6, '0')
+
+    /** True when [argb] is pure black: OLED pixels stay off, never warm it. */
+    fun isPureBlack(argb: Int): Boolean = (argb and 0x00FFFFFF) == 0
+
+    /**
+     * Warms [fgArgb] toward amber by [intensity]: night-light must tint text,
+     * never the background. [intensity] 0f returns [fgArgb] unchanged.
+     */
+    fun warmForeground(fgArgb: Int, intensity: Float): Int {
+        val t = intensity.coerceIn(0f, 1f) * 0.55f
+        if (t <= 0f) return fgArgb
+        val r = ((fgArgb shr 16) and 0xFF)
+        val g = ((fgArgb shr 8) and 0xFF)
+        val b = (fgArgb and 0xFF)
+        val nr = (r + (0xFF - r) * t).toInt().coerceIn(0, 255)
+        val ng = (g + (0x9E - g) * t).toInt().coerceIn(0, 255)
+        val nb = (b + (0x42 - b) * t).toInt().coerceIn(0, 255)
+        return (0xFF shl 24) or (nr shl 16) or (ng shl 8) or nb
+    }
 }

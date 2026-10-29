@@ -51,9 +51,9 @@ class SettingsExpressiveParityTest {
         val state = SettingsUiState()
         assertEquals(ThemeMode.SYSTEM, state.theme.mode)
         assertEquals(MotionStyle.EXPRESSIVE, state.motionStyle)
-        assertEquals(1.0f, state.reader.fontScale)
-        assertEquals(1.0f, state.reader.pageMargins)
-        assertEquals(1.4f, state.reader.lineHeight)
+        assertEquals(1.1f, state.reader.fontScale)
+        assertEquals(2f, state.reader.pageMargins)
+        assertEquals(1.6f, state.reader.lineHeight)
         assertFalse(state.crashReportingEnabled)
     }
 
@@ -159,12 +159,10 @@ class SettingsExpressiveParityTest {
     }
 
     @Test
-    fun `reading toggles dispatch page-counter and volume-keys`() {
+    fun `reading toggles dispatch volume-keys`() {
         val actions = mutableListOf<SettingsAction>()
         setScreen(SettingsUiState(), onAction = actions::add)
-        composeTestRule.onNodeWithText("Show page counter").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Volume keys turn pages").performScrollTo().performClick()
-        assertTrue(actions.any { it is SettingsAction.SetShowPageCounter && !it.enabled })
         assertTrue(actions.any { it is SettingsAction.SetVolumeKeys && it.enabled })
     }
 

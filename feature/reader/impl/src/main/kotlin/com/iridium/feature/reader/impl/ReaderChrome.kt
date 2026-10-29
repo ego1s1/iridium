@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import com.iridium.core.designsystem.IridiumSquigglySliderThumb
 import com.iridium.core.designsystem.IridiumSquigglyTrack
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /** Tap-zone outcome for a tap inside the reading surface. */
 enum class ChromeTapZone {
@@ -127,11 +129,47 @@ fun ReaderScrubberIsland(
     positionCount: Int,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    onScrubbingChanged: (Boolean) -> Unit = {},
 ) {
     val haptics = rememberIridiumHaptics()
     val safeIndex = positionIndex.coerceIn(0, (positionCount - 1).coerceAtLeast(0))
-    var scrub by remember(positionCount) { mutableStateOf<Int?>(null) }
-    val shownIndex = scrub ?: safeIndex
+    // Holds the drag value until the navigator echo converges: clearing on
+    // release snaps the thumb back to the pre-seek page for ~500ms while
+    // nav.go() lands. Converge-or-timeout instead.
+    var scrub by remember { mutableStateOf<Int?>(null) }
+    var dragStart by remember { mutableStateOf<Int?>(null) }
+    var lastTickBucket by remember { mutableStateOf(Int.MIN_VALUE) }
+    val shownIndex = (scrub ?: safeIndex).coerceIn(0, (positionCount - 1).coerceAtLeast(0))
+
+    // Echo converged (or table shrank under us): release the hold.
+    LaunchedEffect(safeIndex, positionCount) {
+        val held = scrub
+        if (held != null) {
+            if (held == safeIndex || held >= positionCount || safeIndex >= positionCount - 1 && held >= positionCount - 1) {
+                scrub = null
+                dragStart = null
+                lastTickBucket = Int.MIN_VALUE
+                onScrubbingChanged(false)
+            }
+        }
+        if (positionCount <= 1 && scrub != null) {
+            scrub = null
+            dragStart = null
+            onScrubbingChanged(false)
+        }
+    }
+    // Stuck-echo timeout: never trap the thumb if nav.go() never lands.
+    LaunchedEffect(scrub) {
+        if (scrub != null) {
+            delay(2500L)
+            if (scrub != null) {
+                scrub = null
+                dragStart = null
+                lastTickBucket = Int.MIN_VALUE
+                onScrubbingChanged(false)
+            }
+        }
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -212,14 +250,44 @@ fun ReaderScrubberIsland(
                         Slider(
                             value = shownIndex.toFloat(),
                             onValueChange = { raw ->
-                                val next = raw.roundToInt()
-                                if (next != scrub) haptics(IridiumHaptic.FrequentTick)
-                                scrub = next
+                                val next = raw.roundToInt().coerceIn(0, (positionCount - 1).coerceAtLeast(0))
+                                if (dragStart == null) {
+                                    dragStart = safeIndex
+                                    onScrubbingChanged(true)
+                                }
+                                // Quantized ticks (~20 buckets): per-page ticks
+                                // buzz on 1000-position books and scale the
+                                // annoyance with book length.
+                                if (next != scrub) {
+                                    val segments = 20
+                                    val bucket = if (positionCount > 1) {
+                                        (next * segments / (positionCount - 1)).coerceIn(0, segments)
+                                    } else {
+                                        0
+                                    }
+                                    if (bucket != lastTickBucket) {
+                                        lastTickBucket = bucket
+                                        haptics(IridiumHaptic.FrequentTick)
+                                    }
+                                    scrub = next
+                                }
                             },
                             onValueChangeFinished = {
-                                haptics(IridiumHaptic.Select)
-                                scrub?.let { onSeek(progressionForIndex(it, positionCount)) }
-                                scrub = null
+                                val target = scrub
+                                val start = dragStart
+                                // Only confirm when a seek is actually emitted:
+                                // a tap-without-move is a no-op, not a select.
+                                if (target != null && target != start) {
+                                    haptics(IridiumHaptic.Select)
+                                    onSeek(progressionForIndex(target, positionCount))
+                                    // Hold `scrub` until the echo converges
+                                    // (cleared by LaunchedEffect above).
+                                } else {
+                                    scrub = null
+                                    dragStart = null
+                                    lastTickBucket = Int.MIN_VALUE
+                                    onScrubbingChanged(false)
+                                }
                             },
                             valueRange = 0f..(positionCount - 1).toFloat(),
                             interactionSource = scrubInteraction,

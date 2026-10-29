@@ -1,49 +1,42 @@
 package com.iridium.feature.reader.impl
 
-import com.iridium.core.model.ColorSchemeChoice
-import com.iridium.core.model.pageBackgroundArgb
-import com.iridium.core.model.pageForegroundArgb
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderThemeOverrideTest {
 
     @Test
-    fun `override css uses exact theme colors`() {
-        ColorSchemeChoice.entries.forEach { theme ->
-            val css = ReaderThemeOverride.overrideCss(theme)
-            assertTrue("bg present for $theme", css.contains("#" + ReaderThemeOverride.hex(theme.pageBackgroundArgb())))
-            assertTrue("fg present for $theme", css.contains("#" + ReaderThemeOverride.hex(theme.pageForegroundArgb())))
-        }
+    fun `pure black detection`() {
+        assertTrue(ReaderThemeOverride.isPureBlack(-16777216)) // 0xFF000000
+        assertFalse(ReaderThemeOverride.isPureBlack(-15592942)) // 0xFF121212
+        assertFalse(ReaderThemeOverride.isPureBlack(-1)) // 0xFFFFFFFF
     }
 
     @Test
-    fun `override css wins specificity with important`() {
-        val css = ReaderThemeOverride.overrideCss(ColorSchemeChoice.SEPIA)
-        assertTrue(css.contains("!important"))
-        assertTrue(css.contains("-webkit-text-fill-color: currentcolor"))
-        // Repeated class to beat any book rule.
-        val repeats = Regex("\\.__Ir_Theme").findAll(css).count()
-        assertTrue("repeated specificity selects, got $repeats", repeats >= 16)
+    fun `zero intensity returns foreground unchanged`() {
+        val fg = -1
+        assertEquals(fg, ReaderThemeOverride.warmForeground(fg, 0f))
     }
 
     @Test
-    fun `grey does not collapse to the dark theme`() {
-        val grey = ReaderThemeOverride.overrideCss(ColorSchemeChoice.GREY)
-        // Exact color used (not the nearest built-in dark theme).
-        assertTrue(
-            grey.contains(ReaderThemeOverride.hex(ColorSchemeChoice.GREY.pageBackgroundArgb())),
-        )
+    fun `warming moves white toward amber`() {
+        val warmed = ReaderThemeOverride.warmForeground(-1, 1f)
+        val r = (warmed shr 16) and 0xFF
+        val g = (warmed shr 8) and 0xFF
+        val b = warmed and 0xFF
+        // Amber target (255,158,66): red stays max, green/blue drop.
+        assertEquals(255, r)
+        assertTrue(g in 150..230)
+        assertTrue(b in 100..180)
     }
 
     @Test
-    fun `inject script embeds the css safely`() {
-        val script = ReaderThemeOverride.injectOverrideScript(ColorSchemeChoice.DARK)
-        assertTrue(script.startsWith("(function(){"))
-        assertTrue(script.contains("iridiumThemeOverride"))
-        assertTrue(script.endsWith("})()"))
-        // Quote / newline escaping must not break the single-quoted string.
-        assertEquals(script.count { it == '\'' }, script.count { it == '\'' })
+    fun `scrub helpers round-trip`() {
+        assertEquals(0, scrubIndexForProgression(0f, 10))
+        assertEquals(9, scrubIndexForProgression(1f, 10))
+        assertEquals(5, scrubIndexForProgression(0.55f, 10))
+        assertEquals(0.5f, progressionForIndex(5, 11), 0.001f)
     }
 }

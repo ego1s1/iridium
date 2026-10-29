@@ -124,7 +124,6 @@ class DataStorePreferencesDataSourceTest {
                 theme = ColorSchemeChoice.BLACK,
                 brightness = 0.25f,
                 keepScreenOn = false,
-                showPageCounter = false,
                 volumeKeys = true,
                 volumeKeysInverted = true,
                 invertTaps = true,
@@ -141,7 +140,6 @@ class DataStorePreferencesDataSourceTest {
         assertEquals(ColorSchemeChoice.BLACK, reader.theme)
         assertEquals(0.25f, reader.brightness)
         assertFalse(reader.keepScreenOn)
-        assertFalse(reader.showPageCounter)
         assertTrue(reader.volumeKeys)
         assertTrue(reader.volumeKeysInverted)
         assertTrue(reader.invertTaps)

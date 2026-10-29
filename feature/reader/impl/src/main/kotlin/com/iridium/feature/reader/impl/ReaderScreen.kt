@@ -1,9 +1,21 @@
 package com.iridium.feature.reader.impl
 
+import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.view.PixelCopy
+import android.view.View
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.tween
 import com.iridium.core.designsystem.IridiumEnter
 import com.iridium.core.designsystem.IridiumEnterKind
 import androidx.compose.foundation.Image
@@ -49,10 +61,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,8 +84,8 @@ import androidx.navigation.compose.composable
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
+import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumLoading
-import com.iridium.core.designsystem.IridiumScrimPill
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.ReadingFlow
@@ -81,6 +96,11 @@ import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
 import com.iridium.feature.reader.api.ReaderRoute
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
     composable<ReaderRoute>(
@@ -108,6 +128,14 @@ internal fun ReaderRoute(
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
     val haptics = rememberIridiumHaptics()
+
+    // Tap-time turn pulses drive the page slide (see ReaderScreen).
+    var turnPulse by remember { mutableStateOf(PageTurnPulse.Idle) }
+    LaunchedEffect(Unit) {
+        viewModel.pageTurns.collect { direction ->
+            turnPulse = PageTurnPulse(turnPulse.id + 1, direction)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
@@ -176,6 +204,7 @@ internal fun ReaderRoute(
         is ReaderUiState.Ready -> ReaderScreen(
             state = state,
             sessionReady = sessionReady,
+            turnPulse = turnPulse,
             dictionaryState = dictionaryState,
             shownImage = shownImage,
             loadImageBytes = viewModel::loadImageBytes,
@@ -195,6 +224,7 @@ internal fun ReaderRoute(
 internal fun ReaderScreen(
     state: ReaderUiState.Ready,
     sessionReady: Boolean,
+    turnPulse: PageTurnPulse,
     dictionaryState: DictionaryUiState?,
     shownImage: String?,
     loadImageBytes: suspend (String) -> ByteArray?,
@@ -207,6 +237,70 @@ internal fun ReaderScreen(
     val activity = context.findActivity()
     var showAddDialog by remember { mutableStateOf(false) }
     val haptics = rememberIridiumHaptics()
+
+    // Full-page cross-slide page turn: the outgoing page and the incoming page
+    // move together one screen width — leftward for a forward turn, rightward
+    // back. The incoming page is the live navigator, started fully off-screen
+    // so the toolkit's instant swap is never seen; the outgoing page is a
+    // snapshot taken while the view was at rest (paged layout snaps scroll
+    // offsets to page boundaries, so the document itself cannot be animated).
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    val slideShift = remember { Animatable(0f) }
+    var slideDir by remember { mutableStateOf(1f) }
+    var outgoingPage by remember { mutableStateOf<ImageBitmap?>(null) }
+    var navigatorView by remember { mutableStateOf<View?>(null) }
+    var sliding by remember { mutableStateOf(false) }
+    val slideEnabled = state.prefs.flow != ReadingFlow.SCROLLED
+    val pageFillArgb = state.prefs.resolvedColors().first
+    val chromeTopPx = WindowInsets.statusBarsIgnoringVisibility.getTop(density).toInt() +
+        with(density) { ChromeTopStrip.toPx() }.toInt()
+    val chromeBottomPx = WindowInsets.navigationBarsIgnoringVisibility.getBottom(density).toInt() +
+        with(density) { ChromeBottomStrip.toPx() }.toInt()
+
+    suspend fun refreshSnapshot() {
+        if (!slideEnabled || sliding) return
+        outgoingPage = capturePage(
+            activity = activity,
+            view = navigatorView,
+            blankTopPx = chromeTopPx,
+            blankBottomPx = chromeBottomPx,
+            fillArgb = pageFillArgb,
+        )?.asImageBitmap()
+    }
+
+    LaunchedEffect(turnPulse.id) {
+        if (!slideEnabled || turnPulse.id == 0L) return@LaunchedEffect
+        sliding = true
+        // A turn landing mid-slide has no valid snapshot (the view is
+        // displaced), so it slides the incoming page alone: still reads as a
+        // turn, and can never tear or stack.
+        if (slideShift.isRunning) outgoingPage = null
+        slideDir = if (turnPulse.direction >= 0) 1f else -1f
+        try {
+            slideShift.snapTo(slideDir * screenWidthPx)
+            slideShift.animateTo(
+                0f,
+                tween(durationMillis = PageTurnDurationMs, easing = EaseOut),
+            )
+        } finally {
+            // Rapid taps cancel this effect mid-glide: the page must never be
+            // left displaced and the snapshot layer must never be left behind.
+            withContext(NonCancellable) { slideShift.snapTo(0f) }
+            outgoingPage = null
+            sliding = false
+        }
+        // Re-arm for the next isolated turn.
+        refreshSnapshot()
+    }
+
+    LaunchedEffect(sessionReady, navigatorView, slideEnabled, state.prefs) {
+        if (sessionReady && slideEnabled && navigatorView != null) {
+            // Let the settled frame paint before capturing it.
+            kotlinx.coroutines.delay(PageSnapshotSettleMs)
+            refreshSnapshot()
+        }
+    }
 
     // Book text always stays clear of the status and navigation zones, even
     // in immersive mode: visibility-ignoring insets are stable, so toggling
@@ -248,19 +342,33 @@ internal fun ReaderScreen(
         NavigatorHost(
             bookId = state.book.id,
             sessionReady = sessionReady,
-            modifier = Modifier.fillMaxSize(),
+            onViewReady = { navigatorView = it },
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationX = slideShift.value },
         )
-        // Layer 1: position pill, only while chrome is hidden (pure overlay).
-        if (!state.chromeVisible && state.prefs.showPageCounter) {
-            state.positionText?.let {
-                IridiumScrimPill(
-                    text = it,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
-                )
-            }
+        // The outgoing page. The two layers never overlap on screen (one
+        // exits as the other enters), so a single snapshot beside the live
+        // page reproduces the cross-slide.
+        outgoingPage?.let { snapshot ->
+            Image(
+                bitmap = snapshot,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationX = slideShift.value - slideDir * screenWidthPx },
+            )
         }
-        // Layer 2: night-light tint. Visual only, taps fall through to the book.
-        if (state.prefs.nightLight) {
+        // Layer 1: night-light tint. Visual only, taps fall through to the book.
+        // (The position counter lives only in the chrome scrubber island:
+        // nothing overlays the page while chrome is hidden.)
+        // Pure-black pages skip the scrim: any translucent warm overlay would
+        // lift #000000 (OLED pixels on). Text warming rides the injected CSS
+        // instead (see applyThemeOverride), so black stays black.
+        if (state.prefs.nightLight &&
+            !ReaderThemeOverride.isPureBlack(state.prefs.resolvedColors().first)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -285,16 +393,23 @@ internal fun ReaderScreen(
                         ReadingFlow.SCROLLED -> stringResource(R.string.reader_settings_flow_scrolled)
                     },
                     onCycleFlow = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
+                    // Symmetric with the bottom island: system inset plus the
+                    // same 12dp breathing room, so the top bar sits as far
+                    // below the status bar as the island floats above nav.
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .windowInsetsPadding(topSafeInsets),
+                        .windowInsetsPadding(topSafeInsets)
+                        .padding(vertical = 12.dp),
                 )
             },
             bottomBar = {
                 ReaderScrubberIsland(
                     positionIndex = state.positionIndex,
                     positionCount = state.positionCount,
-                    onSeek = { onAction(ReaderAction.SeekTo(it)) },
+                    onSeek = { onAction(ReaderAction.ScrubFinished(it)) },
+                    onScrubbingChanged = { scrubbing ->
+                        if (scrubbing) onAction(ReaderAction.ScrubStarted)
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(bottomSafeInsets)
@@ -304,7 +419,10 @@ internal fun ReaderScreen(
         )
         SnackbarHost(
             hostState = snackbarHost,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(bottomSafeInsets)
+                .padding(16.dp),
         )
     }
 
@@ -419,6 +537,29 @@ private fun ReaderMenuItem(
         },
         modifier = modifier.testTag(testTag),
     )
+}
+
+/** Page-turn slide duration: the reference flow settles in ~180 ms. */
+private const val PageTurnDurationMs = 180
+
+/** Delay before capturing a settled page (lets the swap finish painting). */
+private const val PageSnapshotSettleMs = 120L
+
+/** Top bar + its padding, in dp (blanked from turn snapshots). */
+private val ChromeTopStrip = 76.dp
+
+/** Scrubber island + its padding, in dp (blanked from turn snapshots). */
+private val ChromeBottomStrip = 90.dp
+
+/**
+ * A tap-time page-turn pulse: [id] increments per accepted turn so the UI
+ * restarts the slide even for same-direction repeats; [direction] is +1
+ * forward, -1 backward. [Idle] is the pre-first-turn value.
+ */
+internal data class PageTurnPulse(val id: Long, val direction: Int) {
+    companion object {
+        val Idle = PageTurnPulse(0L, 1)
+    }
 }
 
 /**
@@ -601,8 +742,14 @@ private fun ReaderTopBar(
     )
 }
 
-/** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */@Composable
-private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modifier = Modifier) {
+/** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
+@Composable
+private fun NavigatorHost(
+    bookId: String,
+    sessionReady: Boolean,
+    onViewReady: (View) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val activity = context.findActivity()
     if (activity == null) {
@@ -622,7 +769,7 @@ private fun NavigatorHost(bookId: String, sessionReady: Boolean, modifier: Modif
     // and collided with an in-flight composition on the first open.
     AndroidView(
         factory = { ctx -> FragmentContainerView(ctx).apply { id = containerId } },
-        update = {},
+        update = { onViewReady(it) },
         modifier = modifier.fillMaxSize(),
     )
 
@@ -733,6 +880,57 @@ internal fun decodeShowcaseBitmap(bytes: ByteArray, context: Context): android.g
     while (imageMax / (sample * 2) >= screenMax) sample *= 2
     val opts = BitmapFactory.Options().apply { inSampleSize = sample }
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+}
+
+/**
+ * Captures the settled reader page for the next turn's outgoing layer.
+ * Uses PixelCopy (hardware-accurate); returns null where unavailable so the
+ * slide degrades to a plain slide-in instead of failing. The chrome strips
+ * are repainted with the page colour: a window capture bakes the bars in and
+ * they would otherwise ghost across the slide.
+ */
+private suspend fun capturePage(
+    activity: Activity?,
+    view: View?,
+    blankTopPx: Int,
+    blankBottomPx: Int,
+    fillArgb: Int,
+): Bitmap? {
+    if (activity == null || view == null) return null
+    if (view.width <= 0 || view.height <= 0) return null
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    val bitmap = suspendCancellableCoroutine<Bitmap?> { cont ->
+        val loc = IntArray(2)
+        view.getLocationInWindow(loc)
+        val src = Rect(loc[0], loc[1], loc[0] + view.width, loc[1] + view.height)
+        val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        PixelCopy.request(
+            activity.window,
+            src,
+            target,
+            { result ->
+                if (cont.isActive) {
+                    cont.resume(if (result == PixelCopy.SUCCESS) target else null)
+                }
+            },
+            Handler(Looper.getMainLooper()),
+        )
+    } ?: return null
+    val canvas = android.graphics.Canvas(bitmap)
+    val paint = android.graphics.Paint().apply { color = fillArgb }
+    if (blankTopPx > 0) {
+        canvas.drawRect(0f, 0f, bitmap.width.toFloat(), blankTopPx.toFloat(), paint)
+    }
+    if (blankBottomPx > 0) {
+        canvas.drawRect(
+            0f,
+            (bitmap.height - blankBottomPx).toFloat(),
+            bitmap.width.toFloat(),
+            bitmap.height.toFloat(),
+            paint,
+        )
+    }
+    return bitmap
 }
 
 /** Shares an annotation export via Markdown + HTML intents (SAF/share). Returns false when undeliverable. */

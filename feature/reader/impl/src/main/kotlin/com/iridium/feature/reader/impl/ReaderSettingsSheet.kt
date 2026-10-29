@@ -346,11 +346,6 @@ internal fun ReaderSettingsContent(
                 checked = prefs.keepScreenOn,
                 onCheckedChange = { onAction(ReaderAction.SetKeepScreenOn(it)) },
             )
-            IridiumSettingSwitch(
-                title = stringResource(R.string.reader_settings_page_counter),
-                checked = prefs.showPageCounter,
-                onCheckedChange = { onAction(ReaderAction.SetShowPageCounter(it)) },
-            )
         }
     }
 

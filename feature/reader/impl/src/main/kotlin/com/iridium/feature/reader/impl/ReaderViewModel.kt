@@ -28,7 +28,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -66,7 +69,7 @@ class ReaderViewModel @Inject constructor(
     private val chrome = ReaderChromeController(viewModelScope)
     private val dictionary = ReaderDictionaryController(viewModelScope, dictionaryLookup, store)
     private val positions = ReaderPositionTracker(store, clock)
-    private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store)
+    private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store, positions)
     private val navigatorAttached = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private val openFileMissing = MutableStateFlow(false)
@@ -81,6 +84,20 @@ class ReaderViewModel @Inject constructor(
 
     private val messageChannel = Channel<ReaderMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
+
+    /** Burst guard state for [requestTurn] (main-thread only). */
+    private var lastTurnMs = 0L
+    private var burstWindowStartMs = 0L
+    private var burstTurns = 0
+
+    /**
+     * Tap-time page-turn pulses (+1 forward, -1 backward), emitted the moment
+     * a turn is accepted — before the navigator's asynchronous commit. The UI
+     * starts its slide from this so the motion begins with the tap instead of
+     * one WebView round-trip later.
+     */
+    private val _pageTurns = MutableSharedFlow<Int>(extraBufferCapacity = 16)
+    val pageTurns: SharedFlow<Int> = _pageTurns.asSharedFlow()
 
     /**
      * True once the publication is published and the navigator host may be
@@ -140,11 +157,13 @@ class ReaderViewModel @Inject constructor(
         )
 
     val uiState: StateFlow<ReaderUiState> = combine(
-        content, chromeBundle, navBundle, positions.positionsVersion,
-    ) { c, ch, n, _,
+        content, chromeBundle, navBundle, positions.positionsVersion, store.latestLocator,
+    ) { c, ch, n, _, _,
         ->
-        // The version flow is a recombine trigger only (unused here): it
-        // re-emits whenever the tracker refills the positions table.
+        // positionsVersion + latestLocator are recombine triggers: the
+        // tracker reads latestLocator synchronously, but combine only
+        // re-evaluates when an input changes — the debounced progression
+        // alone left the counter frozen for rapid/small moves.
         when {
             c.book == null && n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
             c.book == null -> ReaderUiState.Gone
@@ -160,7 +179,11 @@ class ReaderViewModel @Inject constructor(
                     settingsOpen = ch.settingsOpen,
                     tocOpen = ch.tocOpen,
                     highlightsOpen = ch.highlightsOpen,
-                    progression = (c.book.progress.takeIf { n.progression == 0f } ?: n.progression),
+                    // Before the navigator attaches there is no live locator:
+                    // show the saved progress. After attach, the debounced
+                    // locator value is truth (0f is a real "start of book",
+                    // not "not loaded").
+                    progression = if (!n.navigatorAttached) c.book.progress else n.progression,
                     positionText = positions.positionText(),
                     positionIndex = positionIndex,
                     positionCount = positionCount,
@@ -230,15 +253,14 @@ class ReaderViewModel @Inject constructor(
                 positions.seekTo(action.progression)
                 chrome.scheduleHide()
             }
+            is ReaderAction.ScrubStarted -> chrome.pinForScrub()
+            is ReaderAction.ScrubFinished -> {
+                positions.seekTo(action.progression)
+                chrome.scheduleHide()
+            }
             is ReaderAction.GoTocEntry -> goTocEntry(action.entry)
-            is ReaderAction.GoForward -> {
-                store.navigator?.goForward(action.animated)
-                chrome.scheduleHide()
-            }
-            is ReaderAction.GoBackward -> {
-                store.navigator?.goBackward(action.animated)
-                chrome.scheduleHide()
-            }
+            is ReaderAction.GoForward -> requestTurn(1)
+            is ReaderAction.GoBackward -> requestTurn(-1)
             is ReaderAction.AddHighlight -> annotations.addHighlight(action.color, action.note, viewModelScope)
             is ReaderAction.DeleteHighlight -> annotations.deleteHighlight(action.id, viewModelScope)
             is ReaderAction.PrefsChange -> onPrefsAction(action)
@@ -276,9 +298,6 @@ class ReaderViewModel @Inject constructor(
             }
             is ReaderAction.SetKeepScreenOn -> prefsApplier.updateReaderPrefs {
                 it.copy(keepScreenOn = action.enabled)
-            }
-            is ReaderAction.SetShowPageCounter -> prefsApplier.updateReaderPrefs {
-                it.copy(showPageCounter = action.enabled)
             }
             is ReaderAction.SetVolumeKeys -> prefsApplier.updateReaderPrefs {
                 it.copy(volumeKeys = action.enabled)
@@ -425,16 +444,37 @@ class ReaderViewModel @Inject constructor(
                 prefsFlow.value.invertTaps,
             )
         ) {
-            ChromeTapZone.PREV -> {
-                store.navigator?.goBackward(true)
-                chrome.scheduleHide()
-            }
-            ChromeTapZone.NEXT -> {
-                store.navigator?.goForward(true)
-                chrome.scheduleHide()
-            }
+            ChromeTapZone.PREV -> requestTurn(-1)
+            ChromeTapZone.NEXT -> requestTurn(1)
             ChromeTapZone.MENU -> chrome.toggle()
         }
+    }
+
+    /**
+     * Single gate for every page turn. Caps rapid tapping so a burst cannot
+     * outrun the navigator (the WebView swap plus the slide would queue and
+     * tear), and emits the tap-time [pageTurns] pulse the UI slides on.
+     *
+     * @return true when the turn was accepted.
+     */
+    private fun requestTurn(direction: Int): Boolean {
+        val now = clock.uptimeNow()
+        // Burst window: reset once the user pauses.
+        if (now - burstWindowStartMs > BURST_WINDOW_MS) {
+            burstWindowStartMs = now
+            burstTurns = 0
+        }
+        if (burstTurns >= MAX_BURST_TURNS) return false
+        if (now - lastTurnMs < MIN_TURN_INTERVAL_MS) return false
+        lastTurnMs = now
+        burstTurns += 1
+        // Keep chrome up while the user is turning; the timer restarts on
+        // every accepted turn, so it hides only once turning stops.
+        positions.markProgrammaticNav()
+        _pageTurns.tryEmit(direction)
+        viewModelScope.launch { positions.completeTurn(forward = direction > 0) }
+        chrome.scheduleHide()
+        return true
     }
 
     /**
@@ -551,11 +591,19 @@ class ReaderViewModel @Inject constructor(
         /**
          * Locator changes inside this window after programmatic navigation
          * (open, seek, TOC jump) never hide the chrome: only user page turns
-         * do.
+         * do. Generous because nav.go() echoes asynchronously — a slow
+         * WebView can land well after a 750ms window.
          */
-        const val LOCATOR_HIDE_GRACE_MS = 750L
+        const val LOCATOR_HIDE_GRACE_MS = 1500L
 
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
+
+        /** Minimum gap between accepted turns: below this a tap is a repeat. */
+        const val MIN_TURN_INTERVAL_MS = 90L
+
+        /** At most [MAX_BURST_TURNS] accepted turns per [BURST_WINDOW_MS]. */
+        const val BURST_WINDOW_MS = 1_000L
+        const val MAX_BURST_TURNS = 6
     }
 }
 

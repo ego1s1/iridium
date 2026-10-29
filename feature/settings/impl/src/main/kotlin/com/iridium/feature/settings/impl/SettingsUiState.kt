@@ -30,7 +30,6 @@ sealed interface SettingsAction {
     data class SetFilter(val filter: LibraryFilter) : SettingsAction
     data class SetHideErrors(val hide: Boolean) : SettingsAction
     data class SetKeepScreenOn(val enabled: Boolean) : SettingsAction
-    data class SetShowPageCounter(val enabled: Boolean) : SettingsAction
     data class SetVolumeKeys(val enabled: Boolean) : SettingsAction
     data class SetFontSize(val scale: Float) : SettingsAction
     data class SetMargins(val margins: Float) : SettingsAction

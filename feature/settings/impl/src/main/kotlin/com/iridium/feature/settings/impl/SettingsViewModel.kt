@@ -139,7 +139,6 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.SetFilter -> updateDisplay { it.copy(filter = action.filter) }
             is SettingsAction.SetHideErrors -> updateDisplay { it.copy(hideErrors = action.hide) }
             is SettingsAction.SetKeepScreenOn -> updateReader { it.copy(keepScreenOn = action.enabled) }
-            is SettingsAction.SetShowPageCounter -> updateReader { it.copy(showPageCounter = action.enabled) }
             is SettingsAction.SetVolumeKeys -> updateReader { it.copy(volumeKeys = action.enabled) }
             is SettingsAction.SetFontSize -> coalesceSliderWrite("fontScale") { it.copy(fontScale = action.scale) }
             is SettingsAction.SetMargins -> coalesceSliderWrite("margins") { it.copy(pageMargins = action.margins) }

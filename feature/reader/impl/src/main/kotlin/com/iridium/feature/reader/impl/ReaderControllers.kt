@@ -10,6 +10,7 @@ import com.iridium.core.model.HighlightColor
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.resolvedColors
 import java.util.UUID
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -22,7 +23,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.Decoration
+import kotlinx.coroutines.delay
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.services.positions
 
 /**
  * Chrome + sheet visibility for the reader. Owns the five visibility flows,
@@ -90,6 +93,12 @@ internal class ReaderChromeController(private val scope: CoroutineScope) {
                 chromeVisible.value = false
             }
         }
+    }
+
+    /** Holds chrome open while the scrubber is dragged (cancels auto-hide). */
+    fun pinForScrub() {
+        chromeJob?.cancel()
+        chromeVisible.value = true
     }
 
     private companion object {
@@ -215,15 +224,18 @@ internal class ReaderPositionTracker(
         val positions = positionsCache
         if (positions.isEmpty()) return 0 to 0
         val current = store.latestLocator.value ?: return 0 to positions.size
-        val index = positions.indexOfFirst { it.href == current.href }
-        // Fallback to nearest by total progression when hrefs diverge.
-        val pos = if (index >= 0) {
-            index
-        } else {
-            ((current.locations.totalProgression ?: 0.0) * positions.size).toInt()
-                .coerceIn(0, positions.size - 1)
+        // totalProgression is continuous across pages; hrefs repeat within a
+        // chapter, so href-first matching freezes the counter mid-chapter
+        // (every page of the chapter resolves to its first position).
+        val total = current.locations.totalProgression?.takeIf { it.isFinite() }
+        if (total != null) {
+            // roundToInt everywhere: display, thumb and seek must agree at
+            // every .5 boundary (floor vs round gave off-by-one seeks).
+            return (total * (positions.size - 1)).roundToInt()
+                .coerceIn(0, positions.size - 1) to positions.size
         }
-        return pos to positions.size
+        val index = positions.indexOfFirst { it.href == current.href }
+        return (if (index >= 0) index else 0) to positions.size
     }
 
     /** Slider seek: jumps the navigator to the position table entry. */
@@ -232,8 +244,21 @@ internal class ReaderPositionTracker(
         val positions = positionsCache
         if (positions.isEmpty()) return
         markProgrammaticNav()
-        val index = (progression * (positions.size - 1)).toInt().coerceIn(0, positions.size - 1)
+        val index = (progression.coerceIn(0f, 1f) * (positions.size - 1)).roundToInt()
+            .coerceIn(0, positions.size - 1)
         nav.go(positions[index])
+    }
+
+    /**
+     * Performs one page step. The slide itself is drawn by the UI (it needs a
+     * snapshot of the outgoing page); this only advances the navigator, whose
+     * paged layout snaps scroll offsets to page boundaries and therefore
+     * cannot be animated from inside the document.
+     */
+    fun completeTurn(forward: Boolean) {
+        val nav = store.navigator ?: return
+        markProgrammaticNav()
+        if (forward) nav.goForward(false) else nav.goBackward(false)
     }
 }
 
@@ -348,6 +373,7 @@ internal class ReaderPrefsController(
     private val scope: CoroutineScope,
     private val preferences: IridiumPreferencesDataSource,
     private val store: ReaderSessionStore,
+    private val positions: ReaderPositionTracker,
 ) {
 
     fun updateReaderPrefs(transform: (ReaderPreferences) -> ReaderPreferences) {
@@ -356,6 +382,11 @@ internal class ReaderPrefsController(
             val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
             runCatching { store.navigator?.submitPreferences(updated) }
             applyThemeOverride()
+            // Pagination moves under the slider after font/margin/line/flow
+            // changes: refresh the positions table so index/count/seek stay
+            // truthful instead of reporting fiction from the old layout.
+            val fresh = safeCatching { store.publication?.positions() }.getOrNull()
+            if (fresh != null) positions.replaceAll(fresh)
         }
     }
 
@@ -363,9 +394,18 @@ internal class ReaderPrefsController(
     suspend fun applyThemeOverride() {
         val prefs = preferences.readerPreferences.first()
         val (bg, fg) = prefs.resolvedColors()
+        // Night light warms text in CSS (background keeps its exact color,
+        // so pure black stays #000000 with OLED pixels off). The Compose
+        // scrim below handles non-black themes; see ReaderScreen night-light
+        // gate which skips the scrim when the page is pure black.
+        val warmedFg = if (prefs.nightLight) {
+            ReaderThemeOverride.warmForeground(fg, prefs.nightLightIntensity)
+        } else {
+            fg
+        }
         val script = ReaderThemeOverride.injectOverrideScriptColors(
             ReaderThemeOverride.hex(bg),
-            ReaderThemeOverride.hex(fg),
+            ReaderThemeOverride.hex(warmedFg),
         )
         safeCatching {
             store.navigator?.evaluateJavascript(script)

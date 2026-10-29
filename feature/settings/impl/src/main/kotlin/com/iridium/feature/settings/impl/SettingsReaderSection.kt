@@ -123,11 +123,6 @@ internal fun ReaderSection(
                 onCheckedChange = { onAction(SettingsAction.SetKeepScreenOn(it)) },
             )
             IridiumSettingSwitch(
-                title = stringResource(R.string.settings_reading_page_counter),
-                checked = state.reader.showPageCounter,
-                onCheckedChange = { onAction(SettingsAction.SetShowPageCounter(it)) },
-            )
-            IridiumSettingSwitch(
                 title = stringResource(R.string.settings_reading_volume_keys),
                 checked = state.reader.volumeKeys,
                 onCheckedChange = { onAction(SettingsAction.SetVolumeKeys(it)) },
