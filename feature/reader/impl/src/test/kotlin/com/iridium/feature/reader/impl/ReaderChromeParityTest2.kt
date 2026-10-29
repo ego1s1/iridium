@@ -62,7 +62,5 @@ class ReaderChromeParityTest2 {
         assertEquals(0, scrubIndexForProgression(0.9f, 0))
         assertEquals(0f, progressionForIndex(-4, 173), 0.0001f)
         assertEquals(1f, progressionForIndex(999, 173), 0.0001f)
-        assertEquals(false, canChromeGoForward(0, 1))
-        assertEquals(false, canChromeGoBackward(0))
     }
 }

@@ -106,8 +106,6 @@ internal object ReaderChromeTestTags {
     const val ScrubberIsland = "chromeScrubberIsland"
     const val ScrubTooltip = "chromeScrubTooltip"
     const val ScrubSlider = "chromeScrubSlider"
-    const val ScrubPrev = "chromeScrubPrev"
-    const val ScrubNext = "chromeScrubNext"
     const val EpubDock = "chromeEpubDock"
     const val EpubFlowButton = "chromeEpubFlow"
     const val EpubThemeButton = "chromeEpubTheme"
@@ -131,10 +129,6 @@ internal fun progressionForIndex(index: Int, count: Int): Float {
     if (count <= 1) return 0f
     return index.coerceIn(0, count - 1).toFloat() / (count - 1).toFloat()
 }
-
-internal fun canChromeGoForward(index: Int, count: Int): Boolean = index < count - 1
-
-internal fun canChromeGoBackward(index: Int): Boolean = index > 0
 
 /** Warm scrim color for night light at [intensity] 0f..1f (max 40% alpha). */
 internal fun nightLightColor(intensity: Float): Color {
@@ -186,28 +180,12 @@ fun ReaderScrubberIsland(
     positionIndex: Int,
     positionCount: Int,
     onSeek: (Float) -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()
-    val prevLabel = stringResource(R.string.reader_scrub_previous)
-    val nextLabel = stringResource(R.string.reader_scrub_next)
     val safeIndex = positionIndex.coerceIn(0, (positionCount - 1).coerceAtLeast(0))
     var scrub by remember(positionCount) { mutableStateOf<Int?>(null) }
     val shownIndex = scrub ?: safeIndex
-    val prevIcon = IridiumIcons.SkipPrevious
-    val nextIcon = IridiumIcons.SkipNext
-    val prevEnabled = canChromeGoBackward(safeIndex)
-    val nextEnabled = canChromeGoForward(safeIndex, positionCount)
-    val prevContainer = MaterialTheme.colorScheme.surfaceContainerHigh
-        .copy(alpha = if (prevEnabled) 1f else 0.4f)
-    val prevContent = MaterialTheme.colorScheme.onSurface
-        .copy(alpha = if (prevEnabled) 1f else 0.38f)
-    val nextContainer = MaterialTheme.colorScheme.surfaceContainerHigh
-        .copy(alpha = if (nextEnabled) 1f else 0.4f)
-    val nextContent = MaterialTheme.colorScheme.onSurface
-        .copy(alpha = if (nextEnabled) 1f else 0.38f)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -242,139 +220,85 @@ fun ReaderScrubberIsland(
         if (positionCount > 1) {
             // Reading direction does not flip the scrubber: always LTR order.
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 6.dp,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    val prevInteraction = remember { MutableInteractionSource() }
-                    val nextInteraction = remember { MutableInteractionSource() }
-                    FilledTonalIconButton(
-                        onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onPrevious()
-                        },
-                        enabled = prevEnabled,
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = prevContainer,
-                            contentColor = prevContent,
-                        ),
-                        interactionSource = prevInteraction,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .then(pressScale(prevInteraction))
-                            .testTag(ReaderChromeTestTags.ScrubPrev),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
                     ) {
-                        Icon(
-                            imageVector = prevIcon,
-                            contentDescription = prevLabel,
-                        )
-                    }
-
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = 4.dp,
-                        shadowElevation = 6.dp,
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-                        ),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = positionCount.coerceAtLeast(1).toString(),
-                                    style = IridiumEmphasized.titleMedium,
-                                    modifier = Modifier.alpha(0f)
-                                        .clearAndSetSemantics { },
-                                )
-                                AnimatedContent(
-                                    targetState = shownIndex,
-                                    transitionSpec = {
-                                        fadeIn(IridiumMotion.defaultEffectsSpec()) +
-                                            scaleIn(
-                                                IridiumMotion.defaultSpatialSpec(),
-                                                initialScale = 0.9f,
-                                            ) togetherWith fadeOut(IridiumMotion.defaultEffectsSpec())
-                                    },
-                                    label = "scrubCounter",
-                                ) { index ->
-                                    Text(
-                                        text = (index + 1).toString(),
-                                        style = IridiumEmphasized.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                }
-                            }
-                            // Keep the slider geometry LTR regardless of any
-                            // surrounding layout direction:
-                            // the value domain (first -> last position) must
-                            // not flip with layout direction.
-                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                                val scrubInteraction = remember { MutableInteractionSource() }
-                                Slider(
-                                    value = shownIndex.toFloat(),
-                                    onValueChange = { raw ->
-                                        val next = raw.roundToInt()
-                                        if (next != scrub) haptics(IridiumHaptic.FrequentTick)
-                                        scrub = next
-                                    },
-                                    onValueChangeFinished = {
-                                        haptics(IridiumHaptic.Select)
-                                        scrub?.let { onSeek(progressionForIndex(it, positionCount)) }
-                                        scrub = null
-                                    },
-                                    valueRange = 0f..(positionCount - 1).toFloat(),
-                                    interactionSource = scrubInteraction,
-                                    thumb = { state ->
-                                        IridiumSquigglySliderThumb(
-                                            sliderState = state,
-                                            interactionSource = scrubInteraction,
-                                        )
-                                    },
-                                    track = { state ->
-                                        IridiumSquigglyTrack(sliderState = state)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag(ReaderChromeTestTags.ScrubSlider),
-                                )
-                            }
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = positionCount.toString(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = positionCount.coerceAtLeast(1).toString(),
+                                style = IridiumEmphasized.titleMedium,
+                                modifier = Modifier.alpha(0f)
+                                    .clearAndSetSemantics { },
+                            )
+                            AnimatedContent(
+                                targetState = shownIndex,
+                                transitionSpec = {
+                                    fadeIn(IridiumMotion.defaultEffectsSpec()) +
+                                        scaleIn(
+                                            IridiumMotion.defaultSpatialSpec(),
+                                            initialScale = 0.9f,
+                                        ) togetherWith fadeOut(IridiumMotion.defaultEffectsSpec())
+                                },
+                                label = "scrubCounter",
+                            ) { index ->
+                                Text(
+                                    text = (index + 1).toString(),
+                                    style = IridiumEmphasized.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                        // Keep the slider geometry LTR regardless of any
+                        // surrounding layout direction:
+                        // the value domain (first -> last position) must
+                        // not flip with layout direction.
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            val scrubInteraction = remember { MutableInteractionSource() }
+                            Slider(
+                                value = shownIndex.toFloat(),
+                                onValueChange = { raw ->
+                                    val next = raw.roundToInt()
+                                    if (next != scrub) haptics(IridiumHaptic.FrequentTick)
+                                    scrub = next
+                                },
+                                onValueChangeFinished = {
+                                    haptics(IridiumHaptic.Select)
+                                    scrub?.let { onSeek(progressionForIndex(it, positionCount)) }
+                                    scrub = null
+                                },
+                                valueRange = 0f..(positionCount - 1).toFloat(),
+                                interactionSource = scrubInteraction,
+                                thumb = { state ->
+                                    IridiumSquigglySliderThumb(
+                                        sliderState = state,
+                                        interactionSource = scrubInteraction,
+                                    )
+                                },
+                                track = { state ->
+                                    IridiumSquigglyTrack(sliderState = state)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(ReaderChromeTestTags.ScrubSlider),
                             )
                         }
-                    }
-
-                    FilledTonalIconButton(
-                        onClick = {
-                            haptics(IridiumHaptic.Select)
-                            onNext()
-                        },
-                        enabled = nextEnabled,
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = nextContainer,
-                            contentColor = nextContent,
-                        ),
-                        interactionSource = nextInteraction,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .then(pressScale(nextInteraction))
-                            .testTag(ReaderChromeTestTags.ScrubNext),
-                    ) {
-                        Icon(
-                            imageVector = nextIcon,
-                            contentDescription = nextLabel,
+                        Text(
+                            text = positionCount.toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

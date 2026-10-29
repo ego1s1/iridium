@@ -1,14 +1,15 @@
 package com.iridium.feature.reader.impl
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import com.iridium.core.designsystem.IridiumTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,16 +45,44 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun `chrome navigation enables only away from the ends`() {
-        assertEquals(false, canChromeGoBackward(0))
-        assertEquals(true, canChromeGoBackward(1))
-        assertEquals(true, canChromeGoForward(0, 173))
-        assertEquals(false, canChromeGoForward(172, 173))
+    fun `counter formats as one-based position over total`() {
+        assertEquals("13 / 173", formatChromeCounter(13, 173))
     }
 
     @Test
-    fun `counter formats as one-based position over total`() {
-        assertEquals("13 / 173", formatChromeCounter(13, 173))
+    fun `scrubber island shows the position counter and full-width slider`() {
+        composeTestRule.setContent {
+            IridiumTheme {
+                ReaderScrubberIsland(
+                    positionIndex = 12,
+                    positionCount = 173,
+                    onSeek = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubberIsland).assertIsDisplayed()
+        composeTestRule.onNodeWithText("13").assertIsDisplayed()
+        composeTestRule.onNodeWithText("173").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubSlider).assertIsDisplayed()
+    }
+
+    @Test
+    fun `scrubber seeks through the slider`() {
+        var sought = -1f
+        composeTestRule.setContent {
+            IridiumTheme {
+                ReaderScrubberIsland(
+                    positionIndex = 12,
+                    positionCount = 173,
+                    onSeek = { sought = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubSlider)
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(0.5f) }
+        assertTrue(sought in 0f..1f)
     }
 
     @Test
@@ -76,68 +105,6 @@ class ReaderChromeTest {
     }
 
     // Composables
-
-    @Test
-    fun `scrubber island shows the position counter and both steppers`() {
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderScrubberIsland(
-                    positionIndex = 12,
-                    positionCount = 173,
-                    onSeek = {},
-                    onPrevious = {},
-                    onNext = {},
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubberIsland).assertIsDisplayed()
-        composeTestRule.onNodeWithText("13").assertIsDisplayed()
-        composeTestRule.onNodeWithText("173").assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubSlider).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubPrev).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubNext).assertIsDisplayed()
-    }
-
-    @Test
-    fun `scrubber steppers disable at the ends of the book`() {
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderScrubberIsland(
-                    positionIndex = 0,
-                    positionCount = 173,
-                    onSeek = {},
-                    onPrevious = {},
-                    onNext = {},
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubPrev).assertIsNotEnabled()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubNext).assertIsEnabled()
-    }
-
-    @Test
-    fun `stepper clicks reach the host callbacks`() {
-        var previous = 0
-        var next = 0
-        composeTestRule.setContent {
-            IridiumTheme {
-                ReaderScrubberIsland(
-                    positionIndex = 12,
-                    positionCount = 173,
-                    onSeek = {},
-                    onPrevious = { previous++ },
-                    onNext = { next++ },
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubPrev).performClick()
-        composeTestRule.onNodeWithTag(ReaderChromeTestTags.ScrubNext).performClick()
-        assertEquals(1, previous)
-        assertEquals(1, next)
-    }
 
     @Test
     fun `epub dock exposes flow theme toc highlights and settings`() {

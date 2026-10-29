@@ -358,8 +358,6 @@ internal fun ReaderScreen(
                     positionIndex = state.positionIndex,
                     positionCount = state.positionCount,
                     onSeek = { onAction(ReaderAction.SeekTo(it)) },
-                    onPrevious = { onAction(ReaderAction.GoBackward()) },
-                    onNext = { onAction(ReaderAction.GoForward()) },
                 )
                 ReaderEpubDock(
                     onFlowCycle = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },

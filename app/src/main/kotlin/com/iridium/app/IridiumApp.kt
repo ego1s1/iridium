@@ -19,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.iridium.core.designsystem.IridiumLoading
 import com.iridium.core.designsystem.IridiumTheme
@@ -67,7 +68,6 @@ fun IridiumApp(
         hapticsEnabled = state.theme.hapticsEnabled,
     ) {
         CompositionLocalProvider(LocalExpressiveMotionEnabled provides expressiveMotion) {
-            SystemBarGlyphs(darkTheme)
             Surface(modifier = modifier.fillMaxSize()) {
                 // Null until DataStore's first emission: never flash the wizard.
                 if (completed == null) {
@@ -75,6 +75,17 @@ fun IridiumApp(
                     return@Surface
                 }
                 val navController = rememberNavController()
+                // The reader owns system-bar glyphs per book theme (sepia
+                // needs dark glyphs, pitch-black needs light ones). The app
+                // default must stand down there, or its SideEffect would
+                // overwrite the reader's on every recomposition. Matched on
+                // the typed route's class name (stable across arguments).
+                val backStackEntry by navController.currentBackStackEntryAsState()
+                val inReader = backStackEntry?.destination?.route
+                    ?.contains("ReaderRoute") == true
+                if (!inReader) {
+                    SystemBarGlyphs(darkTheme)
+                }
                 // Deep-link imports land here: open the imported book once
                 // the graph exists (replay-1 covers the cold-start race).
                 androidx.compose.runtime.LaunchedEffect(navController) {
