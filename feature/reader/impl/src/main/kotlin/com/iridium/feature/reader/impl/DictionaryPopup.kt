@@ -1,8 +1,6 @@
 package com.iridium.feature.reader.impl
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Immutable
@@ -28,6 +25,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumAlertDialog
+import com.iridium.core.designsystem.IridiumEnter
+import com.iridium.core.designsystem.IridiumEnterKind
 import com.iridium.core.designsystem.IridiumPrimaryButton
 import com.iridium.core.designsystem.IridiumTonalButton
 
@@ -50,12 +49,6 @@ internal object DictionaryTestTags {
     const val CloseButton = "dictionary_close"
 }
 
-/** Entrance scale duration for [DictionaryPopup] (ms). */
-internal const val DICTIONARY_ENTER_MS = 220
-
-/** Entrance fade duration for [DictionaryPopup] (ms). */
-internal const val DICTIONARY_FADE_MS = 180
-
 /**
  * Word lookup popup: word header with phonetic, then short
  * per-part-of-speech definitions — no clutter. Copy puts the word on the
@@ -72,56 +65,47 @@ fun DictionaryPopup(
 ) {
     val clipboard = LocalClipboardManager.current
     // Scale/fade entrance: the host keys this popup by word, so every fresh
-    // selection replays the reveal once the lookup grace period elapses.
+    // selection replays the hero pop once the lookup grace period elapses.
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    val enterScale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.92f,
-        animationSpec = tween(DICTIONARY_ENTER_MS, easing = FastOutSlowInEasing),
-        label = "dictionaryEnterScale",
-    )
-    val enterAlpha by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(DICTIONARY_FADE_MS),
-        label = "dictionaryEnterAlpha",
-    )
-    IridiumAlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = state.word,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        },
-        text = {
-            DictionaryPopupBody(state = state)
-        },
-        confirmButton = {
-            IridiumPrimaryButton(
-                onClick = { clipboard.setText(AnnotatedString(state.word)) },
-                modifier = Modifier.testTag(DictionaryTestTags.CopyButton),
-            ) {
-                Text(stringResource(R.string.reader_dictionary_copy))
-            }
-        },
-        dismissButton = {
-            IridiumTonalButton(
-                onClick = onDismiss,
-                modifier = Modifier.testTag(DictionaryTestTags.CloseButton),
-            ) {
-                Text(stringResource(R.string.reader_dictionary_close))
-            }
-        },
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = enterScale
-                scaleY = enterScale
-                alpha = enterAlpha
-            }
-            .testTag(DictionaryTestTags.Dialog),
-    )
+    AnimatedVisibility(
+        visible = entered,
+        enter = IridiumEnter.enter(IridiumEnterKind.DIALOG_POP),
+        exit = IridiumEnter.exit(IridiumEnterKind.DIALOG_POP),
+        label = "dictionaryEnter",
+    ) {
+        IridiumAlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = state.word,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            text = {
+                DictionaryPopupBody(state = state)
+            },
+            confirmButton = {
+                IridiumPrimaryButton(
+                    onClick = { clipboard.setText(AnnotatedString(state.word)) },
+                    modifier = Modifier.testTag(DictionaryTestTags.CopyButton),
+                ) {
+                    Text(stringResource(R.string.reader_dictionary_copy))
+                }
+            },
+            dismissButton = {
+                IridiumTonalButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag(DictionaryTestTags.CloseButton),
+                ) {
+                    Text(stringResource(R.string.reader_dictionary_close))
+                }
+            },
+            modifier = modifier.testTag(DictionaryTestTags.Dialog),
+        )
+    }
 }
 
 @Composable

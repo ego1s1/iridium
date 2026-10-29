@@ -4,10 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import com.iridium.core.designsystem.IridiumEnter
+import com.iridium.core.designsystem.IridiumEnterKind
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -248,8 +246,8 @@ internal fun ReaderScreen(
         }
         AnimatedVisibility(
             visible = state.chromeVisible,
-            enter = slideInVertically { -it } + fadeIn(),
-            exit = slideOutVertically { -it } + fadeOut(),
+            enter = IridiumEnter.enter(IridiumEnterKind.CHROME_TOP),
+            exit = IridiumEnter.exit(IridiumEnterKind.CHROME_TOP),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
                 TopAppBar(
@@ -319,8 +317,8 @@ internal fun ReaderScreen(
         }
         AnimatedVisibility(
             visible = state.chromeVisible,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
+            enter = IridiumEnter.enter(IridiumEnterKind.CHROME_BOTTOM),
+            exit = IridiumEnter.exit(IridiumEnterKind.CHROME_BOTTOM),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Column(

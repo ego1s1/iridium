@@ -50,6 +50,9 @@ enum class IridiumEnterKind {
 
     /** Plain fade for content arrivals (grids, detail bodies, counters). */
     FADE,
+
+    /** Dialog/popups scale in from 85% with a hero spring (dictionary, confirms). */
+    DIALOG_POP,
 }
 
 /** Enter/exit transitions for a semantic [IridiumEnterKind]. */
@@ -78,6 +81,8 @@ object IridiumEnter {
                 IridiumEnterKind.FADE_THROUGH -> fadeIn(IridiumMotion.defaultEffectsSpec()) +
                     scaleIn(animationSpec = IridiumMotion.defaultSpatialSpec(), initialScale = 0.98f)
                 IridiumEnterKind.FADE -> fadeIn(IridiumMotion.defaultEffectsSpec())
+                IridiumEnterKind.DIALOG_POP -> fadeIn(IridiumMotion.defaultEffectsSpec()) +
+                    scaleIn(animationSpec = IridiumMotion.heroSpring(), initialScale = 0.85f)
             }
         }
     }
@@ -106,6 +111,8 @@ object IridiumEnter {
                     slideOutVertically(IridiumMotion.defaultSpatialSpec()) { it / 4 }
                 IridiumEnterKind.FADE_THROUGH -> fadeOut(IridiumMotion.defaultEffectsSpec())
                 IridiumEnterKind.FADE -> fadeOut(IridiumMotion.defaultEffectsSpec())
+                IridiumEnterKind.DIALOG_POP -> fadeOut(IridiumMotion.defaultEffectsSpec()) +
+                    scaleOut(animationSpec = IridiumMotion.heroSpring(), targetScale = 0.85f)
             }
         }
     }
