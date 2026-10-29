@@ -39,7 +39,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -53,6 +58,7 @@ import com.iridium.core.designsystem.IridiumEnterKind
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
+import com.iridium.core.designsystem.LocalAppFonts
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.LibrarySortOrder
@@ -247,16 +253,13 @@ private fun ReadingTimeHeroCard(
             val numberEnter = IridiumEnter.enter(IridiumEnterKind.FADE_THROUGH)
             val numberExit = IridiumEnter.exit(IridiumEnterKind.FADE_THROUGH)
             AnimatedContent(
-                targetState = formatHistoryDuration(durationMs),
+                targetState = durationMs,
                 transitionSpec = { numberEnter togetherWith numberExit },
                 label = "heroReadingTime",
-            ) { duration ->
-                Text(
-                    text = duration,
-                    style = MaterialTheme.typography.displayLarge,
+            ) { current ->
+                HeroDurationText(
+                    durationMs = current,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -318,7 +321,10 @@ private fun CompanionStatCard(
             ) { current ->
                 Text(
                     text = current,
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontFamily = LocalAppFonts.current.displayFlexMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
                     color = contentColor,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -487,7 +493,10 @@ private fun HistoryStreakCard(
                     streak.current,
                     streak.current,
                 ),
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontFamily = LocalAppFonts.current.displayFlex,
+                    fontWeight = FontWeight.Black,
+                ),
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
             )
@@ -559,4 +568,63 @@ private fun formatHistoryDuration(durationMs: Long): String {
         minutes > 0 -> stringResource(R.string.history_duration_minutes, minutes)
         else -> stringResource(R.string.history_duration_seconds, seconds)
     }
+}
+
+/**
+ * Staggered hero duration: hours in the wide 900 face, minutes in the
+ * 800 intermediate face, units in the compact 700 face. Numbers are kept
+ * as plain digits (locale-safe); only the faces stagger.
+ */
+@Composable
+private fun HeroDurationText(
+    durationMs: Long,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    val fonts = LocalAppFonts.current
+    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1000L)
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    val base = MaterialTheme.typography.displayLarge
+    val annotated = remember(hours, minutes, seconds, fonts) {
+        buildAnnotatedString {
+            fun numberPart(value: Long, family: FontFamily, weight: FontWeight) {
+                withStyle(SpanStyle(fontFamily = family, fontWeight = weight)) {
+                    append(value.toString())
+                }
+            }
+            fun unitPart(unit: String) {
+                withStyle(
+                    SpanStyle(fontFamily = fonts.displayUnit, fontWeight = FontWeight.Bold),
+                ) {
+                    append(unit)
+                }
+            }
+            when {
+                hours > 0 -> {
+                    numberPart(hours, fonts.displayFlex, FontWeight.Black)
+                    unitPart("h ")
+                    numberPart(minutes, fonts.displayFlexMedium, FontWeight.ExtraBold)
+                    unitPart("m")
+                }
+                minutes > 0 -> {
+                    numberPart(minutes, fonts.displayFlexMedium, FontWeight.ExtraBold)
+                    unitPart("m")
+                }
+                else -> {
+                    numberPart(seconds, fonts.displayFlexMedium, FontWeight.ExtraBold)
+                    unitPart("s")
+                }
+            }
+        }
+    }
+    Text(
+        text = annotated,
+        style = base,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = modifier,
+    )
 }
