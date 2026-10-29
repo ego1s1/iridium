@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DropdownMenu
@@ -212,13 +210,11 @@ internal fun ReaderScreen(
     val bottomSafeInsets =
         WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)
 
-    // The CONTENT host, by contrast, uses visibility-aware insets so the page
-    // truly goes full-bleed when the system bars are hidden (no letterbox).
-    // The aware insets collapse to 0 when bars hide, so this only pads the
-    // text clear of the bars while they are actually visible.
-    val topVisibleInset = WindowInsets.statusBars.only(WindowInsetsSides.Top)
-    val bottomVisibleInset = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
-
+    // The navigator host uses the SAME ignoring-visibility insets: when the
+    // system bars show/hide with the chrome, aware insets would collapse to
+    // zero and resize the WebView, repaginating the book on every tap. A
+    // stable container lets the chrome float above static text; page content
+    // drawing under the translucent bars is standard edge-to-edge behavior.
     ReaderWindowEffects(
         chromeVisible = state.chromeVisible,
         brightness = state.prefs.brightness,
@@ -231,12 +227,15 @@ internal fun ReaderScreen(
     // the navigator on every chrome toggle, making Readium repaginate (text jump).
     Box(modifier = modifier.fillMaxSize()) {
         // Readium content fills the whole area; chrome overlays it.
+        // The container is stable across chrome toggles: ignoring-visibility
+        // insets never change when the system bars show/hide, so the WebView
+        // keeps its size and the text never repaginates on tap.
         NavigatorHost(
             bookId = state.book.id,
             sessionReady = sessionReady,
             modifier = Modifier.fillMaxSize()
-                .windowInsetsPadding(topVisibleInset)
-                .windowInsetsPadding(bottomVisibleInset),
+                .windowInsetsPadding(topSafeInsets)
+                .windowInsetsPadding(bottomSafeInsets),
         )
         if (!state.chromeVisible && state.prefs.showPageCounter) {
             state.positionText?.let {
