@@ -72,6 +72,7 @@ import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
+import com.iridium.core.model.resolvedColors
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
@@ -220,6 +221,7 @@ internal fun ReaderScreen(
         brightness = state.prefs.brightness,
         keepScreenOn = state.prefs.keepScreenOn,
         theme = state.prefs.theme,
+        pageBackgroundArgb = state.prefs.resolvedColors().first,
     )
 
     // Full-bleed reader: the book fills the whole window and the chrome floats

@@ -3,6 +3,7 @@ package com.iridium.feature.reader.impl
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
@@ -21,6 +22,7 @@ internal fun ReaderWindowEffects(
     brightness: Float,
     keepScreenOn: Boolean,
     theme: ColorSchemeChoice,
+    pageBackgroundArgb: Int,
 ) {
     val context = LocalContext.current
     val activity = context.findActivity()
@@ -60,11 +62,12 @@ internal fun ReaderWindowEffects(
         }
     }
 
-    // Seamless system bars: tint status + navigation bars to the page
-    // background of the active reader theme so no black strips frame the
-    // page, with icon contrast to match. Unrelated to the visibility effect
-    // above (that one only shows/hides); restored when the theme changes.
-    DisposableEffect(theme) {
+    // Seamless system bars: on API 35+ (edge-to-edge enforced) the system
+    // ignores statusBarColor/navigationBarColor, so transparent bars reveal
+    // whatever is behind them. Paint the window + decor with the resolved
+    // page background (custom themes included) so bars, letterbox and page
+    // are one continuous surface instead of mismatched strips.
+    DisposableEffect(theme, pageBackgroundArgb) {
         val window = activity?.window
         val controller =
             activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
@@ -73,9 +76,12 @@ internal fun ReaderWindowEffects(
         val previousNav = window.navigationBarColor
         val previousLightStatus = controller.isAppearanceLightStatusBars
         val previousLightNav = controller.isAppearanceLightNavigationBars
-        val pageBg = theme.pageBackground()
+        val previousBg = window.decorView.background
+        val pageBg = Color(pageBackgroundArgb)
         window.statusBarColor = pageBg.toArgb()
         window.navigationBarColor = pageBg.toArgb()
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(pageBg.toArgb()))
+        window.decorView.setBackgroundColor(pageBg.toArgb())
         controller.isAppearanceLightStatusBars = theme.lightSystemBars()
         controller.isAppearanceLightNavigationBars = theme.lightSystemBars()
         onDispose {
@@ -83,6 +89,7 @@ internal fun ReaderWindowEffects(
             window.navigationBarColor = previousNav
             controller.isAppearanceLightStatusBars = previousLightStatus
             controller.isAppearanceLightNavigationBars = previousLightNav
+            window.setBackgroundDrawable(previousBg)
         }
     }
 
