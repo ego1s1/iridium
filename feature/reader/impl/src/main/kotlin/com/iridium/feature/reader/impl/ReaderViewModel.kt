@@ -86,10 +86,8 @@ class ReaderViewModel @Inject constructor(
     private val messageChannel = Channel<ReaderMessage>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
 
-    /** Burst guard state for [requestTurn] (main-thread only). */
-    private var lastTurnMs = 0L
-    private var burstWindowStartMs = 0L
-    private var burstTurns = 0
+    /** Fixed page-turn ceiling; see [TurnRateLimiter] for the chosen rate. */
+    private val turnLimiter = TurnRateLimiter()
 
     /**
      * Tap-time page-turn pulses (+1 forward, -1 backward), emitted the moment
@@ -466,22 +464,12 @@ class ReaderViewModel @Inject constructor(
      * @return true when the turn was accepted.
      */
     private fun requestTurn(direction: Int): Boolean {
-        val now = clock.uptimeNow()
-        if (now - burstWindowStartMs > BURST_WINDOW_MS) {
-            burstWindowStartMs = now
-            burstTurns = 0
-        }
-        // Every tap keeps the chrome up, including taps the burst cap drops:
+        // Every tap keeps the chrome up, including taps the rate limit drops:
         // it must hide only once the user stops turning.
         positions.markProgrammaticNav()
         chrome.scheduleHide()
 
-        val withinBurst = burstTurns < MAX_BURST_TURNS
-        val spaced = now - lastTurnMs >= MIN_TURN_INTERVAL_MS
-        if (!withinBurst || !spaced) return false
-
-        lastTurnMs = now
-        burstTurns += 1
+        if (!turnLimiter.tryAcquire(clock.uptimeNow())) return false
         positions.onTurnRequested(direction)
         _pageTurns.tryEmit(direction)
         viewModelScope.launch {
@@ -616,12 +604,7 @@ class ReaderViewModel @Inject constructor(
         /** Lets the freshly attached navigator lay out before measuring pages. */
         const val ATTACH_PAGINATION_DELAY_MS = 600L
 
-        /** Minimum gap between accepted turns: below this a tap is a repeat. */
-        const val MIN_TURN_INTERVAL_MS = 90L
 
-        /** At most [MAX_BURST_TURNS] accepted turns per [BURST_WINDOW_MS]. */
-        const val BURST_WINDOW_MS = 1_000L
-        const val MAX_BURST_TURNS = 6
     }
 }
 
