@@ -2,6 +2,11 @@ package com.iridium.feature.reader.impl
 
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -23,7 +28,7 @@ import com.iridium.core.model.ColorSchemeChoice
  * Grace period after a system-driven bar restore. Predictive-back abort
  * animations finish inside this window, so a deferred re-hide is not undone.
  */
-private const val BAR_RESTORE_SETTLE_MS = 220L
+private const val BAR_WATCHDOG_INTERVAL_MS = 400L
 
 @Composable
 internal fun ReaderWindowEffects(
@@ -64,11 +69,13 @@ internal fun ReaderWindowEffects(
     // disappears, and back/home still respond to the first swipe. The platform
     // animates hide()/show() on Android 11+, so the bars fade rather than
     // blink; a longer custom fade would need WindowInsetsAnimationController.
+    val scope = rememberCoroutineScope()
     DisposableEffect(chromeVisible) {
         val window = activity?.window
         val decor = window?.decorView
         // `decor` is only non-null when `window` is, but the compiler cannot
         // see through the smart cast across the nullable pair.
+        var watchdogJob: Job? = null
         val controller = if (window != null && decor != null) {
             WindowCompat.getInsetsController(window, decor)
         } else {
@@ -87,26 +94,29 @@ internal fun ReaderWindowEffects(
         // The system brings the bars back on its own in several cases — a
         // predictive-back preview shows the destination with its bars, and
         // cancelling that gesture leaves them visible even though the chrome is
-        // still hidden.
+        // still hidden. Reacting to the change is not enough: the abort
+        // animation restores them as it settles, and a single hide (even
+        // deferred) loses that race.
         //
-        // Hiding synchronously inside the insets dispatch is not enough: the
-        // abort animation restores the bars as it settles, so the request is
-        // overridden in the same transaction. Posting it lands after that
-        // restore, and a second pass after the animation settles covers the
-        // remainder. Returning the insets unmodified keeps them flowing to the
-        // content below.
-        ViewCompat.setOnApplyWindowInsetsListener(decor) { view, insets ->
-            if (!chromeVisible && insets.isVisible(WindowInsetsCompat.Type.systemBars())) {
-                val bars = WindowInsetsCompat.Type.systemBars()
-                view.post { controller.hide(bars) }
-                view.postDelayed({ controller.hide(bars) }, BAR_RESTORE_SETTLE_MS)
+        // While the chrome is hidden this reaches the desired state however
+        // often the system deviates. Reading the live root insets is a cheap
+        // property read, and hide() is a no-op when the bars are already gone,
+        // so the steady state costs nothing.
+        watchdogJob = scope.launch {
+            while (isActive) {
+                // Unconditional: the live insets report the state the app asked
+                // for, not necessarily what the system is showing, so there is
+                // nothing reliable to test against. hide() is idempotent when
+                // the bars are already gone, and re-asserting simply wins the
+                // next time the system puts them back.
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                delay(BAR_WATCHDOG_INTERVAL_MS)
             }
-            insets
         }
 
         // Leaving the reader must not leave the library without its bars.
         onDispose {
-            ViewCompat.setOnApplyWindowInsetsListener(decor, null)
+            watchdogJob?.cancel()
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
