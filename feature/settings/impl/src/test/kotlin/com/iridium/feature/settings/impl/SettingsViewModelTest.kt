@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +31,7 @@ class SettingsViewModelTest {
     private val sync = DriveSyncManager(
         backup,
         DriveGatewayFactory { throw UnsupportedOperationException("no network in settings tests") },
+        ioDispatcher = Dispatchers.Unconfined,
     )
     private lateinit var viewModel: SettingsViewModel
 
