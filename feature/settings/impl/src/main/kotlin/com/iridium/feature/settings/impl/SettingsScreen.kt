@@ -34,7 +34,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -62,10 +63,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.designsystem.IridiumAlertDialog
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
-import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
-import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
 import com.iridium.core.designsystem.IridiumSettingRow
 import com.iridium.core.designsystem.IridiumSettingSwitch
@@ -220,20 +220,16 @@ internal fun SettingsScreen(
     onSyncNow: () -> Unit = {},
     snackbarHost: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.settings_title),
-                        style = IridiumEmphasized.headlineSmall,
-                    )
-                },
-                actions = { Icon(IridiumIcons.Settings, contentDescription = null) },
+            IridiumCollapsingTopBar(
+                title = stringResource(R.string.settings_title),
+                scrollBehavior = scrollBehavior,
             )
         },
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { padding ->
         Column(
             Modifier
