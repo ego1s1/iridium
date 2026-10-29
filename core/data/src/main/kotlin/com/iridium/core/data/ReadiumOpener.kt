@@ -2,13 +2,14 @@ package com.iridium.core.data
 
 import android.content.Context
 import android.net.Uri
+import com.iridium.core.common.IoDispatcher
 import com.iridium.core.common.safeCatching
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.Closeable
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.Try
@@ -40,13 +41,16 @@ sealed interface OpenResult {
 @Singleton
 class ReadiumOpener @Inject constructor(
     @ApplicationContext private val context: Context,
+    // Container access + archive reads are blocking IO; injected so the open
+    // path can be driven deterministically from a test dispatcher.
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : BookOpener {
     private val httpClient = DefaultHttpClient()
     private val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
     private val parser = DefaultPublicationParser(context, httpClient, assetRetriever, null)
     private val opener = PublicationOpener(parser, emptyList())
 
-    override suspend fun open(sourcePath: String): OpenResult = withContext(Dispatchers.IO) {
+    override suspend fun open(sourcePath: String): OpenResult = withContext(ioDispatcher) {
         when (val retrieved = retrieveAsset(sourcePath)) {
             Retrieved.Gone -> OpenResult.FileMissing
             Retrieved.Unreadable -> OpenResult.ParseFailed

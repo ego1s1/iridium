@@ -1,10 +1,12 @@
 package com.iridium.feature.reader.impl
 
 import androidx.compose.runtime.Immutable
+import com.iridium.core.common.IoDispatcher
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -113,6 +115,10 @@ class UrlConnectionDictionaryHttpClient(
 class HttpDictionaryLookup(
     private val httpClient: DictionaryHttpClient = UrlConnectionDictionaryHttpClient(),
     private val cache: MutableMap<String, WordDefinition> = synchronizedLruCache(),
+    // The HTTP GET blocks, so it runs off the caller's (Main) dispatcher.
+    // Injected rather than hardcoded so the lookup is testable on a controlled
+    // dispatcher; the default only keeps no-arg construction source-compatible.
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : DictionaryLookup {
 
     /** Serializes check-then-act cache access across concurrent lookups. */
@@ -123,7 +129,7 @@ class HttpDictionaryLookup(
             ?: return Result.failure(WordNotFoundException(word))
         cacheMutex.withLock { cache[query] }?.let { return Result.success(it) }
         return try {
-            val response = withContext(Dispatchers.IO) {
+            val response = withContext(ioDispatcher) {
                 val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
                 httpClient.get("$DICTIONARY_ENDPOINT/$encoded")
             }

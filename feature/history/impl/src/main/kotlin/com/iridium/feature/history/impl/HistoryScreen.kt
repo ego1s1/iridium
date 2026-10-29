@@ -33,25 +33,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import com.iridium.core.data.BooksRepository
 import com.iridium.core.designsystem.BookCoverArt
 import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.model.Book
-import com.iridium.core.model.LibraryQuery
-import com.iridium.core.model.LibrarySortOrder
-import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import javax.inject.Inject
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /** Bucket a history entry falls into; the label is resolved in the UI layer
  * so grouping stays locale-free and unit-testable. */
@@ -65,59 +53,6 @@ sealed interface HistoryGroupKey {
 data class HistoryGroup(val key: HistoryGroupKey, val books: List<Book>)
 
 data class HistoryUiState(val groups: List<HistoryGroup> = emptyList())
-
-@HiltViewModel
-class HistoryViewModel @Inject constructor(
-    repository: BooksRepository,
-) : ViewModel() {
-
-    val uiState: StateFlow<HistoryUiState> = repository
-        .observeLibrary(LibraryQuery(sortOrder = LibrarySortOrder.RECENTLY_READ))
-        .map { books ->
-            HistoryUiState(books.filter { it.progress > 0f }.groupByDay())
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = HistoryUiState(),
-        )
-}
-
-/** Groups books into Today / Yesterday / dated buckets by last read. */
-private fun List<Book>.groupByDay(now: Long = System.currentTimeMillis()): List<HistoryGroup> {
-    val calendar = Calendar.getInstance()
-    calendar.timeInMillis = now
-    calendar.set(Calendar.HOUR_OF_DAY, 0)
-    calendar.set(Calendar.MINUTE, 0)
-    calendar.set(Calendar.SECOND, 0)
-    calendar.set(Calendar.MILLISECOND, 0)
-    val startOfToday = calendar.timeInMillis
-    // Calendar arithmetic, not minus-24h: DST transitions make yesterday
-    // 23 or 25 hours long.
-    calendar.add(Calendar.DAY_OF_YEAR, -1)
-    val startOfYesterday = calendar.timeInMillis
-
-    return groupBy { book ->
-        when {
-            book.updatedAt >= startOfToday -> HistoryGroupKey.Today
-            book.updatedAt >= startOfYesterday -> HistoryGroupKey.Yesterday
-            else -> HistoryGroupKey.Dated(startOfDay(book.updatedAt))
-        }
-    }.map { (key, books) ->
-        HistoryGroup(key, books.sortedByDescending { it.updatedAt })
-    }
-}
-
-/** Midnight in the device's zone for [millis], used to bucket dated groups. */
-private fun startOfDay(millis: Long): Long {
-    val calendar = Calendar.getInstance()
-    calendar.timeInMillis = millis
-    calendar.set(Calendar.HOUR_OF_DAY, 0)
-    calendar.set(Calendar.MINUTE, 0)
-    calendar.set(Calendar.SECOND, 0)
-    calendar.set(Calendar.MILLISECOND, 0)
-    return calendar.timeInMillis
-}
 
 /** Localised header for a history bucket. */
 @Composable

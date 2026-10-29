@@ -52,7 +52,7 @@ class OfflineFirstBooksRepositoryTest {
         lister = FakeLister()
         tempDir = File(context.cacheDir, "repo-test").apply { mkdirs() }
         repository = OfflineFirstBooksRepository(
-            observer = LibraryObserver(
+            observer = OfflineFirstLibraryObserver(
                 bookDao = database.bookDao(),
                 highlightDao = database.highlightDao(),
                 bookmarkDao = database.bookmarkDao(),
@@ -64,7 +64,7 @@ class OfflineFirstBooksRepositoryTest {
                 chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
                 ioDispatcher = UnconfinedTestDispatcher(),
             ),
-            annotations = AnnotationRepository(
+            annotations = OfflineFirstAnnotationRepository(
                 highlightDao = database.highlightDao(),
                 bookmarkDao = database.bookmarkDao(),
             ),
@@ -74,7 +74,7 @@ class OfflineFirstBooksRepositoryTest {
                 database = database,
                 bookDao = database.bookDao(),
                 chapterTextDao = database.chapterTextDao(),
-                annotations = AnnotationRepository(
+                annotations = OfflineFirstAnnotationRepository(
                     highlightDao = database.highlightDao(),
                     bookmarkDao = database.bookmarkDao(),
                 ),
@@ -96,7 +96,7 @@ class OfflineFirstBooksRepositoryTest {
                     database = database,
                     bookDao = database.bookDao(),
                     chapterTextDao = database.chapterTextDao(),
-                    annotations = AnnotationRepository(
+                    annotations = OfflineFirstAnnotationRepository(
                         highlightDao = database.highlightDao(),
                         bookmarkDao = database.bookmarkDao(),
                     ),

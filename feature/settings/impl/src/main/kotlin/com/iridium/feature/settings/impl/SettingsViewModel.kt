@@ -17,10 +17,12 @@ import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -97,6 +99,13 @@ class SettingsViewModel @Inject constructor(
             linkedFolders = args[5] as Set<String>,
             revokedFolders = args[6] as Set<String>,
         )
+    }.catch { error ->
+        // A failed read would otherwise cancel the state flow and leave the
+        // screen on its initial value forever. Settings has no dedicated error
+        // state, so fall back to the documented defaults: the screen stays
+        // usable and writes still reach DataStore.
+        if (error is CancellationException) throw error
+        emit(SettingsUiState())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

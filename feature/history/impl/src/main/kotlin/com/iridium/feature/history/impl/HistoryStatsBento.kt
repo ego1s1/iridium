@@ -47,10 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import com.iridium.core.data.BooksRepository
 import com.iridium.core.designsystem.BookCoverArt
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumEnter
@@ -60,16 +57,6 @@ import com.iridium.core.designsystem.IridiumIcons
 import com.iridium.core.designsystem.IridiumSectionCard
 import com.iridium.core.designsystem.LocalAppFonts
 import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.model.LibraryQuery
-import com.iridium.core.model.LibrarySortOrder
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 
 /** Test tags for the history stats bento. */
 object HistoryStatsTestTags {
@@ -83,42 +70,6 @@ object HistoryStatsTestTags {
     const val TopBooks = "historyStatsTopBooks"
 
     fun rangeFor(range: HistoryStatsRange): String = "historyStatsRange:${range.name}"
-}
-
-/**
- * Stats bento over Iridium history data, per Mori UI hierarchy §3.4.
- * Aggregates the history book list (progress / updatedAt / spineCount) into
- * the Mori bento shape: hero reading-time card, segments-read +
- * finished-volumes cards, activity chart, streak card, top-books list.
- */
-@HiltViewModel
-class HistoryStatsViewModel @Inject constructor(
-    repository: BooksRepository,
-) : ViewModel() {
-
-    private val range = MutableStateFlow(HistoryStatsRange.WEEK)
-
-    val uiState: StateFlow<HistoryStatsSnapshot> = combine(
-        repository.observeLibrary(LibraryQuery(sortOrder = LibrarySortOrder.RECENTLY_READ)),
-        range,
-    ) { books, selected ->
-        // One clock read inside toHistoryStats: buckets and streak agree.
-        books.toHistoryStats(selected)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HistoryStatsSnapshot(
-            totals = HistoryTotals(0, 0, 0, 0L),
-            buckets = emptyList(),
-            range = HistoryStatsRange.WEEK,
-            streak = HistoryStreak(0, 0),
-            topBooks = emptyList(),
-        ),
-    )
-
-    fun onRangeSelect(range: HistoryStatsRange) {
-        this.range.update { range }
-    }
 }
 
 /** Route entry: bento grid bound to [HistoryStatsViewModel]. */

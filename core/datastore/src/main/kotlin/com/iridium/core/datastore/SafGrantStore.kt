@@ -4,9 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.iridium.core.common.IoDispatcher
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 /**
@@ -25,15 +26,16 @@ interface SafGrantStore {
 @Singleton
 internal class ContentResolverGrantStore @Inject constructor(
     @ApplicationContext private val context: Context,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : SafGrantStore {
 
-    override suspend fun persistedReadUris(): Set<String> = withContext(Dispatchers.IO) {
+    override suspend fun persistedReadUris(): Set<String> = withContext(ioDispatcher) {
         context.contentResolver.persistedUriPermissions
             .filter { it.isReadPermission }
             .mapTo(mutableSetOf()) { it.uri.toString() }
     }
 
-    override suspend fun releaseReadUri(uri: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun releaseReadUri(uri: String): Boolean = withContext(ioDispatcher) {
         runCatching {
             context.contentResolver.releasePersistableUriPermission(
                 Uri.parse(uri),

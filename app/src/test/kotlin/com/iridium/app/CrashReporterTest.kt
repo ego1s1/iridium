@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -18,7 +19,8 @@ import org.robolectric.annotation.Config
 class CrashReporterTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val reporter = CrashReporter(context)
+    // Unconfined keeps the tombstone writes synchronous under the test dispatcher.
+    private val reporter = CrashReporter(context, Dispatchers.Unconfined)
     private val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
 
     @After

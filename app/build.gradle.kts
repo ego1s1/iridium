@@ -69,6 +69,7 @@ dependencies {
     implementation(project(":feature:reader:api"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
+    implementation(project(":core:common"))
     implementation(project(":core:data"))
     implementation(project(":core:datastore"))
     implementation(project(":epub-core"))

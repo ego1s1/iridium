@@ -9,6 +9,7 @@ import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,7 +45,14 @@ internal class OnboardingViewModel @Inject constructor(
         preferences.readerPreferences,
         preferences.linkedFolders,
         ::toUiState,
-    ).stateIn(
+    ).catch { error ->
+        // A failed read would otherwise cancel the state flow and freeze the
+        // wizard on its initial step forever. Welcome is the only safe resting
+        // state: it needs no preference values and every step stays reachable
+        // from it.
+        if (error is CancellationException) throw error
+        emit(OnboardingUiState.Welcome)
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = OnboardingUiState.Welcome,

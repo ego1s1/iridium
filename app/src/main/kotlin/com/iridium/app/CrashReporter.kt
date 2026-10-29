@@ -12,7 +12,8 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import com.iridium.core.common.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 /**
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class CrashReporter @Inject constructor(
     @ApplicationContext private val context: Context,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val directory: File get() = File(context.cacheDir, DIR).apply { mkdirs() }
 
@@ -66,22 +68,22 @@ class CrashReporter @Inject constructor(
     }
 
     /** Tombstones waiting to be offered to the user, newest first. */
-    suspend fun pending(): List<File> = withContext(Dispatchers.IO) {
+    suspend fun pending(): List<File> = withContext(ioDispatcher) {
         directory.listFiles()?.filter { it.isFile && it.name.endsWith(EXT) }
             ?.sortedByDescending { it.lastModified() }
             .orEmpty()
     }
 
-    suspend fun read(file: File): String? = withContext(Dispatchers.IO) {
+    suspend fun read(file: File): String? = withContext(ioDispatcher) {
         runCatching { file.readText() }.getOrNull()
     }
 
-    suspend fun clear(file: File) = withContext(Dispatchers.IO) {
+    suspend fun clear(file: File) = withContext(ioDispatcher) {
         runCatching { file.delete() }
         Unit
     }
 
-    suspend fun clearAll() = withContext(Dispatchers.IO) {
+    suspend fun clearAll() = withContext(ioDispatcher) {
         directory.listFiles()?.forEach { runCatching { it.delete() } }
         Unit
     }

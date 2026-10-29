@@ -6,12 +6,13 @@ import android.net.Uri
 import android.os.Parcelable
 import android.provider.OpenableColumns
 import com.iridium.core.data.BooksRepository
+import com.iridium.core.common.IoDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 /** A parsed share/open request for one EPUB document. */
@@ -29,6 +30,7 @@ data class ImportRequest(val uri: Uri, val displayName: String?)
 class ImportDeepLinkHandler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: BooksRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
     /** Extracts an [ImportRequest] from an intent, or null when not ours. */
@@ -50,7 +52,7 @@ class ImportDeepLinkHandler @Inject constructor(
     }
 
     /** Imports the intent's book; null when absent, declined, or failed. */
-    suspend fun handle(intent: Intent?): String? = withContext(Dispatchers.IO) {
+    suspend fun handle(intent: Intent?): String? = withContext(ioDispatcher) {
         val request = parseIntent(intent) ?: return@withContext null
         val name = resolveDisplayName(request.uri) ?: request.uri.lastPathSegment
         importUri(name) {
@@ -68,7 +70,7 @@ class ImportDeepLinkHandler @Inject constructor(
     suspend fun importUri(
         displayName: String?,
         openStream: () -> java.io.InputStream?,
-    ): String? = withContext(Dispatchers.IO) {
+    ): String? = withContext(ioDispatcher) {
         try {
             repository.importEpub(displayName ?: "book.epub", openStream)
         } catch (e: CancellationException) {

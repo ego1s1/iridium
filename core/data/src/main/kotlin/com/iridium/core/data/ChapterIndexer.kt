@@ -1,5 +1,6 @@
 package com.iridium.core.data
 
+import com.iridium.core.common.DefaultDispatcher
 import com.iridium.core.common.safeCatching
 import com.iridium.core.database.ChapterTextEntity
 import com.iridium.core.model.TocEntry
@@ -7,6 +8,7 @@ import com.iridium.epub.engine.HtmlText
 import com.iridium.epub.engine.IridiumEpubEngine
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -24,13 +26,17 @@ import kotlinx.coroutines.withContext
 internal class ChapterIndexer @Inject constructor(
     private val sourceFactory: EpubSourceFactory,
     private val engine: IridiumEpubEngine,
+    // Extraction is CPU-bound parsing and belongs off the IO pool. Injected so
+    // a test dispatcher can drive it; the default only keeps direct
+    // construction source-compatible.
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     suspend fun extract(
         bookId: String,
         sourcePath: String,
         displayName: String,
         toc: List<TocEntry>,
-    ): List<ChapterTextEntity> = withContext(Dispatchers.Default) {
+    ): List<ChapterTextEntity> = withContext(defaultDispatcher) {
         val source = safeCatching { sourceFactory.open(sourcePath, displayName) }.getOrNull()
             ?: return@withContext emptyList()
 

@@ -72,10 +72,9 @@ interface BooksRepository {
 }
 
 /**
- * Offline-first, link-only repository (Mori's storage model): Room is the
- * source of truth and books are addressed by their SAF document URI — bytes
- * are read in place, never copied into the app. Only cover thumbnails and
- * reading state live on-device.
+ * Offline-first, link-only repository: Room is the source of truth and books
+ * are addressed by their SAF document URI — bytes are read in place, never
+ * copied into the app. Only cover thumbnails and reading state live on-device.
  */
 @Singleton
 // 14 params: 12 collaborators + 2 injected dispatchers. The 1.2 split

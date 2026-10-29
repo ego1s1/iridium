@@ -8,9 +8,11 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.iridium.core.common.IoDispatcher
 import com.iridium.core.common.safeCatching
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -60,6 +62,10 @@ interface DriveGateway {
 class DriveSyncManager @Inject constructor(
     private val backup: LibraryBackupManager,
     private val gatewayFactory: DriveGatewayFactory,
+    // Injected so a sync pass can be driven from a test dispatcher. Hilt
+    // always supplies the qualified IO binding; the default only keeps
+    // direct construction (tests, ad-hoc callers) source-compatible.
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val syncMutex = kotlinx.coroutines.sync.Mutex()
     /**
@@ -67,7 +73,7 @@ class DriveSyncManager @Inject constructor(
      * newer, downloads + restores when the remote wins, no-op on ties.
      */
     suspend fun syncNow(accountEmail: String): DriveSyncResult = syncMutex.withLock {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
         if (accountEmail.isBlank()) return@withContext DriveSyncResult.SignedOut
         val gateway = safeCatching { gatewayFactory.create(accountEmail) }.getOrNull()
             ?: return@withContext DriveSyncResult.Failed("Drive unavailable")
@@ -112,6 +118,7 @@ fun interface DriveGatewayFactory {
 
 class GoogleDriveGatewayFactory @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : DriveGatewayFactory {
     override fun create(accountEmail: String): DriveGateway {
         val credential = GoogleAccountCredential.usingOAuth2(
@@ -121,12 +128,15 @@ class GoogleDriveGatewayFactory @Inject constructor(
         val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
             .setApplicationName("Iridium")
             .build()
-        return GoogleDriveGateway(drive)
+        return GoogleDriveGateway(drive, ioDispatcher)
     }
 }
 
-internal class GoogleDriveGateway(private val drive: Drive) : DriveGateway {
-    override suspend fun findBackup(): RemoteBackup? = withContext(Dispatchers.IO) {
+internal class GoogleDriveGateway(
+    private val drive: Drive,
+    private val ioDispatcher: CoroutineDispatcher,
+) : DriveGateway {
+    override suspend fun findBackup(): RemoteBackup? = withContext(ioDispatcher) {
         val list = drive.files().list()
             .setSpaces("appDataFolder")
             .setQ("name = '${DriveSyncManager.BACKUP_FILENAME}' and trashed = false")
@@ -140,14 +150,14 @@ internal class GoogleDriveGateway(private val drive: Drive) : DriveGateway {
         )
     }
 
-    override suspend fun download(fileId: String): String? = withContext(Dispatchers.IO) {
+    override suspend fun download(fileId: String): String? = withContext(ioDispatcher) {
         val out = ByteArrayOutputStream()
         drive.files().get(fileId).executeMediaAndDownloadTo(out)
         out.toString(Charsets.UTF_8.name())
     }
 
     override suspend fun upload(filename: String, json: String, existingFileId: String?): RemoteBackup? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val createdAt = System.currentTimeMillis().toString()
             if (existingFileId != null) {
                 val meta = File().setAppProperties(mapOf("createdAt" to createdAt))

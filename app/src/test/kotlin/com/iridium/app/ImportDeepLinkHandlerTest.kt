@@ -6,6 +6,7 @@ import com.iridium.core.fakes.TestBooksRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import kotlinx.coroutines.Dispatchers
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -19,6 +20,7 @@ class ImportDeepLinkHandlerTest {
     private fun handler() = ImportDeepLinkHandler(
         context = org.robolectric.RuntimeEnvironment.getApplication(),
         repository = repository,
+        ioDispatcher = Dispatchers.Unconfined,
     )
 
     @Test
