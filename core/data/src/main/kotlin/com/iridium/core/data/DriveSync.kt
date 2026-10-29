@@ -13,7 +13,6 @@ import com.iridium.core.common.safeCatching
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 

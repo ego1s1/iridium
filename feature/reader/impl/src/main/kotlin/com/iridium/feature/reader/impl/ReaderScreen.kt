@@ -1,30 +1,14 @@
 package com.iridium.feature.reader.impl
 
-import android.app.Activity
-import android.graphics.Bitmap
-import android.graphics.Rect
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.view.PixelCopy
-import android.view.View
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
-import androidx.compose.animation.AnimatedVisibility
+import android.view.View
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.tween
-import com.iridium.core.designsystem.IridiumEnter
-import com.iridium.core.designsystem.IridiumEnterKind
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -34,27 +18,16 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,20 +36,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.net.toUri
-import com.iridium.core.designsystem.findActivity
-import androidx.fragment.app.FragmentContainerView
-import androidx.fragment.app.commitNow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
@@ -84,23 +48,18 @@ import androidx.navigation.compose.composable
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
-import com.iridium.core.designsystem.IridiumMotion
 import com.iridium.core.designsystem.IridiumLoading
-import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.model.ColorSchemeChoice
-import com.iridium.core.model.ReadingFlow
-import com.iridium.core.model.pageBackgroundArgb
-import com.iridium.core.model.isLightScheme
-import com.iridium.core.model.resolvedColors
 import com.iridium.core.designsystem.LocalNavAnimatedVisibilityScope
+import com.iridium.core.designsystem.findActivity
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
+import com.iridium.core.designsystem.rememberIridiumHaptics
+import com.iridium.core.model.ReadingFlow
+import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderRoute
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 fun NavGraphBuilder.readerScreen(onBackClick: () -> Unit) {
     composable<ReaderRoute>(
@@ -515,427 +474,6 @@ private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
         (com.iridium.core.model.ReadingFlow.entries.indexOf(flow) + 1) %
             com.iridium.core.model.ReadingFlow.entries.size,
     ]
-
-/**
- * One overflow-menu row: leading icon is decorative (the screen reader uses
- * the label), an optional trailing value shows the cycle target, and every
- * tap plays the standard select haptic.
- */
-@Composable
-private fun ReaderMenuItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    testTag: String,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-    trailing: String? = null,
-) {
-    val haptics = rememberIridiumHaptics()
-    DropdownMenuItem(
-        text = { Text(label) },
-        trailingIcon = trailing?.let { { Text(text = it, style = MaterialTheme.typography.labelMedium) } },
-        leadingIcon = { Icon(icon, contentDescription = null) },
-        onClick = {
-            haptics(IridiumHaptic.Select)
-            onSelect()
-        },
-        modifier = modifier.testTag(testTag),
-    )
-}
-
-/** Page-turn slide duration: the reference flow settles in ~180 ms. */
-private const val PageTurnDurationMs = 180
-
-/** Delay before capturing a settled page (lets the swap finish painting). */
-private const val PageSnapshotSettleMs = 120L
-
-/** Top bar + its padding, in dp (blanked from turn snapshots). */
-private val ChromeTopStrip = 76.dp
-
-/** Scrubber island + its padding, in dp (blanked from turn snapshots). */
-private val ChromeBottomStrip = 90.dp
-
-/**
- * A tap-time page-turn pulse: [id] increments per accepted turn so the UI
- * restarts the slide even for same-direction repeats; [direction] is +1
- * forward, -1 backward. [Idle] is the pre-first-turn value.
- */
-internal data class PageTurnPulse(val id: Long, val direction: Int) {
-    companion object {
-        val Idle = PageTurnPulse(0L, 1)
-    }
-}
-
-/**
- * Page background per reader theme (mirrors the settings swatches): system
- * bars tint to this so they read as a seamless frame around the page.
- */
-internal fun ColorSchemeChoice.pageBackground(): Color = Color(pageBackgroundArgb())
-
-/** Dark status/nav icons on the light page themes, light icons otherwise. */
-internal fun ColorSchemeChoice.lightSystemBars(): Boolean = isLightScheme()
-
-/**
- * The chrome overlay: top bar + bottom scrubber animated as one unit over a
- * static page. Both bars float above the WebView and never participate in
- * layout, so tapping can neither resize content nor repaginate the book.
- */
-@Composable
-private fun BoxScope.ReaderChromeOverlay(
-    visible: Boolean,
-    topBar: @Composable () -> Unit,
-    bottomBar: @Composable () -> Unit,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = IridiumEnter.enter(IridiumEnterKind.CHROME_TOP),
-        exit = IridiumEnter.exit(IridiumEnterKind.CHROME_TOP),
-        modifier = Modifier.align(Alignment.TopCenter),
-    ) {
-        topBar()
-    }
-    AnimatedVisibility(
-        visible = visible,
-        enter = IridiumEnter.enter(IridiumEnterKind.CHROME_BOTTOM),
-        exit = IridiumEnter.exit(IridiumEnterKind.CHROME_BOTTOM),
-        modifier = Modifier.align(Alignment.BottomCenter),
-    ) {
-        bottomBar()
-    }
-}
-
-/** Opaque top bar: title + quick actions + overflow menu. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReaderTopBar(
-    title: String,
-    author: String?,
-    flowLabel: String,
-    onBackClick: () -> Unit,
-    onAction: (ReaderAction) -> Unit,
-    onAddHighlight: () -> Unit,
-    onCycleFlow: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = rememberIridiumHaptics()
-    // Opaque surface: no blur means text must not show through.
-    TopAppBar(
-        modifier = modifier,
-        title = {
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                author?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = {
-                haptics(IridiumHaptic.Select)
-                onBackClick()
-            }) {
-                Icon(IridiumIcons.Back, contentDescription = stringResource(R.string.reader_action_back))
-            }
-        },
-        actions = {
-            IconButton(onClick = {
-                haptics(IridiumHaptic.Select)
-                onAction(ReaderAction.OpenToc)
-            }) {
-                Icon(IridiumIcons.List, contentDescription = stringResource(R.string.reader_toc_title))
-            }
-            IconButton(onClick = {
-                haptics(IridiumHaptic.Select)
-                onAction(ReaderAction.OpenHighlights)
-            }) {
-                Icon(
-                    IridiumIcons.Highlight,
-                    contentDescription = stringResource(R.string.reader_action_highlights),
-                )
-            }
-            IconButton(onClick = {
-                haptics(IridiumHaptic.Select)
-                onAction(ReaderAction.OpenSettings)
-            }) {
-                Icon(
-                    IridiumIcons.Settings,
-                    contentDescription = stringResource(R.string.reader_action_settings),
-                )
-            }
-            var menuOpen by remember { mutableStateOf(false) }
-            IconButton(onClick = {
-                haptics(IridiumHaptic.Select)
-                menuOpen = true
-            }) {
-                Icon(IridiumIcons.More, contentDescription = stringResource(R.string.reader_action_more))
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                ReaderMenuItem(
-                    icon = IridiumIcons.List,
-                    label = stringResource(R.string.reader_toc_title),
-                    testTag = "readerMenuToc",
-                    onSelect = {
-                        menuOpen = false
-                        onAction(ReaderAction.OpenToc)
-                    },
-                )
-                ReaderMenuItem(
-                    icon = IridiumIcons.Edit,
-                    label = stringResource(R.string.reader_action_highlight_selection),
-                    testTag = "readerMenuHighlightSelection",
-                    onSelect = {
-                        menuOpen = false
-                        onAddHighlight()
-                    },
-                )
-                ReaderMenuItem(
-                    icon = IridiumIcons.Highlight,
-                    label = stringResource(R.string.reader_action_highlights),
-                    testTag = "readerMenuHighlights",
-                    onSelect = {
-                        menuOpen = false
-                        onAction(ReaderAction.OpenHighlights)
-                    },
-                )
-                HorizontalDivider()
-                ReaderMenuItem(
-                    icon = IridiumIcons.ViewAgenda,
-                    label = stringResource(R.string.reader_settings_flow),
-                    trailing = flowLabel,
-                    testTag = "readerMenuFlow",
-                    onSelect = {
-                        menuOpen = false
-                        onCycleFlow()
-                    },
-                )
-                ReaderMenuItem(
-                    icon = IridiumIcons.Contrast,
-                    label = stringResource(R.string.reader_settings_theme),
-                    testTag = "readerMenuTheme",
-                    onSelect = {
-                        menuOpen = false
-                        onAction(ReaderAction.OpenThemeSheet)
-                    },
-                )
-                HorizontalDivider()
-                ReaderMenuItem(
-                    icon = IridiumIcons.Settings,
-                    label = stringResource(R.string.reader_action_settings),
-                    testTag = "readerMenuSettings",
-                    onSelect = {
-                        menuOpen = false
-                        onAction(ReaderAction.OpenSettings)
-                    },
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-    )
-}
-
-/** Hosts the [ReaderHostFragment] inside Compose via FragmentContainerView. */
-@Composable
-private fun NavigatorHost(
-    bookId: String,
-    sessionReady: Boolean,
-    onViewReady: (View) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val activity = context.findActivity()
-    if (activity == null) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.reader_unavailable))
-        }
-        return
-    }
-    // Stable id so the FragmentManager can restore the navigator fragment
-    // across configuration changes (a generated id would not be restorable).
-    val containerId = R.id.reader_navigator_container
-    val tag = "iridium_reader_$bookId"
-
-    // The container is always composed so FragmentManager has somewhere to
-    // restore into; the host fragment itself is only added once the session
-    // is published. Adding it earlier handed Readium a null navigator factory
-    // and collided with an in-flight composition on the first open.
-    AndroidView(
-        factory = { ctx -> FragmentContainerView(ctx).apply { id = containerId } },
-        update = { onViewReady(it) },
-        modifier = modifier.fillMaxSize(),
-    )
-
-    if (!sessionReady) {
-        IridiumLoading(modifier)
-        return
-    }
-
-    LaunchedEffect(bookId, containerId, sessionReady) {
-        val fm = activity.supportFragmentManager
-        if (fm.findFragmentByTag(tag) != null || fm.findFragmentById(containerId) != null) {
-            return@LaunchedEffect
-        }
-        val fragment = ReaderHostFragment.newInstance()
-        if (fm.isStateSaved) {
-            // The activity already saved state (e.g. opening during a
-            // restore): commitNow would throw, so allow state loss.
-            fm.beginTransaction().add(containerId, fragment, tag).commitAllowingStateLoss()
-        } else {
-            fm.commitNow { add(containerId, fragment, tag) }
-        }
-    }
-
-    DisposableEffect(bookId, containerId) {
-        onDispose {
-            // Config change (rotation) disposes effects but the FragmentManager
-            // restores the navigator itself into the stable container id —
-            // only detach when truly leaving the reader.
-            if (activity.isChangingConfigurations || activity.isFinishing) return@onDispose
-            // Leaving the reader: detach the navigator so a stale WebView never
-            // lingers behind the library. commitAllowingStateLoss (not
-            // commitNow) avoids throwing if the host already saved state.
-            val fm = activity.supportFragmentManager
-            fm.findFragmentByTag(tag)?.takeIf { it.isAdded }?.let {
-                fm.beginTransaction().remove(it).commitAllowingStateLoss()
-            }
-        }
-    }
-}
-
-/**
- * Full-screen showcase for a tapped book image (image showcase). Loads the
- * tapped resource's bytes and draws them edge-to-edge; a tap anywhere
- * dismisses back to the book.
- */
-@Composable
-private fun ReaderImageShowcase(
-    src: String,
-    loadImageBytes: suspend (String) -> ByteArray?,
-    onDismiss: () -> Unit,
-) {
-    var bitmap by remember(src) { mutableStateOf<ImageBitmap?>(null) }
-    val context = LocalContext.current
-    LaunchedEffect(src) {
-        bitmap = runCatching {
-            val bytes = loadImageBytes(src) ?: return@runCatching null
-            decodeShowcaseBitmap(bytes, context)?.asImageBitmap()
-        }.getOrNull()
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .clickable(onClick = onDismiss)
-            .testTag("readerImageShowcase"),
-        contentAlignment = Alignment.Center,
-    ) {
-        val bmp = bitmap
-        if (bmp == null) {
-            CircularProgressIndicator(color = Color.White)
-        } else {
-            key(bmp) {
-                var entered by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { entered = true }
-                AnimatedVisibility(
-                    visible = entered,
-                    enter = IridiumEnter.enter(IridiumEnterKind.DIALOG_POP),
-                    exit = IridiumEnter.exit(IridiumEnterKind.DIALOG_POP),
-                    label = "showcaseImageEnter",
-                ) {
-                    Image(
-                        bitmap = bmp,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Bounded showcase decode: subsamples huge EPUB illustrations down to the
- * display size before allocating pixels. A 4000x6000 plate is ~96MB decoded
- * at full res — enough to OOM the reader — while the screen can only show
- * ~2MP of it anyway.
- */
-internal fun decodeShowcaseBitmap(bytes: ByteArray, context: Context): android.graphics.Bitmap? {
-    if (bytes.isEmpty()) return null
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    val metrics = context.resources.displayMetrics
-    val screenMax = maxOf(metrics.widthPixels, metrics.heightPixels).coerceAtLeast(1)
-    val imageMax = maxOf(bounds.outWidth, bounds.outHeight)
-    var sample = 1
-    while (imageMax / (sample * 2) >= screenMax) sample *= 2
-    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-}
-
-/**
- * Captures the settled reader page for the next turn's outgoing layer.
- * Uses PixelCopy (hardware-accurate); returns null where unavailable so the
- * slide degrades to a plain slide-in instead of failing. The chrome strips
- * are repainted with the page colour: a window capture bakes the bars in and
- * they would otherwise ghost across the slide.
- */
-private suspend fun capturePage(
-    activity: Activity?,
-    view: View?,
-    blankTopPx: Int,
-    blankBottomPx: Int,
-    fillArgb: Int,
-): Bitmap? {
-    if (activity == null || view == null) return null
-    if (view.width <= 0 || view.height <= 0) return null
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
-    val bitmap = suspendCancellableCoroutine<Bitmap?> { cont ->
-        val loc = IntArray(2)
-        view.getLocationInWindow(loc)
-        val src = Rect(loc[0], loc[1], loc[0] + view.width, loc[1] + view.height)
-        val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.RGB_565)
-        PixelCopy.request(
-            activity.window,
-            src,
-            target,
-            { result ->
-                if (cont.isActive) {
-                    cont.resume(if (result == PixelCopy.SUCCESS) target else null)
-                }
-            },
-            Handler(Looper.getMainLooper()),
-        )
-    } ?: return null
-    val canvas = android.graphics.Canvas(bitmap)
-    val paint = android.graphics.Paint().apply { color = fillArgb }
-    if (blankTopPx > 0) {
-        canvas.drawRect(0f, 0f, bitmap.width.toFloat(), blankTopPx.toFloat(), paint)
-    }
-    if (blankBottomPx > 0) {
-        canvas.drawRect(
-            0f,
-            (bitmap.height - blankBottomPx).toFloat(),
-            bitmap.width.toFloat(),
-            bitmap.height.toFloat(),
-            paint,
-        )
-    }
-    return bitmap
-}
 
 /** Shares an annotation export via Markdown + HTML intents (SAF/share). Returns false when undeliverable. */
 private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport): Boolean {
