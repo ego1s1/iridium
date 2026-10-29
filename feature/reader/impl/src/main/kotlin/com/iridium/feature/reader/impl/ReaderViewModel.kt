@@ -272,7 +272,6 @@ class ReaderViewModel @Inject constructor(
     /** Reader-preference writes, split out so onAction stays under the complexity gate. */
     private fun onPrefsAction(action: ReaderAction.PrefsChange) {
         when (action) {
-            is ReaderAction.SetFlow -> prefsApplier.updateReaderPrefs { it.copy(flow = action.flow) }
             is ReaderAction.SetFontScale -> prefsApplier.updateReaderPrefs {
                 it.copy(fontScale = action.scale.coerceIn(0.5f, 3f))
             }

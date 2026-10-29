@@ -57,11 +57,9 @@ private fun ReaderMenuItem(
 internal fun ReaderTopBar(
     title: String,
     author: String?,
-    flowLabel: String,
     onBackClick: () -> Unit,
     onAction: (ReaderAction) -> Unit,
     onAddHighlight: () -> Unit,
-    onCycleFlow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberIridiumHaptics()
@@ -156,16 +154,6 @@ internal fun ReaderTopBar(
                     },
                 )
                 HorizontalDivider()
-                ReaderMenuItem(
-                    icon = IridiumIcons.ViewAgenda,
-                    label = stringResource(R.string.reader_settings_flow),
-                    trailing = flowLabel,
-                    testTag = "readerMenuFlow",
-                    onSelect = {
-                        menuOpen = false
-                        onCycleFlow()
-                    },
-                )
                 ReaderMenuItem(
                     icon = IridiumIcons.Contrast,
                     label = stringResource(R.string.reader_settings_theme),

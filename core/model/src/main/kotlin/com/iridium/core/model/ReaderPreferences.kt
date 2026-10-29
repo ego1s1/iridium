@@ -36,7 +36,6 @@ data class CustomReaderTheme(
 
 /** Reader preferences persisted in DataStore. */
 data class ReaderPreferences(
-    val flow: ReadingFlow = ReadingFlow.AUTO,
     val fontScale: Float = 1.4f,
     val fontFamily: ReaderFontFamily = ReaderFontFamily.BOOK,
     val textAlign: TextAlign = TextAlign.JUSTIFY,

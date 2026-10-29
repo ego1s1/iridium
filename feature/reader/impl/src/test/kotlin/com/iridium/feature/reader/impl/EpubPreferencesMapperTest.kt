@@ -3,7 +3,6 @@ package com.iridium.feature.reader.impl
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.ReaderPreferences
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.pageForegroundArgb
@@ -21,19 +20,10 @@ import kotlinx.collections.immutable.persistentListOf
 @Config(sdk = [34])
 class EpubPreferencesMapperTest {
     @Test
-    fun `scrolled flow maps to scroll true, paged and auto to false`() {
-        assertEquals(
-            true,
-            EpubPreferencesMapper.map(ReaderPreferences(flow = ReadingFlow.SCROLLED)).scroll,
-        )
-        assertEquals(
-            false,
-            EpubPreferencesMapper.map(ReaderPreferences(flow = ReadingFlow.PAGED)).scroll,
-        )
-        assertEquals(
-            false,
-            EpubPreferencesMapper.map(ReaderPreferences(flow = ReadingFlow.AUTO)).scroll,
-        )
+    fun `reading is always paged`() {
+        // Scrolling was removed as a reading mode, so every preference set
+        // must ask the navigator for paged layout.
+        assertEquals(false, EpubPreferencesMapper.map(ReaderPreferences()).scroll)
     }
 
     @Test

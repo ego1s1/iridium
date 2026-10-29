@@ -11,10 +11,6 @@
     <string name="reader_add_highlight_note_hint">Tap to add a note</string>
     <string name="reader_add_highlight_save">Save</string>
     <string name="reader_dialog_cancel">Cancel</string>
-    <string name="reader_settings_flow">Flow</string>
-    <string name="reader_settings_flow_auto">Auto</string>
-    <string name="reader_settings_flow_paged">Paged</string>
-    <string name="reader_settings_flow_scrolled">Scrolled</string>
     <string name="reader_settings_brightness_system">Match system brightness</string>
     <string name="reader_settings_brightness">Brightness</string>
     <string name="reader_settings_theme">Theme</string>

@@ -3,7 +3,6 @@ package com.iridium.feature.reader.impl
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.ReaderPreferences
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.isCustomThemeActive
 import com.iridium.core.model.resolvedColors
@@ -50,13 +49,8 @@ internal object EpubPreferencesMapper {
     }
 
     fun map(prefs: ReaderPreferences): EpubPreferences = EpubPreferences(
-        // AUTO is intentionally paged (scroll=false): it means "follow the
-        // book" rather than a third layout mode, and Readium renders paged
-        // unless explicitly told to scroll.
-        scroll = when (prefs.flow) {
-            ReadingFlow.SCROLLED -> true
-            ReadingFlow.AUTO, ReadingFlow.PAGED -> false
-        },
+        // Paged only: scrolling was removed as a reading mode.
+        scroll = false,
         // The stored scale is a multiplier of a comfortable base, so the UI's
         // "100%" already reads at a normal book size instead of the toolkit's
         // small default. 140% is the default and lands near the reference page.

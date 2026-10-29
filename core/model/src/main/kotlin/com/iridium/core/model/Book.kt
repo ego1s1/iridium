@@ -1,8 +1,6 @@
 package com.iridium.core.model
 
 /** Reading flow for the EPUB navigator. Mirrors a common reader's Auto/Paged/Scrolled. */
-enum class ReadingFlow { AUTO, PAGED, SCROLLED }
-
 enum class BookFormat { EPUB }
 
 enum class BookError { CORRUPT, EMPTY, UNSUPPORTED }

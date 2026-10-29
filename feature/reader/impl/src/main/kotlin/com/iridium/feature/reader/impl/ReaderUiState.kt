@@ -92,7 +92,6 @@ sealed interface ReaderAction {
     // directly under ReaderAction (dual supertypes) so existing
     // `ReaderAction.SetTheme(...)` call sites keep compiling unchanged.
     sealed interface PrefsChange : ReaderAction
-    data class SetFlow(val flow: com.iridium.core.model.ReadingFlow) : ReaderAction, PrefsChange
     data class SetFontScale(val scale: Float) : ReaderAction, PrefsChange
     data class SetFontFamily(val family: ReaderFontFamily) : ReaderAction, PrefsChange
     data class SetLineHeight(val lineHeight: Float) : ReaderAction, PrefsChange

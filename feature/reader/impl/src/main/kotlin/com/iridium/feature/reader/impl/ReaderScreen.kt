@@ -56,7 +56,6 @@ import com.iridium.core.designsystem.findActivity
 import com.iridium.core.designsystem.readerEnter
 import com.iridium.core.designsystem.readerExit
 import com.iridium.core.designsystem.rememberIridiumHaptics
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderRoute
 import kotlinx.coroutines.NonCancellable
@@ -212,7 +211,8 @@ internal fun ReaderScreen(
     var outgoingPage by remember { mutableStateOf<ImageBitmap?>(null) }
     var navigatorView by remember { mutableStateOf<View?>(null) }
     var sliding by remember { mutableStateOf(false) }
-    val slideEnabled = state.prefs.flow != ReadingFlow.SCROLLED
+    // Paged only, so the page-turn slide is always active.
+    val slideEnabled = true
     val pageFillArgb = state.prefs.resolvedColors().first
     val chromeTopPx = WindowInsets.statusBarsIgnoringVisibility.getTop(density).toInt() +
         with(density) { ChromeTopStrip.toPx() }.toInt()
@@ -380,12 +380,6 @@ internal fun ReaderScreen(
                     onBackClick = onBackClick,
                     onAction = onAction,
                     onAddHighlight = { showAddDialog = true },
-                    flowLabel = when (state.prefs.flow) {
-                        ReadingFlow.AUTO -> stringResource(R.string.reader_settings_flow_auto)
-                        ReadingFlow.PAGED -> stringResource(R.string.reader_settings_flow_paged)
-                        ReadingFlow.SCROLLED -> stringResource(R.string.reader_settings_flow_scrolled)
-                    },
-                    onCycleFlow = { onAction(ReaderAction.SetFlow(nextReadingFlow(state.prefs.flow))) },
                     // Full-bleed to the top: the bar's surface paints behind
                     // the status bar/cutout so the chrome reads as one piece,
                     // and the bar's own inset pads its content. Adding outer
@@ -498,12 +492,6 @@ private fun ReaderOpenFailed(
         modifier = modifier,
     )
 }
-
-private fun nextReadingFlow(flow: com.iridium.core.model.ReadingFlow) =
-    com.iridium.core.model.ReadingFlow.entries[
-        (com.iridium.core.model.ReadingFlow.entries.indexOf(flow) + 1) %
-            com.iridium.core.model.ReadingFlow.entries.size,
-    ]
 
 /** Shares an annotation export via Markdown + HTML intents (SAF/share). Returns false when undeliverable. */
 private fun shareAnnotations(context: Context, msg: ReaderMessage.ShareExport): Boolean {

@@ -42,13 +42,12 @@ import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.pageBackgroundArgb
 import com.iridium.core.model.isLightScheme
 import com.iridium.core.model.ReaderPreferences
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.TextAlign
 
 /**
  * Reader settings sheet (a "Choose from three themes" card):
- * Flow Auto/Paged/Scrolled, brightness slider, theme swatches, text size
+ * brightness slider, theme swatches, text size
  * stepper, text alignment — using M3 Expressive ButtonGroups.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -79,35 +78,6 @@ internal fun ReaderSettingsContent(
             .padding(horizontal = 20.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-            Text(stringResource(R.string.reader_settings_flow), style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(4.dp))
-            ButtonGroup(modifier = Modifier.fillMaxWidth()) {
-                ToggleButton(
-                    checked = prefs.flow == ReadingFlow.AUTO,
-                    onCheckedChange = {
-                        haptics(IridiumHaptic.Select)
-                        onAction(ReaderAction.SetFlow(ReadingFlow.AUTO))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.reader_settings_flow_auto)) }
-                ToggleButton(
-                    checked = prefs.flow == ReadingFlow.PAGED,
-                    onCheckedChange = {
-                        haptics(IridiumHaptic.Select)
-                        onAction(ReaderAction.SetFlow(ReadingFlow.PAGED))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.reader_settings_flow_paged)) }
-                ToggleButton(
-                    checked = prefs.flow == ReadingFlow.SCROLLED,
-                    onCheckedChange = {
-                        haptics(IridiumHaptic.Select)
-                        onAction(ReaderAction.SetFlow(ReadingFlow.SCROLLED))
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.reader_settings_flow_scrolled)) }
-            }
-
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.reader_settings_brightness), style = MaterialTheme.typography.titleSmall)
             // WindowManager only accepts -1 (system) or 0..1: a switch owns

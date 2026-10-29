@@ -13,7 +13,6 @@ import com.iridium.core.model.isCustomThemeActive
 import com.iridium.core.model.resolvedColors
 import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.MotionStyle
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import java.io.File
@@ -53,7 +52,6 @@ class DataStorePreferencesDataSourceTest {
         assertEquals(AppColorScheme.IRIDIUM, source.themePreferences.first().colorScheme)
         assertFalse(source.themePreferences.first().amoled)
         assertEquals(MotionStyle.EXPRESSIVE, source.motionStyle.first())
-        assertEquals(ReadingFlow.AUTO, source.readerPreferences.first().flow)
         assertEquals(TextAlign.JUSTIFY, source.readerPreferences.first().textAlign)
         assertEquals(LibrarySortOrder.RECENTLY_ADDED, source.libraryDisplay.first().sortOrder)
         assertEquals(LibraryFilter.ALL, source.libraryDisplay.first().filter)
@@ -118,7 +116,6 @@ class DataStorePreferencesDataSourceTest {
     fun `reader preferences round-trip including floats`() = runTest {
         source.updateReaderPreferences {
             it.copy(
-                flow = ReadingFlow.SCROLLED,
                 fontScale = 1.4f,
                 textAlign = TextAlign.JUSTIFY,
                 theme = ColorSchemeChoice.BLACK,
@@ -134,7 +131,6 @@ class DataStorePreferencesDataSourceTest {
             )
         }
         val reader = source.readerPreferences.first()
-        assertEquals(ReadingFlow.SCROLLED, reader.flow)
         assertEquals(1.4f, reader.fontScale)
         assertEquals(TextAlign.JUSTIFY, reader.textAlign)
         assertEquals(ColorSchemeChoice.BLACK, reader.theme)
@@ -187,16 +183,42 @@ class DataStorePreferencesDataSourceTest {
     }
 
     @Test
+    fun `legacy grid columns normalise to the default`() = runTest {
+        // 0 was the old "auto" value (which resolved to two columns) and 5/6
+        // were offered before the picker was reduced to 2..4. Either value
+        // would leave the grid on GridCells.Fixed(0) or an unselectable mode.
+        for (legacy in listOf(0, 1, 5, 6)) {
+            dataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    this[androidx.datastore.preferences.core.intPreferencesKey("library_grid_columns")] =
+                        legacy
+                }.toPreferences()
+            }
+            assertEquals(
+                "columns $legacy should read back as 2",
+                2,
+                source.libraryDisplay.first().gridColumns,
+            )
+        }
+    }
+
+    @Test
+    fun `supported grid columns survive a round-trip`() = runTest {
+        for (columns in listOf(2, 3, 4)) {
+            source.updateLibraryDisplay { it.copy(gridColumns = columns) }
+            assertEquals(columns, source.libraryDisplay.first().gridColumns)
+        }
+    }
+
+    @Test
     fun `corrupt enum values fall back to defaults instead of throwing`() = runTest {
         // A future/older build could have written a value this build does not
         // know; reading must not crash the app.
         dataStore.updateData { prefs ->
             prefs.toMutablePreferences().apply {
                 this[androidx.datastore.preferences.core.stringPreferencesKey("theme_mode")] = "NEON"
-                this[androidx.datastore.preferences.core.stringPreferencesKey("reading_flow")] = "DIAGONAL"
             }.toPreferences()
         }
         assertEquals(ThemeMode.SYSTEM, source.themePreferences.first().mode)
-        assertEquals(ReadingFlow.AUTO, source.readerPreferences.first().flow)
     }
 }
