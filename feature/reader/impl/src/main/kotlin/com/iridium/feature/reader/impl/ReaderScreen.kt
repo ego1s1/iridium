@@ -83,6 +83,7 @@ internal fun ReaderRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionReady by viewModel.sessionReady.collectAsStateWithLifecycle()
     val dictionaryState by viewModel.dictionaryUi.collectAsStateWithLifecycle()
+    val selectedText by viewModel.selectedText.collectAsStateWithLifecycle()
     val shownImage by viewModel.shownImage.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -94,6 +95,12 @@ internal fun ReaderRoute(
         viewModel.pageTurns.collect { direction ->
             turnPulse = PageTurnPulse(turnPulse.id + 1, direction)
         }
+    }
+
+    // Crisp buzzy tick the moment text becomes selected, which is now the only
+    // immediate feedback: the definition waits for the Dictionary action.
+    LaunchedEffect(selectedText) {
+        if (selectedText != null) haptics(IridiumHaptic.TextSelect)
     }
 
     LaunchedEffect(Unit) {
@@ -425,11 +432,6 @@ internal fun ReaderScreen(
         )
     }
     dictionaryState?.let { dict ->
-        // Crisp buzzy tick the moment a word is selected. Keyed on the word,
-        // so it fires once per new selection as the hold snaps to a word, not
-        // on every recomposition; the framework fallback guarantees feedback
-        // even where Pulsar cannot play.
-        LaunchedEffect(dict.word) { haptics(IridiumHaptic.TextSelect) }
         // Keyed by word so each fresh selection replays the popup's
         // entrance after the lookup grace period.
         key(dict.word) {

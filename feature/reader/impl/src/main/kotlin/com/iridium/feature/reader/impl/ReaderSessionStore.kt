@@ -46,6 +46,9 @@ sealed interface ReaderSessionEvent {
         val dismissedPopup: Boolean = false,
     ) : ReaderSessionEvent
 
+    /** An action requested from platform UI (the selection bar). */
+    data class ActionRequested(val action: ReaderAction) : ReaderSessionEvent
+
     /** The user tapped a highlight decoration. */
     data class DecorationTapped(val decorationId: String) : ReaderSessionEvent
 

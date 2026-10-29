@@ -76,6 +76,10 @@ sealed interface ReaderAction {
     data class DeleteCustomTheme(val id: String) : ReaderAction, PrefsChange
 
     data object DismissDictionary : ReaderAction
+    /** Look up the active selection (explicit, from the selection bar). */
+    data object LookupSelection : ReaderAction
+    /** Search the web for the active selection. */
+    data object WebSearchSelection : ReaderAction
     data object DismissImage : ReaderAction
     data class SeekTo(val progression: Float) : ReaderAction
     data class GoTocEntry(val entry: TocEntry) : ReaderAction

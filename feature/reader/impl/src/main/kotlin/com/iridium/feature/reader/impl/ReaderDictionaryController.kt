@@ -27,21 +27,22 @@ internal class ReaderDictionaryController(
 
     val isOpen: Boolean get() = _ui.value != null
 
-    fun onSelectionChanged(text: String?) {
+    /**
+     * Explicit lookup, triggered by the Dictionary action in the selection
+     * bar. No debounce: the user asked for exactly this word, and superseded
+     * selections are no longer a concern.
+     */
+    fun lookup(text: String) {
         lookupJob?.cancel()
         // Normalize first: punctuation-only or blank selections show no
         // popup at all, and the popup titles the clean headword rather than
         // the raw multi-word drag.
-        val query = text?.let(::normalizeLookupWord)
-        if (query.isNullOrEmpty()) {
+        val query = normalizeLookupWord(text) ?: return
+        if (query.isEmpty()) {
             _ui.value = null
             return
         }
         lookupJob = scope.launch {
-            // Debounce first: selection drags fire per word, and a blocking
-            // HTTP call cannot be cancelled mid-flight — superseded words
-            // must never reach the network.
-            delay(DICTIONARY_DEBOUNCE_MS)
             val lookup = async { dictionaryLookup.define(query) }
             // Reveal delay: cache hits resolve inside it (popup appears once,
             // with content); slow lookups show a skeleton instead of flashing.
@@ -70,13 +71,6 @@ internal class ReaderDictionaryController(
     }
 
     private companion object {
-        /**
-         * Selection debounce before the lookup starts: drags fire per word
-         * and a blocking HTTP call cannot be cancelled mid-flight, so
-         * superseded words must never reach the network.
-         */
-        const val DICTIONARY_DEBOUNCE_MS = 150L
-
         /**
          * Grace period before the dictionary popup reveals: lookups finishing
          * inside it (cache hits) skip the loading skeleton entirely.

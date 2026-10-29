@@ -191,23 +191,31 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
     }
 
     /**
-     * Intercepts the WebView long-press selection menu. Returning false from
-     * [ActionMode.Callback.onCreateActionMode] suppresses the system
-     * Copy/Share menu — Iridium shows its own dictionary popup (driven by
-     * [ReaderSessionStore.selectedText]) instead. The WebView selection
-     * highlight itself is unaffected.
+     * The WebView's own selection bar, carrying Iridium's two actions.
+     *
+     * This replaces the old approach of publishing the selection and then
+     * finishing the mode: finishing it tore down the selection handles while
+     * the user was still dragging, and a modal popup then stole focus, so
+     * extending a selection was impossible. Keeping the mode alive leaves the
+     * gesture entirely to the platform, which owns handle dragging, positioning
+     * and selection lifetime.
+     *
+     * Selecting text no longer opens the dictionary by itself; both actions are
+     * explicit, and each reads the selection fresh when tapped.
      */
     private var selectionMode: ActionMode? = null
 
     private val selectionActionModeCallback = object : ActionMode.Callback {
         override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
-            // Returning false aborts the nascent selection, so the mode must
-            // live: fetch on a delay (selection lands just after the mode
-            // starts), publish to the store for the dictionary popup, then
-            // finish the system bar — the popup is the UI, not the toolbar.
+            // Returning false aborts the nascent selection.
             selectionMode = mode
+            menu?.clear()
+            menu?.add(Menu.NONE, ACTION_DICTIONARY, 0, R.string.reader_selection_dictionary)
+            menu?.add(Menu.NONE, ACTION_WEB_SEARCH, 1, R.string.reader_selection_web_search)
+            // Publish the text for the selection haptic. Deliberately no
+            // finish(): the mode must outlive the drag.
             viewLifecycleOwner.lifecycleScope.launch {
-                kotlinx.coroutines.delay(250)
+                kotlinx.coroutines.delay(SELECTION_PUBLISH_DELAY_MS)
                 fetchSelection()
             }
             return true
@@ -215,12 +223,22 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
 
         override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean = false
 
-        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean = false
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+            val action = when (item?.itemId) {
+                ACTION_DICTIONARY -> ReaderAction.LookupSelection
+                ACTION_WEB_SEARCH -> ReaderAction.WebSearchSelection
+                else -> return false
+            }
+            // Read at click time: one delayed read was captured mid-drag.
+            viewLifecycleOwner.lifecycleScope.launch {
+                fetchSelection(retry = false)
+                viewModelAction(action)
+                mode?.finish()
+            }
+            return true
+        }
 
         override fun onDestroyActionMode(mode: ActionMode?) {
-            // Intentionally not clearing: selection lifetime is owned by the
-            // popup/tap/page-turn paths in the session store. Clearing here
-            // would dismiss our own popup right after we finish the mode.
             if (selectionMode === mode) selectionMode = null
         }
     }
@@ -240,14 +258,20 @@ class ReaderHostFragment : Fragment(), EpubNavigatorFragment.Listener {
                 }
             } else {
                 store.onSelection(highlight)
-                selectionMode?.finish()
-                selectionMode = null
             }
         }
     }
 
+    /** Routes an action back through the ViewModel that owns the reader. */
+    private fun viewModelAction(action: ReaderAction) {
+        store.tryEmit(ReaderSessionEvent.ActionRequested(action))
+    }
+
     companion object {
         const val NAVIGATOR_TAG = "iridium_epub_navigator"
+        private const val ACTION_DICTIONARY = 1
+        private const val ACTION_WEB_SEARCH = 2
+        private const val SELECTION_PUBLISH_DELAY_MS = 250L
         private const val DECORATION_GROUP = "highlights"
 
         fun newInstance() = ReaderHostFragment()

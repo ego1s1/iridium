@@ -253,6 +253,15 @@ class ReaderViewModel @Inject constructor(
             ReaderAction.OpenHighlights -> chrome.openHighlights()
             ReaderAction.CloseHighlights -> chrome.closeHighlights()
             ReaderAction.DismissDictionary -> dictionary.dismiss()
+            ReaderAction.LookupSelection -> store.selectedText.value?.let { dictionary.lookup(it) }
+            ReaderAction.WebSearchSelection -> {
+                val query = store.selectedText.value?.takeIf { it.isNotBlank() }
+                if (query != null) {
+                    viewModelScope.launch {
+                        messageChannel.send(ReaderMessage.OpenUrl(webSearchUrl(query)))
+                    }
+                }
+            }
             ReaderAction.DismissImage -> store.dismissImage()
             ReaderAction.ExportAnnotations -> annotations.export(viewModelScope)
             is ReaderAction.SeekTo -> {
@@ -465,7 +474,11 @@ class ReaderViewModel @Inject constructor(
                 messageChannel.send(ReaderMessage.OpenUrl(event.url))
             ReaderSessionEvent.ResourceFailed ->
                 messageChannel.send(ReaderMessage.ContentUnavailable)
-            is ReaderSessionEvent.SelectionChanged -> dictionary.onSelectionChanged(event.text)
+            // Selecting text only shows the platform selection bar; the lookup
+            // happens when the user picks Dictionary from it, so there is
+            // nothing to route here.
+            is ReaderSessionEvent.SelectionChanged -> Unit
+            is ReaderSessionEvent.ActionRequested -> onAction(event.action)
             else -> Unit
         }
     }
@@ -583,6 +596,9 @@ class ReaderViewModel @Inject constructor(
     /** Href of the book `<img>` being showcased full-screen, or null. */
     val shownImage: StateFlow<String?> = store.shownImage
 
+    /** Active text selection, or null. Drives the selection haptic. */
+    val selectedText: StateFlow<String?> = store.selectedText
+
     /** Reads a book resource's bytes for the image showcase (null if gone). */
     @OptIn(ExperimentalReadiumApi::class)
     suspend fun loadImageBytes(src: String): ByteArray? {
@@ -655,6 +671,10 @@ class ReaderViewModel @Inject constructor(
 
     }
 }
+
+/** Web search for [query]; DuckDuckGo needs no key and no account. */
+internal fun webSearchUrl(query: String): String =
+    "https://duckduckgo.com/?q=" + java.net.URLEncoder.encode(query.trim(), "UTF-8")
 
 /** Canonical tint for [color]: the single source of truth also used by exports. */
 internal fun highlightTint(color: com.iridium.core.model.HighlightColor): Int = color.argb
