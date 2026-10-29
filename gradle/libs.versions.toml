@@ -2,8 +2,8 @@
 aboutLibraries = "13.2.1"
 agp = "8.13.2"
 kotlin = "2.2.21"
-detekt = "1.23.7"
-coroutines = "1.9.0"
+detekt = "1.23.8"
+coroutines = "1.10.2"
 collectionsImmutable = "0.3.8"
 coreKtx = "1.17.0"
 appcompat = "1.7.0"
@@ -15,7 +15,9 @@ robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
 composeBom = "2025.06.00"
 # M3 Expressive: FloatingToolbar / ButtonGroup / LoadingIndicator ship in the
-# 1.4.0-alpha line; 1.4.0 stable drops them again.
+# 1.4.0-alpha line; 1.4.0 stable drops them. Newer 1.5.0-alpha track requires
+# AGP 9.1.0+ (we are on 8.13.x), and newer BOMs resolve a stable material3
+# without the expressive components, so both stay pinned until the AGP bump.
 material3Expressive = "1.4.0-alpha15"
 navigationCompose = "2.9.8"
 lifecycle = "2.10.0"
@@ -32,7 +34,7 @@ datastore = "1.1.1"
 documentfile = "1.0.1"
 coil = "3.3.0"
 turbine = "1.1.0"
-serialization = "1.7.3"
+serialization = "1.9.0"
 javapoet = "1.13.0"
 readium = "3.1.1"
 pulsar = "1.3.0"
