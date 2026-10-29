@@ -149,8 +149,9 @@ internal fun OnboardingScreen(
                     continueCaption = "",
                 ) {
                     AccessOptions(
-                        folderCount = target.folderCount,
+                        folders = target.folders,
                         onAddFolder = { onAction(OnboardingAction.AddLinkedFolder(it)) },
+                        onRemoveFolder = { onAction(OnboardingAction.RemoveLinkedFolder(it)) },
                     )
                 }
                 is OnboardingUiState.Reading -> WizardStep(

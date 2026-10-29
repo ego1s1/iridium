@@ -3,6 +3,7 @@ package com.iridium.feature.onboarding.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
+import com.iridium.core.datastore.SafGrantStore
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 internal class OnboardingViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
+    private val grants: SafGrantStore,
 ) : ViewModel() {
 
     private enum class Step { WELCOME, ACCESS, READING, APPEARANCE }
@@ -54,7 +56,7 @@ internal class OnboardingViewModel @Inject constructor(
         folders: Set<String>,
     ): OnboardingUiState = when (step) {
         Step.WELCOME -> OnboardingUiState.Welcome
-        Step.ACCESS -> OnboardingUiState.Access(folders.size)
+        Step.ACCESS -> OnboardingUiState.Access(folders.sorted().map(LinkedFolder::of))
         Step.READING -> OnboardingUiState.Reading(reader)
         Step.APPEARANCE -> OnboardingUiState.Appearance(theme)
     }
@@ -89,6 +91,10 @@ internal class OnboardingViewModel @Inject constructor(
             is OnboardingAction.SetAmoled -> updateTheme { it.copy(amoled = action.enabled) }
             is OnboardingAction.AddLinkedFolder -> viewModelScope.launch {
                 preferences.addLinkedFolder(action.uri)
+            }
+            is OnboardingAction.RemoveLinkedFolder -> viewModelScope.launch {
+                grants.releaseReadUri(action.uri)
+                preferences.removeLinkedFolder(action.uri)
             }
             OnboardingAction.Finish -> finish()
         }

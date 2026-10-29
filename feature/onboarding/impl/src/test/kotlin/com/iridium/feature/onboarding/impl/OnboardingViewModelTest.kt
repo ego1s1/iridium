@@ -1,5 +1,6 @@
 package com.iridium.feature.onboarding.impl
 
+import com.iridium.core.fakes.FakeSafGrantStore
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ThemeMode
@@ -25,11 +26,12 @@ class OnboardingViewModelTest {
     val dispatcherRule = TestDispatcherRule()
 
     private val preferences = TestPreferencesDataSource()
+    private val grants = FakeSafGrantStore()
     private lateinit var viewModel: OnboardingViewModel
 
     @Before
     fun setup() {
-        viewModel = OnboardingViewModel(preferences)
+        viewModel = OnboardingViewModel(preferences, grants)
     }
 
     @Test
@@ -133,9 +135,32 @@ class OnboardingViewModelTest {
     @Test
     fun `linked folders surface in the access step`() = runTest {
         viewModel.onAction(OnboardingAction.GetStarted)
-        assertEquals(OnboardingUiState.Access(folderCount = 0), viewModel.uiState.first())
+        assertEquals(OnboardingUiState.Access(emptyList()), viewModel.uiState.first())
 
         viewModel.onAction(OnboardingAction.AddLinkedFolder("content://tree/books"))
-        assertEquals(OnboardingUiState.Access(folderCount = 1), viewModel.uiState.first())
+        assertEquals(
+            OnboardingUiState.Access(listOf(LinkedFolder("content://tree/books", "books"))),
+            viewModel.uiState.first(),
+        )
+    }
+
+    @Test
+    fun `removing a folder releases the grant and drops the row`() = runTest {
+        viewModel.onAction(OnboardingAction.GetStarted)
+        viewModel.onAction(OnboardingAction.AddLinkedFolder("content://tree/books"))
+        grants.persisted.add("content://tree/books")
+
+        viewModel.onAction(OnboardingAction.RemoveLinkedFolder("content://tree/books"))
+        assertEquals(OnboardingUiState.Access(emptyList()), viewModel.uiState.first())
+        assertTrue(grants.released.contains("content://tree/books"))
+    }
+
+    @Test
+    fun `tree uris show the volume-relative name`() {
+        assertEquals(
+            "Books",
+            linkedFolderLabel("content://com.android.externalstorage.documents/tree/primary%3ABooks%20"),
+        )
+        assertEquals("books", linkedFolderLabel("content://tree/books"))
     }
 }

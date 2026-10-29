@@ -71,6 +71,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumHaptic
+import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import kotlin.math.roundToInt
 import com.iridium.core.designsystem.IridiumEnter
@@ -232,33 +234,91 @@ private const val WELCOME_STEPS = 3
 
 @Composable
 internal fun AccessOptions(
-    folderCount: Int,
+    folders: List<LinkedFolder>,
     onAddFolder: (String) -> Unit,
+    onRemoveFolder: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberIridiumHaptics()
     val launchPicker = rememberLinkedFolderPicker(onFolderPicked = onAddFolder)
+    // Confirm the grant the moment it lands: the picker result arrives
+    // asynchronously, so the press haptic alone would leave the add silent.
+    var seenCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(folders.size) {
+        if (seenCount != 0 && folders.size > seenCount) haptics(IridiumHaptic.Confirm)
+        seenCount = folders.size
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Button(
-            onClick = launchPicker,
+            onClick = {
+                haptics(IridiumHaptic.Select)
+                launchPicker()
+            },
             modifier = Modifier.fillMaxWidth().height(56.dp).testTag(OnboardingTestTags.AccessGrant),
         ) {
-            Text(stringResource(R.string.onboarding_access_grant))
+            Text(
+                stringResource(
+                    if (folders.isEmpty()) R.string.onboarding_access_grant
+                    else R.string.onboarding_access_add_another,
+                ),
+            )
+        }
+        folders.forEach { folder ->
+            key(folder.uri) {
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.LinkedFolderRow),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Icon(
+                            imageVector = IridiumIcons.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            text = folder.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = {
+                                haptics(IridiumHaptic.Warning)
+                                onRemoveFolder(folder.uri)
+                            },
+                            modifier = Modifier.size(40.dp).testTag(OnboardingTestTags.RemoveFolder),
+                        ) {
+                            Icon(
+                                imageVector = IridiumIcons.Close,
+                                contentDescription = stringResource(R.string.onboarding_access_remove),
+                            )
+                        }
+                    }
+                }
+            }
         }
         Text(
-            text = if (folderCount > 0) {
+            text = if (folders.isNotEmpty()) {
                 pluralStringResource(
                     R.plurals.onboarding_access_granted,
-                    folderCount,
-                    folderCount,
+                    folders.size,
+                    folders.size,
                 )
             } else {
                 stringResource(R.string.onboarding_access_hint)
             },
             style = MaterialTheme.typography.bodySmall,
-            color = if (folderCount > 0) {
+            color = if (folders.isNotEmpty()) {
                 MaterialTheme.colorScheme.onSurfaceVariant
             } else {
                 MaterialTheme.colorScheme.error

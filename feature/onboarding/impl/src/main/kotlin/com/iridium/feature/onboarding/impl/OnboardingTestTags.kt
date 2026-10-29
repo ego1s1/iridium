@@ -11,6 +11,8 @@ object OnboardingTestTags {
     const val StepIndicators = "onboardingStepIndicators"
     const val StepSegmentPrefix = "onboardingStepSegment"
     const val AccessGrant = "onboardingAccessGrant"
+    const val LinkedFolderRow = "onboardingLinkedFolderRow"
+    const val RemoveFolder = "onboardingRemoveFolder"
     const val ReadingTextSize = "onboardingReadingTextSize"
     const val ReadingLineSpacing = "onboardingReadingLineSpacing"
     const val ReadingTheme = "onboardingReadingTheme"

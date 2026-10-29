@@ -1,7 +1,9 @@
 package com.iridium.feature.onboarding.impl
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -65,7 +67,7 @@ class OnboardingScreenTest {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
                 OnboardingScreen(
-                    uiState = OnboardingUiState.Access(folderCount = 0),
+                    uiState = OnboardingUiState.Access(emptyList()),
                     onAction = {},
                     onOnboardingComplete = {},
                 )
@@ -74,6 +76,28 @@ class OnboardingScreenTest {
         composeTestRule.onNodeWithText("Where are your books?").assertIsDisplayed()
         composeTestRule.onNodeWithText("Choose folders").assertIsDisplayed()
         composeTestRule.onNodeWithText("Continue").assertIsDisplayed()
+    }
+
+    @Test
+    fun `linked folders show as rows with remove actions`() {
+        composeTestRule.setContent {
+            IridiumTheme(expressiveMotion = false) {
+                OnboardingScreen(
+                    uiState = OnboardingUiState.Access(
+                        listOf(
+                            LinkedFolder("content://tree/a", "Books"),
+                            LinkedFolder("content://tree/b", "Downloads"),
+                        ),
+                    ),
+                    onAction = {},
+                    onOnboardingComplete = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Books").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Downloads").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Add another folder").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag(OnboardingTestTags.RemoveFolder).assertCountEquals(2)
     }
 
     @Test

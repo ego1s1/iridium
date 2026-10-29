@@ -1,5 +1,7 @@
 package com.iridium.feature.onboarding.impl
 
+import android.net.Uri
+import android.provider.DocumentsContract
 import com.iridium.core.model.AppColorScheme
 import com.iridium.core.model.ColorSchemeChoice
 import com.iridium.core.model.ReaderPreferences
@@ -16,7 +18,7 @@ sealed interface OnboardingUiState {
     data object Welcome : OnboardingUiState
 
     /** Folder-link step: which SAF folders the library scans for EPUBs. */
-    data class Access(val folderCount: Int) : OnboardingUiState
+    data class Access(val folders: List<LinkedFolder>) : OnboardingUiState
 
     /** Reader defaults step: text size, line spacing, book colors. */
     data class Reading(
@@ -26,6 +28,28 @@ sealed interface OnboardingUiState {
     data class Appearance(
         val theme: ThemePreferences,
     ) : OnboardingUiState
+}
+
+/** One linked SAF tree plus its human-readable display name. */
+data class LinkedFolder(
+    val uri: String,
+    val label: String,
+) {
+    companion object {
+        fun of(uri: String): LinkedFolder = LinkedFolder(uri, linkedFolderLabel(uri))
+    }
+}
+
+/**
+ * Display name for a linked tree URI without a ContentResolver round trip.
+ * Tree document ids look like `primary:Books` (external storage) so the
+ * volume prefix is dropped; anything else falls back to the last segment.
+ */
+internal fun linkedFolderLabel(uri: String): String {
+    val treeId = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(uri)) }.getOrNull()
+    val raw = treeId?.substringAfter(':', missingDelimiterValue = "")?.takeIf { it.isNotEmpty() }
+        ?: Uri.parse(uri).lastPathSegment?.substringAfterLast(':')
+    return raw?.trim()?.takeIf { it.isNotEmpty() } ?: uri
 }
 
 sealed interface OnboardingAction {
@@ -60,6 +84,9 @@ sealed interface OnboardingAction {
 
     /** Link one SAF folder for library scans. */
     data class AddLinkedFolder(val uri: String) : OnboardingAction
+
+    /** Unlink one SAF folder (grant released, row removed). */
+    data class RemoveLinkedFolder(val uri: String) : OnboardingAction
 
     /** Mark onboarding complete and continue to the library. */
     data object Finish : OnboardingAction
