@@ -22,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,7 +62,7 @@ class OfflineFirstBooksRepositoryTest {
             search = ContentSearchUseCase(
                 bookDao = database.bookDao(),
                 chapterTextDao = database.chapterTextDao(),
-                chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine()),
+                chapterIndexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine(), Dispatchers.Unconfined),
                 ioDispatcher = UnconfinedTestDispatcher(),
             ),
             annotations = OfflineFirstAnnotationRepository(

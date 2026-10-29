@@ -9,6 +9,7 @@ import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,7 +31,7 @@ class ChapterIndexerTest {
     @Before
     fun setup() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        indexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine())
+        indexer = ChapterIndexer(EpubSourceFactory(context), IridiumEpubEngine(), Dispatchers.Unconfined)
         tempDir = File(context.cacheDir, "chapter-indexer-test").apply { mkdirs() }
     }
 

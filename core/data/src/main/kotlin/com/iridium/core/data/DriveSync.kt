@@ -65,7 +65,7 @@ class DriveSyncManager @Inject constructor(
     // Injected so a sync pass can be driven from a test dispatcher. Hilt
     // always supplies the qualified IO binding; the default only keeps
     // direct construction (tests, ad-hoc callers) source-compatible.
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val syncMutex = kotlinx.coroutines.sync.Mutex()
     /**

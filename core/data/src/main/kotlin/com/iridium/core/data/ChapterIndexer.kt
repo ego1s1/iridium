@@ -29,7 +29,7 @@ internal class ChapterIndexer @Inject constructor(
     // Extraction is CPU-bound parsing and belongs off the IO pool. Injected so
     // a test dispatcher can drive it; the default only keeps direct
     // construction source-compatible.
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) {
     suspend fun extract(
         bookId: String,
