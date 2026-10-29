@@ -1,5 +1,6 @@
 package com.iridium.feature.reader.impl
 
+import com.iridium.core.common.safeCatching
 import com.iridium.core.common.AppClock
 import com.iridium.core.data.LocatorStrings
 import com.iridium.core.data.BooksRepository
@@ -261,7 +262,7 @@ internal class ReaderAnnotationsController(
         launchIn.launch {
             val nav = store.navigator
             val selection = nav?.let {
-                runCatching { it.currentSelection() }.getOrNull()
+                safeCatching { it.currentSelection() }.getOrNull()
             }
             if (selection == null) {
                 sendMessage(ReaderMessage.SelectTextFirst)
@@ -330,7 +331,7 @@ internal class ReaderAnnotationsController(
                 )
             }
         }
-        runCatching { nav.applyDecorations(decorations, DECORATION_GROUP) }
+        safeCatching { nav.applyDecorations(decorations, DECORATION_GROUP) }
     }
 
     private companion object {
@@ -366,7 +367,7 @@ internal class ReaderPrefsController(
             ReaderThemeOverride.hex(bg),
             ReaderThemeOverride.hex(fg),
         )
-        runCatching {
+        safeCatching {
             store.navigator?.evaluateJavascript(script)
         }
     }

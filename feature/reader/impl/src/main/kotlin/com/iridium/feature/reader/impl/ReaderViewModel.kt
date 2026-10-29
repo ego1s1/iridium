@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.iridium.core.common.safeCatching
 import com.iridium.core.data.LocatorStrings
 import com.iridium.core.data.BookOpener
 import com.iridium.core.data.BooksRepository
@@ -323,7 +324,7 @@ class ReaderViewModel @Inject constructor(
                 val factory = EpubNavigatorFactory(result.publication)
                 store.publish(bookId, result.publication, factory, initialLocator, mapped)
                 positions.replaceAll(
-                    runCatching { result.publication.positions() }.getOrDefault(emptyList()),
+                    safeCatching { result.publication.positions() }.getOrDefault(emptyList()),
                 )
                 indexContentIfNeeded()
             }
@@ -353,7 +354,7 @@ class ReaderViewModel @Inject constructor(
     /** Indexes chapter text once per book so content search has data. */
     private fun indexContentIfNeeded() {
         viewModelScope.launch {
-            runCatching {
+            safeCatching {
                 if (!repository.isContentIndexed(bookId)) {
                     repository.indexBookContent(bookId)
                 }
@@ -388,7 +389,7 @@ class ReaderViewModel @Inject constructor(
                 prefsApplier.applyThemeOverride()
                 annotations.refreshDecorations(highlights.first())
                 // Image-showcase bridge: wire taps in the freshly loaded document.
-                runCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
+                safeCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
             }
             is ReaderSessionEvent.DecorationTapped -> {
                 chrome.showHighlightsForDecoration(event.decorationId)

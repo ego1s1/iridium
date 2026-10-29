@@ -2,6 +2,7 @@ package com.iridium.core.data
 
 import android.content.Context
 import android.net.Uri
+import com.iridium.core.common.safeCatching
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.Closeable
 import java.io.File
@@ -50,7 +51,7 @@ class ReadiumOpener @Inject constructor(
             Retrieved.Gone -> OpenResult.FileMissing
             Retrieved.Unreadable -> OpenResult.ParseFailed
             is Retrieved.Found -> {
-                val result = runCatching {
+                val result = safeCatching {
                     opener.open(retrieved.asset, allowUserInteraction = false)
                 }.getOrNull()
                 when (result) {
@@ -82,7 +83,7 @@ class ReadiumOpener @Inject constructor(
             val url = Uri.parse(sourcePath).toAbsoluteUrl() ?: return Retrieved.Gone
             // A revoked SAF grant throws out of retrieve(): map to ParseFailed
             // at the call site instead of crashing the open coroutine.
-            val result = runCatching { assetRetriever.retrieve(url) }.getOrNull()
+            val result = safeCatching { assetRetriever.retrieve(url) }.getOrNull()
             return when (result) {
                 is Try.Success<*, *> -> {
                     @Suppress("UNCHECKED_CAST")
@@ -95,7 +96,7 @@ class ReadiumOpener @Inject constructor(
         // resolve to the same File.
         val file = File(Uri.parse(sourcePath).path ?: sourcePath)
         if (!file.exists()) return Retrieved.Gone
-        val result = runCatching { assetRetriever.retrieve(file) }.getOrNull()
+        val result = safeCatching { assetRetriever.retrieve(file) }.getOrNull()
         return when (result) {
             is Try.Success<*, *> -> {
                 @Suppress("UNCHECKED_CAST")
