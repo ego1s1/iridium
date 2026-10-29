@@ -564,12 +564,23 @@ private fun ReaderImageShowcase(
         if (bmp == null) {
             CircularProgressIndicator(color = Color.White)
         } else {
-            Image(
-                bitmap = bmp,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
+            key(bmp) {
+                var entered by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { entered = true }
+                AnimatedVisibility(
+                    visible = entered,
+                    enter = IridiumEnter.enter(IridiumEnterKind.DIALOG_POP),
+                    exit = IridiumEnter.exit(IridiumEnterKind.DIALOG_POP),
+                    label = "showcaseImageEnter",
+                ) {
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
         }
     }
 }
