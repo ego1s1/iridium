@@ -48,7 +48,8 @@ data class LibraryDisplay(
     val filter: LibraryFilter = LibraryFilter.ALL,
     val hideErrors: Boolean = false,
     val displayMode: LibraryDisplayMode = LibraryDisplayMode.COMPACT,
-    val gridColumns: Int = 0,
+    /** Fixed column count for the grid: 2 (default), 3 or 4. */
+    val gridColumns: Int = 2,
 ) {
     fun toQuery(text: String): LibraryQuery = LibraryQuery(
         text = text,

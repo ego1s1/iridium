@@ -196,7 +196,7 @@ class LibraryViewModel @Inject constructor(
             is LibraryAction.ToggleHideErrors -> updateDisplay { it.copy(hideErrors = action.hide) }
             is LibraryAction.DisplayModeSelected -> updateDisplay { it.copy(displayMode = action.mode) }
             is LibraryAction.GridColumnsSelected -> updateDisplay {
-                it.copy(gridColumns = action.columns.coerceIn(0, 6))
+                it.copy(gridColumns = action.columns.coerceIn(2, 4))
             }
             LibraryAction.OpenFilter -> filterOpen.value = true
             LibraryAction.CloseFilter -> filterOpen.value = false

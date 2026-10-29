@@ -91,23 +91,14 @@ internal fun LibrarySortFilterSheet(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.semantics { heading() },
                 )
+                val columnChoices = listOf(2, 3, 4)
                 IridiumChoiceGroup(
-                    options = listOf(
-                        IridiumChoiceOption(stringResource(R.string.library_columns_auto)),
-                        IridiumChoiceOption("2"),
-                        IridiumChoiceOption("3"),
-                        IridiumChoiceOption("4"),
-                        IridiumChoiceOption("5"),
-                        IridiumChoiceOption("6"),
-                    ),
-                    selectedIndex = listOf(0, 2, 3, 4, 5, 6)
+                    options = columnChoices.map { IridiumChoiceOption(it.toString()) },
+                    selectedIndex = columnChoices
                         .indexOf(display.gridColumns)
                         .coerceAtLeast(0),
-                    // Option position is not the column count: index 0 is
-                    // auto (0), the rest are literal 2..6.
                     onSelect = {
-                        val columns = listOf(0, 2, 3, 4, 5, 6)[it.coerceIn(0, 5)]
-                        onAction(LibraryAction.GridColumnsSelected(columns))
+                        onAction(LibraryAction.GridColumnsSelected(columnChoices[it.coerceIn(0, 2)]))
                     },
                 )
             }

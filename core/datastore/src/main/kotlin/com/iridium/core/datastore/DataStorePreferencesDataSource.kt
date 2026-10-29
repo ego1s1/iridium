@@ -19,7 +19,6 @@ import com.iridium.core.model.MotionStyle
 import com.iridium.core.model.CustomReaderTheme
 import com.iridium.core.model.ReaderFontFamily
 import com.iridium.core.model.ReaderPreferences
-import com.iridium.core.model.ReadingFlow
 import com.iridium.core.model.TextAlign
 import com.iridium.core.model.ThemeMode
 import com.iridium.core.model.ThemePreferences
@@ -51,9 +50,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
 
     private fun Preferences.toReaderPreferences(): ReaderPreferences =
         ReaderPreferences(
-            flow = this[READING_FLOW]?.let {
-                runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
-            } ?: ReadingFlow.AUTO,
             fontScale = this[FONT_SCALE] ?: 1.4f,
             fontFamily = this[FONT_FAMILY]?.let {
                 runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
@@ -90,7 +86,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     override suspend fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences) {
         dataStore.edit { prefs ->
             val updated = transform(prefs.toReaderPreferences())
-            prefs[READING_FLOW] = updated.flow.name
             prefs[FONT_SCALE] = updated.fontScale
             prefs[FONT_FAMILY] = updated.fontFamily.name
             prefs[TEXT_ALIGN] = updated.textAlign.name
@@ -172,7 +167,11 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 runCatching { LibraryDisplayMode.valueOf(it) }
                     .getOrDefault(LibraryDisplayMode.COMPACT)
             } ?: LibraryDisplayMode.COMPACT,
-            gridColumns = this[LIBRARY_GRID_COLUMNS] ?: 0,
+            // Normalises legacy values: 0 was "auto" (which resolved to 2
+            // columns on every phone) and 5/6 are no longer offered. Anything
+            // outside 2..4 becomes the default, otherwise a stale 0 would reach
+            // GridCells.Fixed(0) and render an empty grid.
+            gridColumns = (this[LIBRARY_GRID_COLUMNS] ?: 2).takeIf { it in 2..4 } ?: 2,
         )
 
     override suspend fun updateLibraryDisplay(transform: (LibraryDisplay) -> LibraryDisplay) {
@@ -231,7 +230,6 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val CRASH_REPORTING_ENABLED = booleanPreferencesKey("crash_reporting_enabled")
         val CRASH_REPORTING_ASKED = booleanPreferencesKey("crash_reporting_asked")
-        val READING_FLOW = stringPreferencesKey("reading_flow")
         val FONT_SCALE = floatPreferencesKey("font_scale")
         val FONT_FAMILY = stringPreferencesKey("font_family")
         val TEXT_ALIGN = stringPreferencesKey("text_align")

@@ -82,7 +82,7 @@ presets only, `LocalHapticFeedback` fallback, cached closures.
 
 1. **Library (root tab):** collapsing top bar (28sp + Tune + active dot) →
    floating search island (56dp pill, float color/elevation on scroll) →
-   quick-filter chips (first grid item) → book grid (Adaptive 128dp, 4 card
+   quick-filter chips (first grid item) → book grid (fixed 2/3/4 columns, default 2, 4 card
    variants, spine brush, badges, wavy progress) → bottom action island
    (Link/Rescan/Index) + Now-Reading hero.
    Shelves carousel: BUILT but UNWIRED (`LibraryShelvesCarousel` +

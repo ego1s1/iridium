@@ -298,10 +298,10 @@ private fun LibraryContent(
                     LazyVerticalGrid(
                         columns = if (listMode) {
                             GridCells.Fixed(1)
-                        } else if (display.gridColumns > 0) {
-                            GridCells.Fixed(display.gridColumns)
                         } else {
-                            GridCells.Adaptive(128.dp)
+                            // Fixed 2..4: the adaptive branch silently grew
+                            // past four columns on wide screens.
+                            GridCells.Fixed(display.gridColumns.coerceIn(2, 4))
                         },
                         state = gridState,
                         contentPadding = PaddingValues(
