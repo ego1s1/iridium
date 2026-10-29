@@ -44,6 +44,14 @@ class SettingsViewModel @Inject constructor(
 
     /** Signed-in Drive account for sync, or null. */
     val driveAccount: StateFlow<String?> = preferences.driveAccount
+        .catch { error ->
+            if (error is CancellationException) throw error
+            // A failed read would otherwise cancel this flow and leave the row
+            // showing "signed out" with no explanation. Fall back to signed-out
+            // and say so, so the user knows why sync is unavailable.
+            _syncMessage.value = "Couldn't read the Drive account"
+            emit(null)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _syncMessage = MutableStateFlow<String?>(null)
