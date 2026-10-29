@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.designsystem.IridiumEmptyState
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumIcons
@@ -158,11 +159,16 @@ internal fun LibraryScreen(
     }
     Scaffold(
         topBar = {
-            LibraryCollapsingTopBar(
+            IridiumCollapsingTopBar(
                 title = stringResource(R.string.library_title),
-                filterActive = uiState.query.hasActiveFilters(),
-                onFilterClick = { onAction(LibraryAction.OpenFilter) },
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    LibraryFilterAction(
+                        filterActive = uiState.query.hasActiveFilters(),
+                        onFilterClick = { onAction(LibraryAction.OpenFilter) },
+                    )
+                },
+                modifier = Modifier.testTag(LibraryChromeTestTags.TopBar),
             )
         },
         snackbarHost = {

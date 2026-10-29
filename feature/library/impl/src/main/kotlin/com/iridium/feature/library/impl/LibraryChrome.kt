@@ -14,9 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -25,8 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -41,13 +37,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumEmphasized
+import com.iridium.core.designsystem.IridiumFilledTonalIconButton
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumIcons
-import com.iridium.core.designsystem.TopBarTitleStyle
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import com.iridium.core.model.LibraryFilter
 
@@ -79,69 +74,40 @@ object LibraryChromeTestTags {
 }
 
 /**
- * Collapsing screen header: heavy 28sp display title that shrinks away on
- * scroll, with sort/filter as a direct icon action. The container is fully
- * transparent so no band ever appears over the grid.
- *
- * Callers must wire `Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)`
- * on the Scaffold and share this [scrollBehavior] instance.
+ * Sort/filter action for the library top bar: tonal icon button with an
+ * active-filter dot. Lives in the shared [IridiumCollapsingTopBar] actions
+ * slot so the header itself stays a single design-system component.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryCollapsingTopBar(
-    title: String,
+fun LibraryFilterAction(
     filterActive: Boolean,
     onFilterClick: () -> Unit,
     modifier: Modifier = Modifier,
-    scrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(),
 ) {
-    val haptics = rememberIridiumHaptics()
-    CenterAlignedTopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = TopBarTitleStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
+    Box(modifier = modifier) {
+        IridiumFilledTonalIconButton(
+            onClick = onFilterClick,
+            modifier = Modifier.testTag(LibraryChromeTestTags.FilterButton),
+        ) {
+            Icon(
+                imageVector = IridiumIcons.Tune,
+                contentDescription = stringResource(R.string.library_action_sort_filter),
             )
-        },
-        actions = {
-            Box {
-                FilledTonalIconButton(
-                    onClick = {
-                        haptics(IridiumHaptic.Select)
-                        onFilterClick()
-                    },
-                    modifier = Modifier.testTag(LibraryChromeTestTags.FilterButton),
-                ) {
-                    Icon(
-                        imageVector = IridiumIcons.Tune,
-                        contentDescription = stringResource(R.string.library_action_sort_filter),
+        }
+        if (filterActive) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 10.dp)
+                    .size(8.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        CircleShape,
                     )
-                }
-                if (filterActive) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 10.dp, end = 10.dp)
-                            .size(8.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary,
-                                CircleShape,
-                            )
-                            .testTag(LibraryChromeTestTags.FilterDot),
-                    )
-                }
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent,
-        ),
-        scrollBehavior = scrollBehavior,
-        modifier = modifier.testTag(LibraryChromeTestTags.TopBar),
-    )
+                    .testTag(LibraryChromeTestTags.FilterDot),
+            )
+        }
+    }
 }
 
 /**

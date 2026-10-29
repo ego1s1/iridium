@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.performSemanticsAction
+import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.designsystem.IridiumTheme
 import com.iridium.core.model.LibraryFilter
 import org.junit.Assert.assertEquals
@@ -45,10 +48,15 @@ class LibraryChromeTest {
         var clicked = false
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
-                LibraryCollapsingTopBar(
+                IridiumCollapsingTopBar(
                     title = "My books",
-                    filterActive = true,
-                    onFilterClick = { clicked = true },
+                    modifier = Modifier.testTag(LibraryChromeTestTags.TopBar),
+                    actions = {
+                        LibraryFilterAction(
+                            filterActive = true,
+                            onFilterClick = { clicked = true },
+                        )
+                    },
                 )
             }
         }
@@ -63,10 +71,14 @@ class LibraryChromeTest {
     fun `top bar hides the active dot when no filter applies`() {
         composeTestRule.setContent {
             IridiumTheme(expressiveMotion = false) {
-                LibraryCollapsingTopBar(
+                IridiumCollapsingTopBar(
                     title = "My books",
-                    filterActive = false,
-                    onFilterClick = {},
+                    actions = {
+                        LibraryFilterAction(
+                            filterActive = false,
+                            onFilterClick = {},
+                        )
+                    },
                 )
             }
         }
