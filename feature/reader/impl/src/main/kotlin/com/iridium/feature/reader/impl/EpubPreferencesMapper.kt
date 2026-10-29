@@ -16,7 +16,7 @@ import org.readium.r2.navigator.preferences.Theme as ReadiumTheme
  * Pure mapping from Iridium reader prefs to Readium [EpubPreferences].
  * Unit-testable; the navigator receives the result via submitPreferences.
  */
-object EpubPreferencesMapper {
+internal object EpubPreferencesMapper {
 
     /**
      * Nearest Readium built-in for the resolved colors. Presets keep their

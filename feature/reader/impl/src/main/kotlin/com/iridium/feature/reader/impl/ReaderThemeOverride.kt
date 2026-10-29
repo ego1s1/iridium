@@ -18,7 +18,7 @@ import com.iridium.core.model.pageForegroundArgb
  * and link colors from [ColorSchemeChoice]. Contains no Android deps — pure
  * String generation, unit-tested.
  */
-object ReaderThemeOverride {
+internal object ReaderThemeOverride {
 
     /** Body class suffix repeated to win specificity over the book's CSS. */
     private const val SPECIFICITY_CLASS = "__Ir_Theme"

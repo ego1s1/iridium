@@ -28,13 +28,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- Open an EPUB shared from another app: bytes are copied into
-                 app-private storage, never read in place. EPUB only. -->
+                 app-private storage, never read in place. EPUB only.
+                 content:// only (no file://); no BROWSABLE so browser links
+                 cannot auto-fire imports — every import still needs an
+                 explicit user confirm in-app (see pending-import dialog). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
-                <data android:scheme="file" />
                 <data android:mimeType="application/epub+zip" />
             </intent-filter>
             <intent-filter>

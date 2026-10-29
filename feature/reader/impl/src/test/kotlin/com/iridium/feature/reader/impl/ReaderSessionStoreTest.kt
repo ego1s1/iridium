@@ -1,6 +1,8 @@
 package com.iridium.feature.reader.impl
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,7 +67,11 @@ class ReaderSessionStoreTest {
 
     @Test
     fun `events are delivered as a stream`() = runTest {
+        val deferred = backgroundScope.async { store.events.first() }
+        // Let the collector attach before emitting: SharedFlow (replay=0)
+        // only delivers to active collectors, unlike the old Channel.
+        runCurrent()
         store.emit(ReaderSessionEvent.NavigatorAttached)
-        assertEquals(ReaderSessionEvent.NavigatorAttached, store.events.first())
+        assertEquals(ReaderSessionEvent.NavigatorAttached, deferred.await())
     }
 }

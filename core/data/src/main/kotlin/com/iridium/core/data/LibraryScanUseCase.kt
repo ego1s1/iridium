@@ -82,28 +82,30 @@ internal class LibraryScanUseCase @Inject constructor(
             }
             onProgress(index + 1, docs.size)
         }
-        // Re-read before writing — but only rows touched since the snapshot:
-        // a reader progress write may have landed after it, and last-writer-
-        // wins with stale rows would eat it. Untouched rows need no merge.
-        val fresh = bookDao.getUpdatedSince(snapshotMs).associateBy { it.id }
-        val merged = rows.map { row ->
-            val live = fresh[row.id]
-            val snap = knownById[row.id]
-            if (live != null && (live.updatedAt > (snap?.updatedAt ?: 0L))) {
-                row.copy(
-                    progress = live.progress,
-                    lastLocator = live.lastLocator,
-                    updatedAt = live.updatedAt,
-                    bookmarked = live.bookmarked,
-                )
-            } else {
-                row
-            }
-        }
+        // Re-read inside the write transaction — a reader progress write may
+        // have landed after the snapshot, and last-writer-wins with stale
+        // rows would eat it. Untouched rows need no merge. Reading inside
+        // the txn closes the check-then-act window between getUpdatedSince
+        // and upsertAll.
         // One transaction: crash/interleave can never leave book rows
         // without FTS or FTS without books. Cover files delete after
         // commit (file I/O must stay out of the DB transaction).
         val prunedLinked: List<BookEntity> = database.withTransaction {
+            val fresh = bookDao.getUpdatedSince(snapshotMs).associateBy { it.id }
+            val merged = rows.map { row ->
+                val live = fresh[row.id]
+                val snap = knownById[row.id]
+                if (live != null && (live.updatedAt > (snap?.updatedAt ?: 0L))) {
+                    row.copy(
+                        progress = live.progress,
+                        lastLocator = live.lastLocator,
+                        updatedAt = live.updatedAt,
+                        bookmarked = live.bookmarked,
+                    )
+                } else {
+                    row
+                }
+            }
             if (merged.isNotEmpty()) bookDao.upsertAll(merged)
             pruneLocked(
                 foundIdsOf = merged,

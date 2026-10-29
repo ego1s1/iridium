@@ -2,9 +2,10 @@ package com.iridium.feature.reader.impl
 
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -120,8 +121,8 @@ class ReaderSessionStore @Inject constructor() {
     private val _openInFlight = MutableStateFlow(false)
     val openInFlight: StateFlow<Boolean> = _openInFlight.asStateFlow()
 
-    private val eventChannel = Channel<ReaderSessionEvent>(Channel.BUFFERED)
-    val events = eventChannel.receiveAsFlow()
+    private var _events = MutableSharedFlow<ReaderSessionEvent>(extraBufferCapacity = 64)
+    val events get() = _events.asSharedFlow()
 
     /** Marks the start of an open: nothing may attach until [publish]. */
     fun beginOpen() {
@@ -177,10 +178,10 @@ class ReaderSessionStore @Inject constructor() {
     }
 
     suspend fun emit(event: ReaderSessionEvent) {
-        eventChannel.send(event)
+        _events.emit(event)
     }
 
-    fun tryEmit(event: ReaderSessionEvent): Boolean = eventChannel.trySend(event).isSuccess
+    fun tryEmit(event: ReaderSessionEvent): Boolean = _events.tryEmit(event)
 
     fun clear() {
         closeCurrent()
@@ -193,6 +194,9 @@ class ReaderSessionStore @Inject constructor() {
         navigator = null
         _latestLocator.value = null
         _selectedText.value = null
+        // Drop buffered one-shot events so a stale tap/selection can never
+        // leak into the next book's session.
+        _events = MutableSharedFlow(extraBufferCapacity = 64)
         runCatching { publication?.close() }
         publication = null
         navigatorFactory = null

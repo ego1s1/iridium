@@ -76,7 +76,7 @@ enum class ChromeTapZone {
 }
 
 /** Test tags for the Mori-parity reader chrome. */
-object ReaderChromeTestTags {
+internal object ReaderChromeTestTags {
     const val ScrubberIsland = "chromeScrubberIsland"
     const val ScrubTooltip = "chromeScrubTooltip"
     const val ScrubSlider = "chromeScrubSlider"
@@ -94,24 +94,24 @@ object ReaderChromeTestTags {
 // Pure helpers (unit-testable without composition)
 
 /** 0-based position index for a 0f..1f progression over [count] positions. */
-fun scrubIndexForProgression(progression: Float, count: Int): Int {
+internal fun scrubIndexForProgression(progression: Float, count: Int): Int {
     if (count <= 1) return 0
     return (progression.coerceIn(0f, 1f) * (count - 1)).roundToInt()
         .coerceIn(0, count - 1)
 }
 
 /** 0f..1f progression for a 0-based position [index] over [count] positions. */
-fun progressionForIndex(index: Int, count: Int): Float {
+internal fun progressionForIndex(index: Int, count: Int): Float {
     if (count <= 1) return 0f
     return index.coerceIn(0, count - 1).toFloat() / (count - 1).toFloat()
 }
 
-fun canChromeGoForward(index: Int, count: Int): Boolean = index < count - 1
+internal fun canChromeGoForward(index: Int, count: Int): Boolean = index < count - 1
 
-fun canChromeGoBackward(index: Int): Boolean = index > 0
+internal fun canChromeGoBackward(index: Int): Boolean = index > 0
 
 /** Warm scrim color for night light at [intensity] 0f..1f (max 40% alpha). */
-fun nightLightColor(intensity: Float): Color {
+internal fun nightLightColor(intensity: Float): Color {
     val alpha = (intensity.coerceIn(0f, 1f) * MaxNightLightAlpha * 255f)
         .roundToInt().coerceIn(0, 255)
     return Color(red = 0xFF, green = 0x9E, blue = 0x42, alpha = alpha)
@@ -120,7 +120,7 @@ fun nightLightColor(intensity: Float): Color {
 private const val MaxNightLightAlpha = 0.4f
 
 /** "12 / 173" style counter; [oneBased] is 1-based. */
-fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total"
+internal fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total"
 
 /**
  * Resolves which tap zone a tap at ([fractionX], [fractionY]) falls into:
@@ -129,7 +129,7 @@ fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total
  * taps turn forward, right taps back); the reading direction does not mirror
  * the zones. Taps landing on the top chrome strip always toggle.
  */
-fun chromeZoneForTap(
+internal fun chromeZoneForTap(
     fractionX: Float,
     fractionY: Float,
     invertTaps: Boolean = false,
