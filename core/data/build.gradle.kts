@@ -23,7 +23,6 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.coil.compose)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)
     implementation(libs.google.http.client.gson)

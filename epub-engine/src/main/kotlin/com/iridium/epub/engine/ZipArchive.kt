@@ -36,8 +36,6 @@ internal class ZipArchive private constructor(
 
     val entryNames: Set<String> get() = entries.keys
 
-    operator fun get(name: String): ZipEntry? = entries[name]
-
     /** Reads and inflates [entry], or returns null when unreadable/oversized. */
     fun read(entry: ZipEntry, maxBytes: Long = MAX_ENTRY_BYTES): ByteArray? {
         if (entry.encrypted) return null

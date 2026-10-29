@@ -50,7 +50,7 @@ class BookDaoTest {
 
         dao.deleteMissingLinked(listOf("content://docs/a.epub"))
 
-        val remaining = dao.getIds().toSet()
+        val remaining = dao.getAll().map { it.id }.toSet()
         assertTrue("content://docs/a.epub" in remaining)
         assertTrue("content://docs/b.epub" !in remaining)
         assertTrue("/data/local/c.epub" in remaining)
@@ -63,7 +63,7 @@ class BookDaoTest {
 
         dao.deleteAllLinked()
 
-        assertEquals(listOf("/data/local/c.epub"), dao.getIds())
+        assertEquals(listOf("/data/local/c.epub"), dao.getAll().map { it.id })
     }
 
     @Test

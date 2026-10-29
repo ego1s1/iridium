@@ -31,9 +31,6 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE updatedAt >= :sinceMs")
     suspend fun getUpdatedSince(sinceMs: Long): List<BookEntity>
 
-    @Query("SELECT id FROM books")
-    suspend fun getIds(): List<String>
-
     @Upsert
     suspend fun upsert(book: BookEntity)
 
@@ -45,9 +42,6 @@ interface BookDao {
 
     @Query("UPDATE books SET bookmarked = :bookmarked, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateBookmark(id: String, bookmarked: Boolean, updatedAt: Long)
-
-    @Query("UPDATE books SET coverPath = NULL")
-    suspend fun clearCovers()
 
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun deleteById(id: String)

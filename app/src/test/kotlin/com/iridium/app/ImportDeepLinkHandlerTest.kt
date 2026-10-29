@@ -80,7 +80,6 @@ class ImportDeepLinkHandlerTest {
     fun `importUri stores the book and returns its id`() = runTest {
         val bytes = "fake-epub-bytes".toByteArray()
         val id = handler().importUri(
-            Uri.parse("content://com.example/shared.epub"),
             "shared.epub",
         ) { bytes.inputStream() }
         assertEquals("imported-1", id)
@@ -91,7 +90,7 @@ class ImportDeepLinkHandlerTest {
     @Test
     fun `importUri null stream returns null`() = runTest {
         assertNull(
-            handler().importUri(Uri.parse("content://com.example/x.epub"), "x.epub") { null },
+            handler().importUri("x.epub") { null },
         )
     }
 }

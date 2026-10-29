@@ -554,7 +554,6 @@ class ReaderViewModel @Inject constructor(
         const val LOCATOR_HIDE_GRACE_MS = 750L
 
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
-        const val DECORATION_GROUP = "highlights"
     }
 }
 

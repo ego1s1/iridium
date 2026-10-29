@@ -52,14 +52,13 @@ class ImportDeepLinkHandler @Inject constructor(
     suspend fun handle(intent: Intent?): String? = withContext(Dispatchers.IO) {
         val request = parseIntent(intent) ?: return@withContext null
         val name = resolveDisplayName(request.uri) ?: request.uri.lastPathSegment
-        importUri(request.uri, name) {
+        importUri(name) {
             runCatching { context.contentResolver.openInputStream(request.uri) }.getOrNull()
         }
     }
 
-    /** Imports one document URI with an explicit stream (test seam). */
+    /** Imports one document with an explicit stream (test seam). */
     suspend fun importUri(
-        @Suppress("unused") uri: Uri,
         displayName: String?,
         openStream: () -> java.io.InputStream?,
     ): String? = withContext(Dispatchers.IO) {
