@@ -19,6 +19,12 @@ import com.iridium.core.model.ColorSchemeChoice
  * per-book brightness, immersive bar visibility, seamless bar tinting,
  * and the keep-awake flag.
  */
+/**
+ * Grace period after a system-driven bar restore. Predictive-back abort
+ * animations finish inside this window, so a deferred re-hide is not undone.
+ */
+private const val BAR_RESTORE_SETTLE_MS = 220L
+
 @Composable
 internal fun ReaderWindowEffects(
     chromeVisible: Boolean,
@@ -81,12 +87,19 @@ internal fun ReaderWindowEffects(
         // The system brings the bars back on its own in several cases — a
         // predictive-back preview shows the destination with its bars, and
         // cancelling that gesture leaves them visible even though the chrome is
-        // still hidden. Re-assert the requested state whenever the insets
-        // change, instead of only when the chrome toggles. Returning the insets
-        // unmodified keeps them flowing to the content below.
-        ViewCompat.setOnApplyWindowInsetsListener(decor) { _, insets ->
+        // still hidden.
+        //
+        // Hiding synchronously inside the insets dispatch is not enough: the
+        // abort animation restores the bars as it settles, so the request is
+        // overridden in the same transaction. Posting it lands after that
+        // restore, and a second pass after the animation settles covers the
+        // remainder. Returning the insets unmodified keeps them flowing to the
+        // content below.
+        ViewCompat.setOnApplyWindowInsetsListener(decor) { view, insets ->
             if (!chromeVisible && insets.isVisible(WindowInsetsCompat.Type.systemBars())) {
-                controller.hide(WindowInsetsCompat.Type.systemBars())
+                val bars = WindowInsetsCompat.Type.systemBars()
+                view.post { controller.hide(bars) }
+                view.postDelayed({ controller.hide(bars) }, BAR_RESTORE_SETTLE_MS)
             }
             insets
         }
