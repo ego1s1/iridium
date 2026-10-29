@@ -67,11 +67,11 @@ object IridiumEnter {
                 return@remember fadeIn(animationSpec = IridiumMotion.calmFadeSpec())
             }
             when (kind) {
-                IridiumEnterKind.CHROME_TOP -> fadeIn(IridiumMotion.defaultEffectsSpec()) +
-                    slideInVertically(IridiumMotion.defaultSpatialSpec()) { -it / 2 }
+                IridiumEnterKind.CHROME_TOP -> fadeIn(IridiumMotion.chromeEnterSpec()) +
+                    slideInVertically(IridiumMotion.chromeEnterSpec()) { -it / 2 }
                 IridiumEnterKind.CHROME_BOTTOM, IridiumEnterKind.TOOLBAR ->
-                    fadeIn(IridiumMotion.defaultEffectsSpec()) +
-                        slideInVertically(IridiumMotion.defaultSpatialSpec()) { it / 2 }
+                    fadeIn(IridiumMotion.chromeEnterSpec()) +
+                        slideInVertically(IridiumMotion.chromeEnterSpec()) { it / 2 }
                 IridiumEnterKind.SEARCH -> fadeIn(IridiumMotion.defaultEffectsSpec()) +
                     expandVertically(IridiumMotion.defaultSpatialSpec())
                 IridiumEnterKind.FAB -> fadeIn(IridiumMotion.defaultEffectsSpec()) +
@@ -96,11 +96,11 @@ object IridiumEnter {
                 return@remember fadeOut(animationSpec = IridiumMotion.calmFadeSpec())
             }
             when (kind) {
-                IridiumEnterKind.CHROME_TOP -> fadeOut(IridiumMotion.defaultEffectsSpec()) +
-                    slideOutVertically(IridiumMotion.defaultSpatialSpec()) { -it / 2 }
+                IridiumEnterKind.CHROME_TOP -> fadeOut(IridiumMotion.chromeExitSpec()) +
+                    slideOutVertically(IridiumMotion.chromeExitSpec()) { -it / 2 }
                 IridiumEnterKind.CHROME_BOTTOM, IridiumEnterKind.TOOLBAR ->
-                    fadeOut(IridiumMotion.defaultEffectsSpec()) +
-                        slideOutVertically(IridiumMotion.defaultSpatialSpec()) { it / 2 }
+                    fadeOut(IridiumMotion.chromeExitSpec()) +
+                        slideOutVertically(IridiumMotion.chromeExitSpec()) { it / 2 }
                 IridiumEnterKind.SEARCH -> fadeOut(IridiumMotion.defaultEffectsSpec()) +
                     shrinkVertically(IridiumMotion.defaultSpatialSpec())
                 IridiumEnterKind.FAB -> fadeOut(IridiumMotion.defaultEffectsSpec()) +

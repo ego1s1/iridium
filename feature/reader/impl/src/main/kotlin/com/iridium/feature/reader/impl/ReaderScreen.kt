@@ -227,7 +227,15 @@ internal fun ReaderScreen(
     // Full-bleed reader: the book fills the whole window and the chrome floats
     // transparently above it. The old Scaffold slots + content padding resized
     // the navigator on every chrome toggle, making Readium repaginate (text jump).
-    Box(modifier = modifier.fillMaxSize()) {
+    // The root is painted the resolved page color so transparent system bars,
+    // letterboxing and overscroll all match the book instead of leaking the
+    // dark app surface as mismatched strips.
+    val pageBg = Color(state.prefs.resolvedColors().first)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(pageBg),
+    ) {
         // Readium content fills the whole area; chrome overlays it.
         // The container is stable across chrome toggles: ignoring-visibility
         // insets never change when the system bars show/hide, so the WebView

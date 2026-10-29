@@ -59,8 +59,8 @@ internal class DataStorePreferencesDataSource @Inject constructor(
                 runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
             } ?: ReaderFontFamily.BOOK,
             textAlign = this[TEXT_ALIGN]?.let {
-                runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.ORIGINAL)
-            } ?: TextAlign.ORIGINAL,
+                runCatching { TextAlign.valueOf(it) }.getOrDefault(TextAlign.JUSTIFY)
+            } ?: TextAlign.JUSTIFY,
             theme = this[READER_THEME]?.let {
                 runCatching { ColorSchemeChoice.valueOf(it) }.getOrDefault(ColorSchemeChoice.SEPIA)
             } ?: ColorSchemeChoice.SEPIA,

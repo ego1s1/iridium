@@ -54,7 +54,7 @@ class DataStorePreferencesDataSourceTest {
         assertFalse(source.themePreferences.first().amoled)
         assertEquals(MotionStyle.EXPRESSIVE, source.motionStyle.first())
         assertEquals(ReadingFlow.AUTO, source.readerPreferences.first().flow)
-        assertEquals(TextAlign.ORIGINAL, source.readerPreferences.first().textAlign)
+        assertEquals(TextAlign.JUSTIFY, source.readerPreferences.first().textAlign)
         assertEquals(LibrarySortOrder.RECENTLY_ADDED, source.libraryDisplay.first().sortOrder)
         assertEquals(LibraryFilter.ALL, source.libraryDisplay.first().filter)
     }

@@ -78,6 +78,18 @@ object IridiumMotion {
     /** Chrome (app bars, toolbars) sliding in and out. */
     fun <T> chromeSpec(): FiniteAnimationSpec<T> = defaultSpatialSpec()
 
+    /**
+     * Chrome show/hide: bounded emphasized tweens, not springs. Chrome must
+     * land exactly (never overshoot past the screen edge) and stay in sync
+     * with the system-bar show/hide animation running on its own clock.
+     */
+    fun <T> chromeEnterSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = 280, easing = EmphasizedDecelerate)
+
+    /** Chrome hide: quicker than enter so the exit leads. */
+    fun <T> chromeExitSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = 200, easing = EmphasizedAccelerate)
+
     /** Hero/shared-element morphs; a touch of bounce for delight. */
     fun <T> heroSpec(): FiniteAnimationSpec<T> =
         spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy)

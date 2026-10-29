@@ -76,11 +76,10 @@ internal fun ReaderWindowEffects(
         val previousNav = window.navigationBarColor
         val previousLightStatus = controller.isAppearanceLightStatusBars
         val previousLightNav = controller.isAppearanceLightNavigationBars
-        val previousBg = window.decorView.background
+        val previousDecorBg = window.decorView.background
         val pageBg = Color(pageBackgroundArgb)
         window.statusBarColor = pageBg.toArgb()
         window.navigationBarColor = pageBg.toArgb()
-        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(pageBg.toArgb()))
         window.decorView.setBackgroundColor(pageBg.toArgb())
         controller.isAppearanceLightStatusBars = theme.lightSystemBars()
         controller.isAppearanceLightNavigationBars = theme.lightSystemBars()
@@ -89,7 +88,7 @@ internal fun ReaderWindowEffects(
             window.navigationBarColor = previousNav
             controller.isAppearanceLightStatusBars = previousLightStatus
             controller.isAppearanceLightNavigationBars = previousLightNav
-            window.setBackgroundDrawable(previousBg)
+            window.decorView.background = previousDecorBg
         }
     }
 

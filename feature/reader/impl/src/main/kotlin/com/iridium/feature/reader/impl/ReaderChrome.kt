@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -72,9 +74,13 @@ import kotlin.math.roundToInt
 @Composable
 private fun pressScale(interaction: MutableInteractionSource): Modifier {
     val pressed by interaction.collectIsPressedAsState()
+    // No bounce: a press affordance must land exactly on rest, never overshoot.
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = IridiumMotion.defaultSpatialSpec(),
+        animationSpec = spring(
+            stiffness = Spring.StiffnessMedium,
+            dampingRatio = Spring.DampingRatioNoBouncy,
+        ),
         label = "chromePressScale",
     )
     return Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
@@ -196,10 +202,10 @@ fun ReaderScrubberIsland(
     ) {
         AnimatedVisibility(
             visible = scrub != null,
-            enter = fadeIn(IridiumMotion.defaultEffectsSpec()) +
-                scaleIn(IridiumMotion.defaultSpatialSpec(), initialScale = 0.85f),
-            exit = fadeOut(IridiumMotion.defaultEffectsSpec()) +
-                scaleOut(IridiumMotion.defaultSpatialSpec(), targetScale = 0.85f),
+            enter = fadeIn(IridiumMotion.chromeEnterSpec()) +
+                scaleIn(IridiumMotion.chromeEnterSpec(), initialScale = 0.9f),
+            exit = fadeOut(IridiumMotion.chromeExitSpec()) +
+                scaleOut(IridiumMotion.chromeExitSpec(), targetScale = 0.9f),
         ) {
             Surface(
                 shape = CircleShape,
@@ -246,11 +252,10 @@ fun ReaderScrubberIsland(
                             AnimatedContent(
                                 targetState = shownIndex,
                                 transitionSpec = {
-                                    fadeIn(IridiumMotion.defaultEffectsSpec()) +
-                                        scaleIn(
-                                            IridiumMotion.defaultSpatialSpec(),
-                                            initialScale = 0.9f,
-                                        ) togetherWith fadeOut(IridiumMotion.defaultEffectsSpec())
+                                    // Quick crossfade while dragging: springs
+                                    // wobble when retargeted every step.
+                                    fadeIn(IridiumMotion.chromeEnterSpec()) togetherWith
+                                        fadeOut(IridiumMotion.chromeExitSpec())
                                 },
                                 label = "scrubCounter",
                             ) { index ->
