@@ -229,6 +229,9 @@ fun HistoryStatsBentoContent(
                 HistoryTopBookRow(top = top)
             }
         }
+        // Clearance for the floating pill navigator, which overlays the
+        // scrollable content (same 96dp reservation as Settings).
+        Spacer(Modifier.height(96.dp))
     }
 }
 
