@@ -259,6 +259,7 @@ internal fun ReaderScreen(
         with(density) { ChromeBottomStrip.toPx() }.toInt()
 
     suspend fun refreshSnapshot() {
+        // Never capture mid-slide (the view is displaced) or in scroll flow.
         if (!slideEnabled || sliding) return
         outgoingPage = capturePage(
             activity = activity,
@@ -281,6 +282,10 @@ internal fun ReaderScreen(
             slideShift.snapTo(slideDir * screenWidthPx)
             slideShift.animateTo(
                 0f,
+                // Ease-out tween on the frame clock: every vsync (16.7 ms at
+                // 60 Hz, 8.3 ms at 120 Hz) produces one layer offset and no
+                // recomposition, since the offsets are read inside
+                // graphicsLayer blocks.
                 tween(durationMillis = PageTurnDurationMs, easing = EaseOut),
             )
         } finally {
@@ -404,6 +409,7 @@ internal fun ReaderScreen(
                 ReaderScrubberIsland(
                     positionIndex = state.positionIndex,
                     positionCount = state.positionCount,
+                    chapterTitle = state.chapterTitle,
                     onSeek = { onAction(ReaderAction.ScrubFinished(it)) },
                     onScrubbingChanged = { scrubbing ->
                         if (scrubbing) onAction(ReaderAction.ScrubStarted)
@@ -901,7 +907,7 @@ private suspend fun capturePage(
         val loc = IntArray(2)
         view.getLocationInWindow(loc)
         val src = Rect(loc[0], loc[1], loc[0] + view.width, loc[1] + view.height)
-        val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.RGB_565)
         PixelCopy.request(
             activity.window,
             src,

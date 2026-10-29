@@ -73,8 +73,10 @@ class EpubPreferencesMapperTest {
     fun `font scale is clamped`() {
         val low = EpubPreferencesMapper.map(ReaderPreferences(fontScale = 0.01f)).fontSize
         val high = EpubPreferencesMapper.map(ReaderPreferences(fontScale = 99f)).fontSize
-        assertEquals(0.5, low ?: 0.0, 0.0001)
-        assertEquals(3.0, high ?: 0.0, 0.0001)
+        // The stored scale is a multiplier of a comfortable base (1.15), so
+        // the clamp applies to the preference before the base is applied.
+        assertEquals(0.575, low ?: 0.0, 0.0001)
+        assertEquals(3.45, high ?: 0.0, 0.0001)
     }
 
     @Test

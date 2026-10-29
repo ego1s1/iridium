@@ -19,6 +19,13 @@ import org.readium.r2.navigator.preferences.Theme as ReadiumTheme
 internal object EpubPreferencesMapper {
 
     /**
+     * Baseline multiplier applied under the user's text-size preference:
+     * the toolkit's 100% is noticeably smaller than a printed page, so the
+     * slider's 100% maps to a readable body size instead of a tiny one.
+     */
+    private const val BASE_FONT_SCALE = 1.15f
+
+    /**
      * Nearest Readium built-in for the resolved colors. Presets keep their
      * historic mapping; custom palettes pick by background luminance (sepia
      * band in the middle). Exact custom colors always ride the CSS override.
@@ -50,7 +57,10 @@ internal object EpubPreferencesMapper {
             ReadingFlow.SCROLLED -> true
             ReadingFlow.AUTO, ReadingFlow.PAGED -> false
         },
-        fontSize = prefs.fontScale.coerceIn(0.5f, 3f).toDouble(),
+        // The stored scale is a multiplier of a comfortable base, so the UI's
+        // "100%" already reads at a normal book size instead of the toolkit's
+        // small default. 140% is the default and lands near the reference page.
+        fontSize = (prefs.fontScale.coerceIn(0.5f, 3f) * BASE_FONT_SCALE).toDouble(),
         fontFamily = prefs.fontFamily.cssName?.let { ReadiumFontFamily(it) },
         pageMargins = prefs.pageMargins.coerceIn(0.5f, 4f).toDouble(),
         lineHeight = prefs.lineHeight.coerceIn(1f, 3f).toDouble(),

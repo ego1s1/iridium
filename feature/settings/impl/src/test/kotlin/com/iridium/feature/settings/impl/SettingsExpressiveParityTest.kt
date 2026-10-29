@@ -51,7 +51,7 @@ class SettingsExpressiveParityTest {
         val state = SettingsUiState()
         assertEquals(ThemeMode.SYSTEM, state.theme.mode)
         assertEquals(MotionStyle.EXPRESSIVE, state.motionStyle)
-        assertEquals(1.5f, state.reader.fontScale)
+        assertEquals(1.4f, state.reader.fontScale)
         assertEquals(1f, state.reader.pageMargins)
         assertEquals(1.55f, state.reader.lineHeight)
         assertFalse(state.crashReportingEnabled)

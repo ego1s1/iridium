@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -169,6 +170,7 @@ class ReaderViewModel @Inject constructor(
             c.book == null -> ReaderUiState.Gone
             n.openFailed -> ReaderUiState.OpenFailed(n.openFileMissing)
             else -> {
+                // The tracker resolves tap vs. echo; this is the only read.
                 val (positionIndex, positionCount) = positions.indexAndCount()
                 ReaderUiState.Ready(
                     book = c.book,
@@ -187,12 +189,19 @@ class ReaderViewModel @Inject constructor(
                     positionText = positions.positionText(),
                     positionIndex = positionIndex,
                     positionCount = positionCount,
+                    chapterTitle = positions.chapterTitle(c.toc),
                     focusedHighlightId = n.focusedHighlightId,
                     navigatorAttached = n.navigatorAttached,
                     themeSheetOpen = ch.themeSheetOpen,
                 )
             }
         }
+    }.catch { error ->
+        // A failure in any upstream flow would otherwise cancel the state
+        // flow and leave the reader on the loading screen forever.
+        if (error is kotlinx.coroutines.CancellationException) throw error
+        openFailed.value = true
+        emit(ReaderUiState.OpenFailed(fileMissing = false))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
 
     private val annotations = ReaderAnnotationsController(
@@ -219,17 +228,10 @@ class ReaderViewModel @Inject constructor(
                 repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
             }
         }
-        viewModelScope.launch {
-            // User page turns hide the chrome; programmatic jumps (open,
-            // seek, TOC) and the initial publish must not.
-            store.latestLocator.collect { locator ->
-                if (locator != null &&
-                    !positions.withinNavGrace(LOCATOR_HIDE_GRACE_MS)
-                ) {
-                    chrome.hideForPageTurn()
-                }
-            }
-        }
+        // Chrome visibility is driven only by explicit toggles and the idle
+        // timer. Page turns never hide it: the locator echo arrives after the
+        // navigator settles, so hiding from it made the chrome vanish in the
+        // middle of a tapping sequence.
         chrome.scheduleHide()
     }
 
@@ -238,14 +240,14 @@ class ReaderViewModel @Inject constructor(
     fun onAction(action: ReaderAction) {
         when (action) {
             ReaderAction.Back -> viewModelScope.launch { messageChannel.send(ReaderMessage.Pop) }
-            ReaderAction.OpenSettings -> chrome.open(chrome.settingsOpen, pinChromeVisible = true)
-            ReaderAction.CloseSettings -> chrome.close(chrome.settingsOpen)
-            ReaderAction.OpenThemeSheet -> chrome.open(chrome.themeSheetOpen, pinChromeVisible = true)
-            ReaderAction.CloseThemeSheet -> chrome.close(chrome.themeSheetOpen)
-            ReaderAction.OpenToc -> chrome.open(chrome.tocOpen)
-            ReaderAction.CloseToc -> chrome.close(chrome.tocOpen)
-            ReaderAction.OpenHighlights -> chrome.open(chrome.highlightsOpen)
-            ReaderAction.CloseHighlights -> chrome.close(chrome.highlightsOpen, clearHighlightFocus = true)
+            ReaderAction.OpenSettings -> chrome.openSettings()
+            ReaderAction.CloseSettings -> chrome.closeSettings()
+            ReaderAction.OpenThemeSheet -> chrome.openThemeSheet()
+            ReaderAction.CloseThemeSheet -> chrome.closeThemeSheet()
+            ReaderAction.OpenToc -> chrome.openToc()
+            ReaderAction.CloseToc -> chrome.closeToc()
+            ReaderAction.OpenHighlights -> chrome.openHighlights()
+            ReaderAction.CloseHighlights -> chrome.closeHighlights()
             ReaderAction.DismissDictionary -> dictionary.dismiss()
             ReaderAction.DismissImage -> store.dismissImage()
             ReaderAction.ExportAnnotations -> annotations.export(viewModelScope)
@@ -409,6 +411,12 @@ class ReaderViewModel @Inject constructor(
                 annotations.refreshDecorations(highlights.first())
                 // Image-showcase bridge: wire taps in the freshly loaded document.
                 safeCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
+                // Measure the rendered page count once the new layout settles:
+                // the counter's total depends on it, not on the position table.
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(ATTACH_PAGINATION_DELAY_MS)
+                    positions.measurePagination()
+                }
             }
             is ReaderSessionEvent.DecorationTapped -> {
                 chrome.showHighlightsForDecoration(event.decorationId)
@@ -459,21 +467,28 @@ class ReaderViewModel @Inject constructor(
      */
     private fun requestTurn(direction: Int): Boolean {
         val now = clock.uptimeNow()
-        // Burst window: reset once the user pauses.
         if (now - burstWindowStartMs > BURST_WINDOW_MS) {
             burstWindowStartMs = now
             burstTurns = 0
         }
-        if (burstTurns >= MAX_BURST_TURNS) return false
-        if (now - lastTurnMs < MIN_TURN_INTERVAL_MS) return false
+        // Every tap keeps the chrome up, including taps the burst cap drops:
+        // it must hide only once the user stops turning.
+        positions.markProgrammaticNav()
+        chrome.scheduleHide()
+
+        val withinBurst = burstTurns < MAX_BURST_TURNS
+        val spaced = now - lastTurnMs >= MIN_TURN_INTERVAL_MS
+        if (!withinBurst || !spaced) return false
+
         lastTurnMs = now
         burstTurns += 1
-        // Keep chrome up while the user is turning; the timer restarts on
-        // every accepted turn, so it hides only once turning stops.
-        positions.markProgrammaticNav()
+        positions.onTurnRequested(direction)
         _pageTurns.tryEmit(direction)
-        viewModelScope.launch { positions.completeTurn(forward = direction > 0) }
-        chrome.scheduleHide()
+        viewModelScope.launch {
+            val moved = positions.completeTurn(forward = direction > 0)
+            // Book ends refuse the step: take the optimistic page back.
+            if (!moved) positions.onTurnRefused(direction)
+        }
         return true
     }
 
@@ -555,8 +570,8 @@ class ReaderViewModel @Inject constructor(
     private fun goTocEntry(entry: TocEntry) {
         val publication = store.publication ?: return
         val nav = store.navigator ?: return
-        chrome.tocOpen.value = false
-        chrome.scheduleHide()
+        // closeToc() also restarts the idle timer, so no separate scheduleHide.
+        chrome.closeToc()
         val link = publication.tableOfContents.firstOrNull {
             it.href.toString().substringBefore('#') == entry.href.substringBefore('#') ||
                 entry.href.substringBefore('#').endsWith(it.href.toString().substringBefore('#'))
@@ -597,6 +612,9 @@ class ReaderViewModel @Inject constructor(
         const val LOCATOR_HIDE_GRACE_MS = 1500L
 
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
+
+        /** Lets the freshly attached navigator lay out before measuring pages. */
+        const val ATTACH_PAGINATION_DELAY_MS = 600L
 
         /** Minimum gap between accepted turns: below this a tap is a repeat. */
         const val MIN_TURN_INTERVAL_MS = 90L

@@ -34,55 +34,75 @@ import org.readium.r2.shared.publication.services.positions
  */
 internal class ReaderChromeController(private val scope: CoroutineScope) {
 
-    val chromeVisible = MutableStateFlow(true)
-    val settingsOpen = MutableStateFlow(false)
-    val themeSheetOpen = MutableStateFlow(false)
-    val tocOpen = MutableStateFlow(false)
-    val highlightsOpen = MutableStateFlow(false)
-    val focusedHighlightId = MutableStateFlow<String?>(null)
+    // Exposed read-only: only this controller may change chrome state.
+    private val _chromeVisible = MutableStateFlow(true)
+    val chromeVisible: StateFlow<Boolean> = _chromeVisible.asStateFlow()
+    private val _settingsOpen = MutableStateFlow(false)
+    val settingsOpen: StateFlow<Boolean> = _settingsOpen.asStateFlow()
+    private val _themeSheetOpen = MutableStateFlow(false)
+    val themeSheetOpen: StateFlow<Boolean> = _themeSheetOpen.asStateFlow()
+    private val _tocOpen = MutableStateFlow(false)
+    val tocOpen: StateFlow<Boolean> = _tocOpen.asStateFlow()
+    private val _highlightsOpen = MutableStateFlow(false)
+    val highlightsOpen: StateFlow<Boolean> = _highlightsOpen.asStateFlow()
+    private val _focusedHighlightId = MutableStateFlow<String?>(null)
+    val focusedHighlightId: StateFlow<String?> = _focusedHighlightId.asStateFlow()
 
     private var chromeJob: Job? = null
 
     fun anySheetOpen(): Boolean =
-        settingsOpen.value || themeSheetOpen.value ||
-            tocOpen.value || highlightsOpen.value
+        _settingsOpen.value || _themeSheetOpen.value ||
+            _tocOpen.value || _highlightsOpen.value
+
+    fun openSettings() = openSheet(_settingsOpen, pinChrome = true)
+    fun closeSettings() = closeSheet(_settingsOpen)
+
+    fun openThemeSheet() = openSheet(_themeSheetOpen, pinChrome = true)
+    fun closeThemeSheet() = closeSheet(_themeSheetOpen)
+
+    fun openToc() = openSheet(_tocOpen, pinChrome = false)
+
+    fun openHighlights() = openSheet(_highlightsOpen, pinChrome = false)
+    fun closeHighlights() = closeSheet(_highlightsOpen, clearHighlightFocus = true)
 
     /** Opens a sheet and holds chrome; TOC/highlights only cancel auto-hide. */
-    fun open(sheet: MutableStateFlow<Boolean>, pinChromeVisible: Boolean = false) {
+    private fun openSheet(sheet: MutableStateFlow<Boolean>, pinChrome: Boolean) {
         sheet.value = true
-        if (pinChromeVisible) chromeVisible.value = true
+        if (pinChrome) _chromeVisible.value = true
         chromeJob?.cancel()
     }
 
     /** Closes a sheet and resumes auto-hide; highlight sheets also clear focus. */
-    fun close(sheet: MutableStateFlow<Boolean>, clearHighlightFocus: Boolean = false) {
+    private fun closeSheet(sheet: MutableStateFlow<Boolean>, clearHighlightFocus: Boolean = false) {
         sheet.value = false
-        if (clearHighlightFocus) focusedHighlightId.value = null
+        if (clearHighlightFocus) _focusedHighlightId.value = null
         scheduleHide()
     }
 
     fun toggle() {
-        chromeVisible.update { !it }
-        if (chromeVisible.value) scheduleHide() else chromeJob?.cancel()
+        _chromeVisible.update { !it }
+        if (_chromeVisible.value) scheduleHide() else chromeJob?.cancel()
     }
+
+    fun closeToc() = closeSheet(_tocOpen)
 
     /** User page turns hide the chrome immediately. */
     fun hideForPageTurn() {
-        chromeVisible.value = false
+        _chromeVisible.value = false
         chromeJob?.cancel()
     }
 
     /** Tapping a highlight decoration selects it and raises the sheet. */
     fun showHighlightsForDecoration(decorationId: String) {
-        focusedHighlightId.value = decorationId
-        highlightsOpen.value = true
-        chromeVisible.value = false
+        _focusedHighlightId.value = decorationId
+        _highlightsOpen.value = true
+        _chromeVisible.value = false
         chromeJob?.cancel()
     }
 
     /** Clears focus when its highlight is deleted out from under the sheet. */
     fun clearFocusIf(id: String) {
-        if (focusedHighlightId.value == id) focusedHighlightId.value = null
+        if (_focusedHighlightId.value == id) _focusedHighlightId.value = null
     }
 
     fun scheduleHide() {
@@ -90,7 +110,7 @@ internal class ReaderChromeController(private val scope: CoroutineScope) {
         chromeJob = scope.launch {
             delay(CHROME_AUTO_HIDE_MS)
             if (!anySheetOpen()) {
-                chromeVisible.value = false
+                _chromeVisible.value = false
             }
         }
     }
@@ -98,7 +118,7 @@ internal class ReaderChromeController(private val scope: CoroutineScope) {
     /** Holds chrome open while the scrubber is dragged (cancels auto-hide). */
     fun pinForScrub() {
         chromeJob?.cancel()
-        chromeVisible.value = true
+        _chromeVisible.value = true
     }
 
     private companion object {
@@ -192,6 +212,19 @@ internal class ReaderPositionTracker(
     private val clock: AppClock,
 ) {
 
+    private companion object {
+        /**
+         * Pages in the current chapter as rendered right now. A paged
+         * reflowable document is a row of page-wide columns, so the document
+         * width over the viewport width is the page count — and it changes
+         * with every typography change.
+         */
+        const val PAGE_COUNT_SCRIPT =
+            "(function(){var e=document.scrollingElement||document.documentElement;" +
+                "var w=window.innerWidth;if(!e||!w||w<=0){return 0;}" +
+                "return Math.max(1,Math.round(e.scrollWidth/w));})()"
+    }
+
     /** Last programmatic jump (open/seek/TOC): locator ticks inside the grace window are the jump's own echo, not user page turns. */
     private var lastProgrammaticNavMs: Long = 0L
 
@@ -199,11 +232,107 @@ internal class ReaderPositionTracker(
      * (viewModelScope + combine), so no synchronization is needed; the version
      * flow below drives recomposition. */
     private var positionsCache: List<Locator> = emptyList()
-    val positionsVersion = MutableStateFlow(0)
+    private val _positionsVersion = MutableStateFlow(0)
+    val positionsVersion: StateFlow<Int> = _positionsVersion.asStateFlow()
+
+    /**
+     * Optimistic page target while the navigator's locator echo is in flight.
+     * The toolkit only reports a new locator once its own scroll settles, so
+     * the counter would otherwise lag hundreds of ms behind the tap. The
+     * display shows this target — never raw + delta — so an echo that has
+     * already advanced the raw index can never be double-counted or make the
+     * number jump forward and snap back.
+     */
+    private var pendingIndex: Int? = null
+    private var pendingForward: Boolean = true
+
+    /**
+     * Rendered pages per position, measured from the live WebView. The
+     * positions table is font-independent (it chunks the text), so using it
+     * directly made the page counter static: it never reacted to a font-size
+     * or margin change, and one page turn moved it by a fraction. Scaling by
+     * the measured ratio makes both the current page and the total track the
+     * real pagination.
+     */
+    private var pagesPerPosition: Float = 0f
+
+    /** Per-chapter rendered-page samples: href -> pages. Averaging chapters
+     *  keeps the total stable instead of re-sampling a different chapter. */
+    private val renderedByChapter = mutableMapOf<String, Int>()
+
+    /** True once a measurement has been attempted (correct-or-nothing total). */
+    private var paginationAttempted: Boolean = false
+
+    /** Sticky chapter title: locators between TOC anchors keep the last one. */
+    private var lastChapterTitle: String? = null
 
     fun replaceAll(positions: List<Locator>) {
         positionsCache = positions
-        positionsVersion.value += 1
+        _positionsVersion.value += 1
+    }
+
+    /** Typography changed: the rendered samples no longer describe the layout. */
+    fun invalidatePagination() {
+        renderedByChapter.clear()
+        pagesPerPosition = 0f
+        _positionsVersion.value += 1
+    }
+
+    /**
+     * Records the pagination measured for [renderedPages] in a chapter that
+     * holds [chapterPositions] table entries. Recomputed on attach and after
+     * every reflow, so the counter always reflects the current typography.
+     */
+    fun updatePagination(renderedPages: Int, chapterPositions: Int, href: String? = null) {
+        paginationAttempted = true
+        if (renderedPages <= 0 || chapterPositions <= 0) return
+        if (href != null) renderedByChapter[href] = renderedPages
+        val sampledPositions = renderedByChapter.keys.sumOf { key ->
+            positionsCache.count { it.href.toString() == key }
+        }
+        val sampledPages = renderedByChapter.values.sum()
+        val ratio = if (sampledPositions > 0 && sampledPages > 0) {
+            sampledPages.toFloat() / sampledPositions
+        } else {
+            renderedPages.toFloat() / chapterPositions
+        }
+        if (ratio.isFinite() && ratio > 0f && ratio != pagesPerPosition) {
+            pagesPerPosition = ratio
+            _positionsVersion.value += 1
+        }
+    }
+
+    /** True once a rendered measurement exists (counter is meaningful). */
+    val hasPagination: Boolean get() = pagesPerPosition > 0f
+
+    /** Total rendered pages for the whole book at the current typography. */
+    private fun totalPages(): Int {
+        val base = positionsCache.size
+        if (base == 0) return 0
+        if (pagesPerPosition <= 0f) {
+            // Before the first measurement, show nothing rather than the
+            // font-independent table size: that value is wrong and used to
+            // flash before the real total arrived.
+            return if (paginationAttempted) base else 0
+        }
+        return (base * pagesPerPosition).roundToInt().coerceAtLeast(1)
+    }
+
+    /**
+     * Current chapter title for [toc], resolved from the live locator. Sticky
+     * between anchors so the label never blanks out mid-chapter.
+     */
+    fun chapterTitle(toc: List<com.iridium.core.model.TocEntry>): String? {
+        val href = store.latestLocator.value?.href?.toString()
+        if (href != null) {
+            val file = href.substringBefore('#').substringAfterLast('/')
+            // Last match wins: subsections in the same file resolve deep.
+            val match = toc.lastOrNull {
+                it.href.substringBefore('#').substringAfterLast('/') == file
+            }
+            if (match != null && match.title.isNotBlank()) lastChapterTitle = match.title
+        }
+        return lastChapterTitle
     }
 
     fun markProgrammaticNav() {
@@ -219,28 +348,91 @@ internal class ReaderPositionTracker(
         return "${index + 1} / $count"
     }
 
-    /** 0-based position index + total count from the cached positions table. */
+    /**
+     * 0-based rendered page index + rendered page total for the counter.
+     *
+     * Both values come from one place so they can never disagree: the total is
+     * the measured pagination, and the index is the locator's continuous
+     * progression across it. A tap publishes an absolute [pendingIndex]
+     * immediately; until the navigator's own index catches up, that value is
+     * shown verbatim. Deliberately *not* "raw + delta": an echo that arrives
+     * before the delta is cleared used to add to an index that had already
+     * moved, which is what made the number jump by two or three and snap back.
+     */
     fun indexAndCount(): Pair<Int, Int> {
+        val (rawIndex, total) = rawIndexAndCount()
+        if (total <= 0) return 0 to 0
+        val pending = pendingIndex ?: return rawIndex to total
+        val caughtUp = if (pendingForward) rawIndex >= pending else rawIndex <= pending
+        if (caughtUp) {
+            // The navigator's own position reached the optimistic target.
+            android.util.Log.d("PageFlow", "caughtUp raw=$rawIndex pending=$pending total=$total")
+            pendingIndex = null
+            return rawIndex to total
+        }
+        return pending.coerceIn(0, total - 1) to total
+    }
+
+    /** Authoritative index from the live locator, ignoring any pending turn. */
+    private fun rawIndexAndCount(): Pair<Int, Int> {
         val positions = positionsCache
         if (positions.isEmpty()) return 0 to 0
-        val current = store.latestLocator.value ?: return 0 to positions.size
+        val current = store.latestLocator.value ?: return 0 to totalPages()
+        val total = totalPages()
+        if (total <= 0) return 0 to 0
         // totalProgression is continuous across pages; hrefs repeat within a
-        // chapter, so href-first matching freezes the counter mid-chapter
-        // (every page of the chapter resolves to its first position).
-        val total = current.locations.totalProgression?.takeIf { it.isFinite() }
-        if (total != null) {
-            // roundToInt everywhere: display, thumb and seek must agree at
-            // every .5 boundary (floor vs round gave off-by-one seeks).
-            return (total * (positions.size - 1)).roundToInt()
-                .coerceIn(0, positions.size - 1) to positions.size
+        // chapter, so href-first matching freezes the counter mid-chapter.
+        val progression = current.locations.totalProgression?.takeIf { it.isFinite() }
+        if (progression != null) {
+            return (progression * (total - 1)).roundToInt().coerceIn(0, total - 1) to total
         }
         val index = positions.indexOfFirst { it.href == current.href }
-        return (if (index >= 0) index else 0) to positions.size
+        return (if (index >= 0) index else 0) to total
+    }
+
+    /**
+     * Registers a tap that will turn the page. The counter advances now, one
+     * step from whatever is currently displayed, so repeated taps accumulate
+     * predictably instead of compounding with a late echo.
+     */
+    fun onTurnRequested(direction: Int) {
+        val (rawIndex, total) = rawIndexAndCount()
+        if (total <= 0) return
+        val base = pendingIndex ?: rawIndex
+        pendingIndex = (base + direction).coerceIn(0, total - 1)
+        android.util.Log.d("PageFlow", "turnRequested dir=$direction raw=$rawIndex pending=$pendingIndex total=$total")
+        pendingForward = direction > 0
+        _positionsVersion.value += 1
+    }
+
+    /** The navigator refused the step (book end): undo the optimistic move. */
+    fun onTurnRefused(direction: Int) {
+        val pending = pendingIndex ?: return
+        val target = pending - direction
+        val (rawIndex, _) = rawIndexAndCount()
+        pendingIndex = if (target == rawIndex) null else target
+        _positionsVersion.value += 1
+    }
+
+    /** Drops the optimistic target once a programmatic jump re-bases position. */
+    fun clearPendingTurn() {
+        if (pendingIndex == null) return
+        pendingIndex = null
+        _positionsVersion.value += 1
+    }
+
+    /** Reads the live WebView's page count for the current chapter. */
+    suspend fun measurePagination() {
+        val nav = store.navigator ?: return
+        val current = store.latestLocator.value ?: return
+        val raw = safeCatching { nav.evaluateJavascript(PAGE_COUNT_SCRIPT) }.getOrNull() ?: return
+        val rendered = raw.trim().trim('"').toDoubleOrNull()?.roundToInt() ?: return
+        val chapterPositions = positionsCache.count { it.href == current.href }
+        updatePagination(rendered, chapterPositions, href = current.href.toString())
     }
 
     /** Slider seek: jumps the navigator to the position table entry. */
-    fun seekTo(progression: Float) {
-        val nav = store.navigator ?: return
+    fun seekTo(progression: Float) {        val nav = store.navigator ?: return
         val positions = positionsCache
         if (positions.isEmpty()) return
         markProgrammaticNav()
@@ -255,10 +447,10 @@ internal class ReaderPositionTracker(
      * paged layout snaps scroll offsets to page boundaries and therefore
      * cannot be animated from inside the document.
      */
-    fun completeTurn(forward: Boolean) {
-        val nav = store.navigator ?: return
+    fun completeTurn(forward: Boolean): Boolean {
+        val nav = store.navigator ?: return false
         markProgrammaticNav()
-        if (forward) nav.goForward(false) else nav.goBackward(false)
+        return if (forward) nav.goForward(false) else nav.goBackward(false)
     }
 }
 
@@ -363,13 +555,11 @@ internal class ReaderAnnotationsController(
         const val DECORATION_GROUP = "highlights"
     }
 }
-
 /**
  * Reader-preference writes + navigator submission. Every write re-submits
  * the mapped Readium preferences and re-injects the forced-override theme
  * stylesheet so exact colors win over the book's own CSS.
- */
-internal class ReaderPrefsController(
+ */internal class ReaderPrefsController(
     private val scope: CoroutineScope,
     private val preferences: IridiumPreferencesDataSource,
     private val store: ReaderSessionStore,
@@ -383,10 +573,13 @@ internal class ReaderPrefsController(
             runCatching { store.navigator?.submitPreferences(updated) }
             applyThemeOverride()
             // Pagination moves under the slider after font/margin/line/flow
-            // changes: refresh the positions table so index/count/seek stay
-            // truthful instead of reporting fiction from the old layout.
+            // changes: refresh the positions table, then re-measure the
+            // rendered page count so the counter follows the new typography.
             val fresh = safeCatching { store.publication?.positions() }.getOrNull()
             if (fresh != null) positions.replaceAll(fresh)
+            positions.invalidatePagination()
+            delay(PAGINATION_SETTLE_MS)
+            positions.measurePagination()
         }
     }
 
@@ -410,5 +603,10 @@ internal class ReaderPrefsController(
         safeCatching {
             store.navigator?.evaluateJavascript(script)
         }
+    }
+
+    private companion object {
+        /** Time for the navigator to re-lay out before measuring its pages. */
+        const val PAGINATION_SETTLE_MS = 350L
     }
 }

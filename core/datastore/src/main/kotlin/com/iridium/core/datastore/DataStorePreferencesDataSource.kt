@@ -54,7 +54,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
             flow = this[READING_FLOW]?.let {
                 runCatching { ReadingFlow.valueOf(it) }.getOrDefault(ReadingFlow.AUTO)
             } ?: ReadingFlow.AUTO,
-            fontScale = this[FONT_SCALE] ?: 1.5f,
+            fontScale = this[FONT_SCALE] ?: 1.4f,
             fontFamily = this[FONT_FAMILY]?.let {
                 runCatching { ReaderFontFamily.valueOf(it) }.getOrDefault(ReaderFontFamily.BOOK)
             } ?: ReaderFontFamily.BOOK,

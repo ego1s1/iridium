@@ -102,4 +102,26 @@ internal fun ReaderWindowEffects(
         }
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
+
+    // Prefer the panel's fastest mode while reading so page-turn slides get a
+    // frame per vsync on high-refresh displays (120 Hz = 8.3 ms). The system
+    // default can pin a window to 60 Hz, which makes the same animation look
+    // half as smooth. Restored on leave like every other reader effect.
+    DisposableEffect(Unit) {
+        val window = activity?.window ?: return@DisposableEffect onDispose { }
+        val attrs = window.attributes
+        val previous = attrs.preferredRefreshRate
+        val maxRefresh = activity.display?.supportedModes
+            ?.maxOfOrNull { it.refreshRate }
+            ?: 0f
+        if (maxRefresh > 0f) {
+            attrs.preferredRefreshRate = maxRefresh
+            window.attributes = attrs
+        }
+        onDispose {
+            val restore = window.attributes
+            restore.preferredRefreshRate = previous
+            window.attributes = restore
+        }
+    }
 }

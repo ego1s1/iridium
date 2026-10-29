@@ -7,6 +7,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -37,12 +45,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.iridium.core.designsystem.IridiumEmphasized
 import com.iridium.core.designsystem.IridiumHaptic
 import com.iridium.core.designsystem.IridiumMotion
-import com.iridium.core.designsystem.IridiumSquigglySliderThumb
-import com.iridium.core.designsystem.IridiumSquigglyTrack
 import com.iridium.core.designsystem.rememberIridiumHaptics
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -60,6 +67,7 @@ internal object ReaderChromeTestTags {
     const val ScrubTooltip = "chromeScrubTooltip"
     const val ScrubSlider = "chromeScrubSlider"
     const val TapZoneInvertSwitch = "tapZoneInvertSwitch"
+    const val ChapterPill = "chromeChapterPill"
 }
 
 // Pure helpers (unit-testable without composition)
@@ -85,6 +93,42 @@ internal fun nightLightColor(intensity: Float): Color {
 }
 
 private const val MaxNightLightAlpha = 0.4f
+
+/**
+ * Static Material 3 Expressive progress track: a rounded inactive rail, a
+ * filled active segment and a stop indicator at the end. No squiggle or
+ * motion — the scrubber reads as a progress bar that happens to be draggable.
+ */
+@Composable
+private fun ExpressiveProgressTrack(fraction: Float) {
+    val active = MaterialTheme.colorScheme.primary
+    val inactive = MaterialTheme.colorScheme.surfaceVariant
+    val stop = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TrackHeight),
+    ) {
+        val h = size.height
+        val radius = CornerRadius(h / 2f, h / 2f)
+        drawRoundRect(color = inactive, cornerRadius = radius)
+        val filled = (size.width * fraction.coerceIn(0f, 1f)).coerceAtLeast(h)
+        drawRoundRect(
+            color = active,
+            size = Size(filled, h),
+            cornerRadius = radius,
+        )
+        // Stop indicator: the M3 Expressive end-cap dot.
+        drawCircle(
+            color = stop,
+            radius = h / 3f,
+            center = Offset(size.width - h / 2f, h / 2f),
+        )
+    }
+}
+
+/** Height of the scrubber progress rail. */
+private val TrackHeight = 8.dp
 
 /** "12 / 173" style counter; [oneBased] is 1-based. */
 internal fun formatChromeCounter(oneBased: Int, total: Int): String = "$oneBased / $total"
@@ -129,6 +173,7 @@ fun ReaderScrubberIsland(
     positionCount: Int,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    chapterTitle: String? = null,
     onScrubbingChanged: (Boolean) -> Unit = {},
 ) {
     val haptics = rememberIridiumHaptics()
@@ -202,6 +247,28 @@ fun ReaderScrubberIsland(
         }
 
         if (positionCount > 1) {
+            // Chapter label pinned to the island's leading edge: a small pill
+            // above the track, so it reads as attached to the scrubber
+            // without competing with the page counter inside it.
+            chapterTitle?.takeIf { it.isNotBlank() }?.let { title ->
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .padding(start = 12.dp, bottom = 6.dp)
+                        .testTag(ReaderChromeTestTags.ChapterPill),
+                ) {
+                    Text(
+                        text = title,
+                        style = IridiumEmphasized.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
+            }
             // Reading direction does not flip the scrubber: always LTR order.
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Surface(
@@ -291,14 +358,24 @@ fun ReaderScrubberIsland(
                             },
                             valueRange = 0f..(positionCount - 1).toFloat(),
                             interactionSource = scrubInteraction,
-                            thumb = { state ->
-                                IridiumSquigglySliderThumb(
-                                    sliderState = state,
-                                    interactionSource = scrubInteraction,
+                            thumb = { _ ->
+                                // Minimal handle: the track carries the state.
+                                Box(
+                                    Modifier
+                                        .size(width = 4.dp, height = 22.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.onPrimary,
+                                            RoundedCornerShape(2.dp),
+                                        ),
                                 )
                             },
                             track = { state ->
-                                IridiumSquigglyTrack(sliderState = state)
+                                ExpressiveProgressTrack(
+                                    fraction = progressionForIndex(
+                                        shownIndex,
+                                        positionCount,
+                                    ),
+                                )
                             },
                             modifier = Modifier
                                 .weight(1f)

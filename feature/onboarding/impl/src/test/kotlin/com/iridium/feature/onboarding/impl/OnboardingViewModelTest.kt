@@ -51,7 +51,7 @@ class OnboardingViewModelTest {
         viewModel.onAction(OnboardingAction.Advance)
         val reading = viewModel.uiState.first()
         assertTrue(reading is OnboardingUiState.Reading)
-        assertEquals(1.5f, (reading as OnboardingUiState.Reading).prefs.fontScale)
+        assertEquals(1.4f, (reading as OnboardingUiState.Reading).prefs.fontScale)
         viewModel.onAction(OnboardingAction.Advance)
         assertTrue(viewModel.uiState.first() is OnboardingUiState.Appearance)
     }

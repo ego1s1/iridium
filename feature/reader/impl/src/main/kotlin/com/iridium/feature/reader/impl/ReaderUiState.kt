@@ -32,6 +32,8 @@ sealed interface ReaderUiState {
         val positionIndex: Int = 0,
         /** Total positions for the scrubber; 0 when positions unknown. */
         val positionCount: Int = 0,
+        /** Current chapter title (nearest TOC anchor); null before first tick. */
+        val chapterTitle: String? = null,
         /** True once the navigator fragment attached (content visible). */
         val navigatorAttached: Boolean = false,
         /** Theme chooser sheet (dock colorscheme button) is open. */
