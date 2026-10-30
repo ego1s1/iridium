@@ -33,6 +33,14 @@ subprojects {
         // propagated to tasks created from convention plugins.
         config.setFrom(rootProject.file("config/detekt/detekt.yml"))
         buildUponDefaultConfig = true
+        // detekt's default source set is main/test only, but flavor folders
+        // hold shipping code (the play-only Drive transport), so gate those too.
+        source = source.plus(
+            project.fileTree(project.projectDir) {
+                include("src/play*/kotlin/**/*.kt")
+                include("src/foss*/kotlin/**/*.kt")
+            },
+        )
         reports {
             html.required.set(true)
             xml.required.set(false)

@@ -198,6 +198,13 @@ internal class DataStorePreferencesDataSource @Inject constructor(
     override val linkedFolders: Flow<Set<String>> =
         dataStore.data.catchOnCorruption().map { it[LINKED_FOLDERS] ?: emptySet() }
 
+    override val removedBookPaths: Flow<Set<String>> =
+        dataStore.data.catchOnCorruption().map { it[REMOVED_BOOK_PATHS] ?: emptySet() }
+
+    override suspend fun rememberRemovedBookPath(path: String) {
+        dataStore.edit { it[REMOVED_BOOK_PATHS] = (it[REMOVED_BOOK_PATHS] ?: emptySet()) + path }
+    }
+
     override suspend fun addLinkedFolder(uri: String) {
         dataStore.edit { it[LINKED_FOLDERS] = (it[LINKED_FOLDERS] ?: emptySet()) + uri }
     }
@@ -244,6 +251,7 @@ internal class DataStorePreferencesDataSource @Inject constructor(
         val VOLUME_KEYS_INVERTED = booleanPreferencesKey("volume_keys_inverted")
         val TAP_INVERT = booleanPreferencesKey("tap_invert")
         val LINKED_FOLDERS = stringSetPreferencesKey("linked_folders")
+        val REMOVED_BOOK_PATHS = stringSetPreferencesKey("removed_book_paths")
         val DRIVE_ACCOUNT = stringPreferencesKey("drive_account")
         // Legacy tap-zone keys (pre single-switch): read once for migration.
         val TAP_ZONE_MODE = stringPreferencesKey("tap_zone_mode")

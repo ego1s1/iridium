@@ -215,6 +215,19 @@ class DataStorePreferencesDataSourceTest {
     }
 
     @Test
+    fun `removed book paths are remembered across reads`() = runTest {
+        // A linked book is unlinked, never deleted from disk, so the scanner
+        // needs this set to avoid re-adding it on the next pass.
+        assertTrue(source.removedBookPaths.first().isEmpty())
+        source.rememberRemovedBookPath("content://tree/book.epub")
+        source.rememberRemovedBookPath("content://tree/other.epub")
+        assertEquals(
+            setOf("content://tree/book.epub", "content://tree/other.epub"),
+            source.removedBookPaths.first(),
+        )
+    }
+
+    @Test
     fun `corrupt enum values fall back to defaults instead of throwing`() = runTest {
         // A future/older build could have written a value this build does not
         // know; reading must not crash the app.

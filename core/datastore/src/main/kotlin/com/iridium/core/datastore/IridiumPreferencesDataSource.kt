@@ -31,6 +31,13 @@ interface IridiumPreferencesDataSource {
     /** SAF tree URIs (folders) the user linked for book scans. */
     val linkedFolders: Flow<Set<String>>
 
+    /**
+     * Source paths the user removed from the library. Scans skip them: linked
+     * books are unlinked, never deleted from disk, so without this a rescan
+     * would find the file again and put the book back.
+     */
+    val removedBookPaths: Flow<Set<String>>
+
     /** True once the user has answered the crash-reporting prompt. */
     val crashReportingAsked: Flow<Boolean>
 
@@ -46,6 +53,9 @@ interface IridiumPreferencesDataSource {
     suspend fun setCrashReporting(enabled: Boolean)
 
     suspend fun setCrashReportingAsked(asked: Boolean)
+
+    /** Remembers a removed book so the next scan does not re-add it. */
+    suspend fun rememberRemovedBookPath(path: String)
 
     suspend fun addLinkedFolder(uri: String)
 
