@@ -30,6 +30,9 @@ import javax.inject.Inject
  * shared EPUB into app-private storage, then reuses the scan's
  * inspect/index path so imports behave exactly like scanned books.
  */
+/** Rows deleted per statement; well under SQLite's bound-variable limit. */
+private const val DELETE_CHUNK = 500
+
 internal class LibraryScanUseCase @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: IridiumDatabase,
@@ -118,7 +121,8 @@ internal class LibraryScanUseCase @Inject constructor(
                     row
                 }
             }
-            if (merged.isNotEmpty()) bookDao.upsertAll(merged)
+            val changed = merged.filter { row -> knownById[row.id] != row }
+            if (changed.isNotEmpty()) bookDao.upsertAll(changed)
             pruneLocked(
                 foundIdsOf = merged,
                 knownById = knownById,
@@ -214,8 +218,13 @@ internal class LibraryScanUseCase @Inject constructor(
         val prunedLinked = pruned.filter { isLinkedSourcePath(it.id) }
         if (foundIdsOf.isEmpty() && pruned.isNotEmpty()) {
             bookDao.deleteAllLinked()
-        } else if (pruned.isNotEmpty()) {
-            bookDao.deleteMissingLinked(foundIds.toList())
+        } else if (prunedLinked.isNotEmpty()) {
+            // Delete exactly what vanished, in chunks: binding every id into
+            // one `NOT IN` broke past SQLite's variable limit and also scanned
+            // the whole table.
+            prunedLinked.chunked(DELETE_CHUNK).forEach { chunk ->
+                bookDao.deleteByIds(chunk.map { it.id })
+            }
         }
         if (prunedLinked.isNotEmpty()) {
             chapterTextDao.deleteForBooks(prunedLinked.map { it.id })

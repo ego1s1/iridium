@@ -50,12 +50,12 @@ interface BookDao {
     suspend fun deleteById(id: String)
 
     /**
-     * Prunes linked rows no longer present in their source tree. The app
-     * links a single tree, so every linked row belongs to the pass that just
-     * ran; anything not re-found was deleted out from under us.
+     * Deletes exactly the rows the scan found missing. Callers chunk the
+     * list: a single `NOT IN (:ids)` binds one variable per book, and a
+     * library past SQLite's variable limit failed the whole prune.
      */
-    @Query("DELETE FROM books WHERE sourcePath LIKE 'content://%' AND id NOT IN (:ids)")
-    suspend fun deleteMissingLinked(ids: List<String>)
+    @Query("DELETE FROM books WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
 
     @Query("DELETE FROM books WHERE sourcePath LIKE 'content://%'")
     suspend fun deleteAllLinked()

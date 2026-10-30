@@ -320,7 +320,12 @@ class LibraryViewModel @Inject constructor(
             val report = repository.indexFilesystem(
                 removedPaths = removed,
                 onProgress = { done, total ->
-                    indexProgress.value = IndexProgress(done, total)
+                    // One event per book used to rebuild the whole shelf
+                    // state (a list copy per tick), which is O(n^2) across a
+                    // scan. Report sparsely; the last one always reports.
+                    if (done == total || done == 1 || done % INDEX_PROGRESS_STRIDE == 0) {
+                        indexProgress.value = IndexProgress(done, total)
+                    }
                 },
             )
             if (report.failed > 0) {
@@ -339,6 +344,8 @@ class LibraryViewModel @Inject constructor(
     private companion object {
         const val KEY_QUERY_TEXT = "iridium_query_text"
         const val SEARCH_DEBOUNCE_MS = 250L
+        /** Books between scan-progress UI updates; the end always reports. */
+        const val INDEX_PROGRESS_STRIDE = 8
         const val CONTENT_DEBOUNCE_MS = 300L
 
         /** Below this, content search would match almost everything. */

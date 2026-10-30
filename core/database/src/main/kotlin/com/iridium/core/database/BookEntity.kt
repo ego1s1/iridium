@@ -11,7 +11,12 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "books",
-    indices = [Index(value = ["sourcePath"])],
+    indices = [
+        Index(value = ["sourcePath"]),
+        // Every scan reads the rows touched since its snapshot inside the
+        // write transaction; without this that is a full table scan.
+        Index(value = ["updatedAt"]),
+    ],
 )
 data class BookEntity(
     /** Stable id (UUID) assigned at import. */

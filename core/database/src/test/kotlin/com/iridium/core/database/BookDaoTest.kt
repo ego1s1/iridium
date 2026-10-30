@@ -43,17 +43,17 @@ class BookDaoTest {
     }
 
     @Test
-    fun `deleteMissingLinked prunes only linked rows`() = runTest {
+    fun `deleteByIds removes exactly the rows the scan found missing`() = runTest {
         dao.upsert(linkedBook("content://docs/a.epub"))
         dao.upsert(linkedBook("content://docs/b.epub"))
         dao.upsert(linkedBook("/data/local/c.epub"))
 
-        dao.deleteMissingLinked(listOf("content://docs/a.epub"))
+        dao.deleteByIds(listOf("content://docs/b.epub"))
 
-        val remaining = dao.getAll().map { it.id }.toSet()
-        assertTrue("content://docs/a.epub" in remaining)
-        assertTrue("content://docs/b.epub" !in remaining)
-        assertTrue("/data/local/c.epub" in remaining)
+        assertEquals(
+            setOf("content://docs/a.epub", "/data/local/c.epub"),
+            dao.getAll().map { it.id }.toSet(),
+        )
     }
 
     @Test
