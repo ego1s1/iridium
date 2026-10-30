@@ -26,6 +26,9 @@ import kotlinx.collections.immutable.toImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import org.readium.r2.navigator.epub.EpubPreferences
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -250,9 +253,15 @@ class ReaderViewModel @Inject constructor(
         }
         viewModelScope.launch {
             // Persist progress on every debounced locator value.
-            progression.collect { prog ->
+            progression.collect { _ ->
                 val locator = store.latestLocator.value ?: return@collect
-                repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
+                // A locator without totalProgression used to persist 0f next
+                // to a correct locator, so the shelf showed 0% for a book that
+                // resumed exactly. Fall back to the counted page position.
+                val persisted = locator.locations.totalProgression?.toFloat()
+                    ?: positions.currentProgress()
+                    ?: return@collect
+                repository.updateProgress(bookId, persisted, LocatorStrings.encode(locator))
             }
         }
         viewModelScope.launch { observeLayout() }
@@ -416,10 +425,19 @@ class ReaderViewModel @Inject constructor(
             store.failOpen()
             return // Gone state via UiState combine.
         }
-        val prefs = preferences.readerPreferences.first()
-        val mapped = EpubPreferencesMapper.map(prefs)
 
-        when (val result = openBook(book.sourcePath)) {
+        // The EPUB parse is the long pole; the preferences are needed for the
+        // factory either way, so read them while the archive is opening rather
+        // than in front of it. DataStore's first emission is not free.
+        coroutineScope {
+            val opened = async { openBook(book.sourcePath) }
+            val mapped = EpubPreferencesMapper.map(preferences.readerPreferences.first())
+            publishOrFail(book, mapped, opened.await())
+        }
+    }
+
+    private fun publishOrFail(book: Book, mapped: EpubPreferences, result: OpenResult) {
+        when (result) {
             is OpenResult.Opened -> {
                 // An explicit href (from a search hit) wins over saved progress.
                 val initialLocator = route.href
@@ -506,10 +524,13 @@ class ReaderViewModel @Inject constructor(
 
     private suspend fun handleSessionEvent(event: ReaderSessionEvent) {
         when (event) {
-            // No SessionLost branch: nothing emits it, and session death
-            // surfaces as Gone/OpenFailed, which own the exit UI. (The else
-            // satisfies exhaustiveness; a future emitter must route through
-            // those states, never a second Pop.)
+            // Process death wiped the in-memory publication. The host is
+            // already holding a dummy factory and the navigator host refuses
+            // to re-add itself, so staying would park the reader on its loader
+            // forever. Leave; tapping the book again opens a fresh session.
+            ReaderSessionEvent.SessionLost -> viewModelScope.launch {
+                messageChannel.send(ReaderMessage.Pop)
+            }
             ReaderSessionEvent.ContentTapped -> {
                 // A content tap with the dictionary open dismisses the popup
                 // instead of toggling chrome; taps behind any sheet are the
@@ -718,8 +739,9 @@ class ReaderViewModel @Inject constructor(
             // NonCancellable children never run), so the tail write needs
             // a scope that outlives the ViewModel.
             store.latestLocator.value?.let { locator ->
-                val prog = locator.locations.totalProgression?.toFloat() ?: 0f
-                appScope.launch {
+                val prog = locator.locations.totalProgression?.toFloat()
+                    ?: positions.currentProgress()
+                if (prog != null) appScope.launch {
                     safeCatching {
                         repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
                     }

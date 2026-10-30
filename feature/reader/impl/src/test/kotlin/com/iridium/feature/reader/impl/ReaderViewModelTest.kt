@@ -134,6 +134,19 @@ class ReaderViewModelTest {
     // `a failed open leaves nothing in flight and nothing ready`.
 
     @Test
+    fun `process death leaves the reader instead of parking on the loader`() = runTest {
+        // ReaderHostFragment reports this when the in-memory publication is
+        // gone, and the navigator host refuses to re-add itself afterwards.
+        // Staying would leave a dummy factory behind a permanent spinner.
+        // Unconfined main: the ViewModel's event collector is already
+        // subscribed when it is constructed.
+        dispatcherRule.runCurrent()
+        store.tryEmit(ReaderSessionEvent.SessionLost)
+
+        assertEquals(ReaderMessage.Pop, viewModel.messages.first())
+    }
+
+    @Test
     fun `session readiness is exposed straight from the store`() = runTest {
         // The UI gate must read the same value the store publishes.
         assertFalse(viewModel.sessionReady.value)

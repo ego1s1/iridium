@@ -179,6 +179,17 @@ internal class ReaderPositionTracker(
     }
 
     /**
+     * Continuous reading position for persistence, derived from the counted
+     * page. Used only when the locator itself carries no totalProgression,
+     * which would otherwise be saved as 0% next to a correct locator.
+     */
+    fun currentProgress(): Float? {
+        val (index, total) = indexAndCount()
+        if (total <= 1) return null
+        return (index.toFloat() / (total - 1)).coerceIn(0f, 1f)
+    }
+
+    /**
      * Registers a tap that will turn the page. The counter advances now, one
      * step from whatever is currently displayed, so repeated taps accumulate
      * predictably instead of compounding with a late echo.
