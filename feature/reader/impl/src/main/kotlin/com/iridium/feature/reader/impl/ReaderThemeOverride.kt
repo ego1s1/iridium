@@ -49,9 +49,9 @@ internal object ReaderThemeOverride {
         selectionFgHex: String? = null,
     ): String {
         val bg = "#$bgHex"
-        val fg = "#$fgHex"
-        val selectionBg = "#${selectionBgHex ?: defaultSelectionBackground(bgHex)}"
-        val selectionFg = "#${selectionFgHex ?: fgHex}"
+        val fg = cssColor(fgHex)
+        val selectionBg = cssColor(selectionBgHex ?: defaultSelectionBackground(bgHex))
+        val selectionFg = cssColor(selectionFgHex ?: fgHex)
         // `body.__Ir_Theme.__Ir_Theme...` — 16x repetition beats any book rule.
         val bodySelector = (0 until 16).joinToString(separator = "", prefix = "body") {
             ".$SPECIFICITY_CLASS"
@@ -111,6 +111,22 @@ internal object ReaderThemeOverride {
             "s.textContent='$escaped';})()"
     }
 
+    /**
+     * CSS colour for a bare hex string. Six digits become `#rrggbb`; eight
+     * digits are `rrggbbaa` and are emitted as `rgba()` because `#RRGGBBAA` is
+     * CSS Color 4 and older WebView builds drop the declaration outright,
+     * which silently disabled text dimming.
+     */
+    internal fun cssColor(hex: String): String {
+        if (hex.length <= 6) return "#$hex"
+        val r = hex.substring(0, 2).toInt(16)
+        val g = hex.substring(2, 4).toInt(16)
+        val b = hex.substring(4, 6).toInt(16)
+        val a = hex.substring(6, 8).toInt(16)
+        val alpha = "%.3f".format(java.util.Locale.US, a / 255f).trimEnd('0').trimEnd('.')
+        return "rgba($r, $g, $b, ${alpha.ifEmpty { "0" }})"
+    }
+
     /** #RRGGBB from an ARGB int (alpha dropped for readability of page colors). */
     internal fun hex(argb: Int): String =
         Integer.toHexString(argb and 0x00FFFFFF).padStart(6, '0')
@@ -165,10 +181,10 @@ internal object ReaderThemeOverride {
     }
 
     /** Maximum extra dim as a fraction of the text's own alpha. */
-    private const val MAX_DIM_ALPHA = 0.6f
+    private const val MAX_DIM_ALPHA = 0.85f
 
     /** Light pages dim far less: grey-on-white loses legibility quickly. */
-    private const val LIGHT_MAX_DIM = 0.3f
+    private const val LIGHT_MAX_DIM = 0.35f
 
     /** Never fade text below a legible floor. */
     private const val MIN_TEXT_ALPHA = 64
