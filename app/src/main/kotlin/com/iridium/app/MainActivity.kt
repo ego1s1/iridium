@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
+import dagger.Lazy
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -16,8 +17,14 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
+    /**
+     * Lazy on purpose: resolving this builds the whole library data graph
+     * (Room, the DAOs, the EPUB engine) and injection happens before
+     * `onCreate`, on the main thread, on every cold start - even for a
+     * launcher intent with nothing to import.
+     */
     @Inject
-    lateinit var importHandler: ImportDeepLinkHandler
+    lateinit var importHandler: Lazy<ImportDeepLinkHandler>
 
     @Inject
     lateinit var deepLinkNavigator: DeepLinkNavigator
@@ -43,7 +50,11 @@ class MainActivity : AppCompatActivity() {
     /** Imports a shared/opened EPUB, then opens it in the reader. */
     private fun handleDeepLink(intent: Intent?) {
         lifecycleScope.launch {
-            val bookId = importHandler.handle(intent) ?: return@launch
+            // Resolve the handler only for an intent that is actually ours;
+            // the check itself allocates nothing and touches no storage.
+            val handler = importHandler.get()
+            if (handler.parseIntent(intent) == null) return@launch
+            val bookId = handler.handle(intent) ?: return@launch
             deepLinkNavigator.openBook(bookId)
         }
     }

@@ -1,6 +1,7 @@
 package com.iridium.core.designsystem
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -77,75 +78,75 @@ import androidx.compose.material.icons.rounded.Warning
  * icon they show per direction, so automirroring would double-flip.
  */
 object IridiumIcons {
-    val Add = Icons.Rounded.Add
-    val Animation = Icons.Rounded.Animation
-    val Back = Icons.AutoMirrored.Rounded.ArrowBack
-    val Bookmark = Icons.Rounded.Bookmark
-    val BookmarkBorder = Icons.Rounded.BookmarkBorder
-    val BrokenImage = Icons.Rounded.BrokenImage
-    val BugReport = Icons.Rounded.BugReport
-    val Check = Icons.Rounded.Check
-    val Close = Icons.Rounded.Close
-    val Code = Icons.Rounded.Code
-    val Contrast = Icons.Rounded.Contrast
-    val Crop = Icons.Rounded.Crop
-    val DarkMode = Icons.Rounded.DarkMode
-    val Delete = Icons.Rounded.Delete
-    val Edit = Icons.Rounded.Edit
-    val ExpandMore = Icons.Rounded.ExpandMore
-    val FitScreen = Icons.Rounded.FitScreen
-    val Folder = Icons.Rounded.Folder
-    val FormatPaint = Icons.Rounded.FormatPaint
-    val Forward = Icons.AutoMirrored.Rounded.ArrowForward
-    val GridView = Icons.Rounded.GridView
-    val Highlight = Icons.Rounded.Highlight
-    val History = Icons.Rounded.History
-    val ImportFile = Icons.Rounded.UploadFile
-    val ImportFolder = Icons.Rounded.CreateNewFolder
-    val Info = Icons.Rounded.Info
-    val LightMode = Icons.Rounded.LightMode
-    val List = Icons.Rounded.List
-    val MenuBook = Icons.AutoMirrored.Rounded.MenuBook
-    val More = Icons.Rounded.MoreVert
-    val Motion = Icons.Rounded.MotionPhotosOn
-    val NewReleases = Icons.Rounded.NewReleases
-    val Next = Icons.AutoMirrored.Rounded.NavigateNext
-    val Palette = Icons.Rounded.Palette
-    val Play = Icons.Rounded.PlayArrow
-    val Previous = Icons.AutoMirrored.Rounded.NavigateBefore
-    val Refresh = Icons.Rounded.Refresh
-    val Remove = Icons.Rounded.Remove
-    val ScreenRotation = Icons.Rounded.ScreenRotation
-    val Search = Icons.Rounded.Search
-    val Settings = Icons.Rounded.Settings
-    val Share = Icons.Rounded.Share
-    val SkipNext = Icons.Rounded.SkipNext
-    val SkipPrevious = Icons.Rounded.SkipPrevious
-    val Spa = Icons.Rounded.Spa
-    val Storage = Icons.Rounded.Storage
-    val SwapHoriz = Icons.Rounded.SwapHoriz
-    val SwapVert = Icons.Rounded.SwapVert
-    val TouchApp = Icons.Rounded.TouchApp
-    val TrendingUp = Icons.Rounded.TrendingUp
-    val Tune = Icons.Rounded.Tune
-    val Vibration = Icons.Rounded.Vibration
-    val ViewAgenda = Icons.Rounded.ViewAgenda
-    val ViewCompact = Icons.Rounded.ViewCompact
-    val ViewList = Icons.Rounded.ViewList
-    val ViewModule = Icons.Rounded.ViewModule
-    val Warning = Icons.Rounded.Warning
-    val Fire = Icons.Rounded.LocalFireDepartment
-    val Trophy = Icons.Rounded.EmojiEvents
-    val Sparkle = Icons.Rounded.AutoAwesome
+    val Add: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Add }
+    val Animation: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Animation }
+    val Back: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.AutoMirrored.Rounded.ArrowBack }
+    val Bookmark: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Bookmark }
+    val BookmarkBorder: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.BookmarkBorder }
+    val BrokenImage: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.BrokenImage }
+    val BugReport: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.BugReport }
+    val Check: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Check }
+    val Close: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Close }
+    val Code: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Code }
+    val Contrast: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Contrast }
+    val Crop: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Crop }
+    val DarkMode: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.DarkMode }
+    val Delete: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Delete }
+    val Edit: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Edit }
+    val ExpandMore: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ExpandMore }
+    val FitScreen: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.FitScreen }
+    val Folder: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Folder }
+    val FormatPaint: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.FormatPaint }
+    val Forward: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.AutoMirrored.Rounded.ArrowForward }
+    val GridView: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.GridView }
+    val Highlight: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Highlight }
+    val History: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.History }
+    val ImportFile: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.UploadFile }
+    val ImportFolder: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.CreateNewFolder }
+    val Info: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Info }
+    val LightMode: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.LightMode }
+    val List: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.List }
+    val MenuBook: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.AutoMirrored.Rounded.MenuBook }
+    val More: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.MoreVert }
+    val Motion: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.MotionPhotosOn }
+    val NewReleases: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.NewReleases }
+    val Next: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.AutoMirrored.Rounded.NavigateNext }
+    val Palette: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Palette }
+    val Play: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.PlayArrow }
+    val Previous: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.AutoMirrored.Rounded.NavigateBefore }
+    val Refresh: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Refresh }
+    val Remove: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Remove }
+    val ScreenRotation: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ScreenRotation }
+    val Search: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Search }
+    val Settings: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Settings }
+    val Share: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Share }
+    val SkipNext: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.SkipNext }
+    val SkipPrevious: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.SkipPrevious }
+    val Spa: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Spa }
+    val Storage: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Storage }
+    val SwapHoriz: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.SwapHoriz }
+    val SwapVert: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.SwapVert }
+    val TouchApp: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.TouchApp }
+    val TrendingUp: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.TrendingUp }
+    val Tune: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Tune }
+    val Vibration: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Vibration }
+    val ViewAgenda: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ViewAgenda }
+    val ViewCompact: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ViewCompact }
+    val ViewList: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ViewList }
+    val ViewModule: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.ViewModule }
+    val Warning: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Warning }
+    val Fire: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.LocalFireDepartment }
+    val Trophy: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.EmojiEvents }
+    val Sparkle: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.AutoAwesome }
 
     // Settings hub categories.
-    val Shelves = Icons.Rounded.CollectionsBookmark
-    val PrivacyLock = Icons.Rounded.Lock
+    val Shelves: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.CollectionsBookmark }
+    val PrivacyLock: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.Lock }
 
     // Navigation pairs: outlined for idle tabs, filled for selected,
     // crossfaded on selection like the reference bottom toolbar.
-    val MenuBookOutlined = Icons.Outlined.MenuBook
-    val BarChartOutlined = Icons.Outlined.BarChart
-    val SettingsOutlined = Icons.Outlined.Settings
-    val BarChart = Icons.Rounded.BarChart
+    val MenuBookOutlined: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Outlined.MenuBook }
+    val BarChartOutlined: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Outlined.BarChart }
+    val SettingsOutlined: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Outlined.Settings }
+    val BarChart: ImageVector by lazy(LazyThreadSafetyMode.NONE) { Icons.Rounded.BarChart }
 }
