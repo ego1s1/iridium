@@ -35,7 +35,6 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       signing: ${{ steps.signing.outputs.mode }}
-      apk: ${{ steps.sign.outputs.apk }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -217,7 +216,6 @@ jobs:
             "$BUILD_TOOLS/apksigner" verify --print-certs "$SIGNED" | head -5
             rm -f "$ALIGNED"
           done
-          echo "apk=iridium-$TAG-play.apk iridium-$TAG-foss.apk" >> "$GITHUB_OUTPUT"
 
       - name: Sign App Bundle
         id: bundle
@@ -258,9 +256,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release
+          # Globs, not a list of names: the sign steps write both variants plus
+          # the bundle into the workspace root, and a space-separated line would
+          # be read as one filename.
           path: |
-            ${{ steps.sign.outputs.apk }}
-            ${{ steps.bundle.outputs.aab }}
+            iridium-*.apk
+            iridium-*.aab
           if-no-files-found: error
 
   release:
@@ -273,13 +274,37 @@ jobs:
           name: release
           path: ./dist
 
+      # The release job has no working tree of its own, and the notes come from
+      # the changelog that was committed for this tag.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+
+      - name: Compose release notes
+        run: |
+          TAG="${{ needs.build.outputs.tag }}"
+          VERSION="${TAG#v}"
+          : > body.md
+          if [ "${{ needs.build.outputs.signing }}" = "generated" ]; then
+            cat >> body.md <<'WARN'
+          > **Alpha test build.** Signed with a throwaway key generated for this tag because no release keystore is configured, so this build will not install over a previous release — uninstall first. Set the KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD repository secrets to enable in-place updates.
+
+          WARN
+          fi
+          # The section for this version, without the heading (the release
+          # title already carries the number).
+          awk -v v="## $VERSION" 'index($0,v)==1{f=1;next} f&&/^## /{exit} f' docs/CHANGELOG.md >> body.md
+          echo "--- release notes ---"
+          cat body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           name: Iridium ${{ needs.build.outputs.tag }}
-          generate_release_notes: ${{ needs.build.outputs.signing == 'secret' }}
-          body: ${{ needs.build.outputs.signing == 'generated' && '> **Alpha test build.** Signed with a throwaway key generated for this tag because no release keystore is configured, so this build will not install over a previous release — uninstall first. Set the KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD repository secrets to enable in-place updates.' || '' }}
+          # The changelog is the curated note set; GitHub's auto-generated
+          # list of commits is noise next to it.
+          body_path: body.md
           prerelease: ${{ contains(needs.build.outputs.tag, 'alpha') || contains(needs.build.outputs.tag, 'beta') || contains(needs.build.outputs.tag, 'rc') }}
           files: |
             ./dist/*.apk
