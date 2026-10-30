@@ -753,7 +753,13 @@ class ReaderViewModel @Inject constructor(
     }
 
     private companion object {
-        const val MAX_SHOWCASE_BYTES = 32 * 1024 * 1024L
+        /**
+         * Cap on the bytes held for a full-screen image. The decode is already
+         * downsampled to the viewport, so this only bounds the source read;
+         * 32 MB let a single picture pin tens of megabytes of heap alongside
+         * the WebView it was opened over.
+         */
+        const val MAX_SHOWCASE_BYTES = 16 * 1024 * 1024L
         /**
          * Locator changes inside this window after programmatic navigation
          * (open, seek, TOC jump) never hide the chrome: only user page turns
