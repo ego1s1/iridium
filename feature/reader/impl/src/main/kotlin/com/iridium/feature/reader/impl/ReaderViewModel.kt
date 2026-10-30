@@ -596,6 +596,16 @@ class ReaderViewModel @Inject constructor(
     /** Href of the book `<img>` being showcased full-screen, or null. */
     val shownImage: StateFlow<String?> = store.shownImage
 
+    /**
+     * Adopts the app's selection colours and re-injects the page stylesheet so
+     * selected text uses them. Called when the reader screen knows the theme.
+     */
+    fun setSelectionColors(backgroundArgb: Int, foregroundArgb: Int) {
+        if (store.selectionColors.value == backgroundArgb to foregroundArgb) return
+        store.setSelectionColors(backgroundArgb, foregroundArgb)
+        viewModelScope.launch { prefsApplier.applyThemeOverride() }
+    }
+
     /** Active text selection, or null. Drives the selection haptic. */
     val selectedText: StateFlow<String?> = store.selectedText
 

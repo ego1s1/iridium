@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -95,6 +97,18 @@ internal fun ReaderRoute(
         viewModel.pageTurns.collect { direction ->
             turnPulse = PageTurnPulse(turnPulse.id + 1, direction)
         }
+    }
+
+    // Selection colours come from the app's palette, so the highlight matches
+    // the dynamic theme instead of the toolkit's fixed pale blue. The pair is
+    // guaranteed to contrast because it is a container/on-container pair.
+    val selectionBackground = MaterialTheme.colorScheme.primaryContainer
+    val selectionForeground = MaterialTheme.colorScheme.onPrimaryContainer
+    LaunchedEffect(selectionBackground, selectionForeground) {
+        viewModel.setSelectionColors(
+            selectionBackground.toArgb(),
+            selectionForeground.toArgb(),
+        )
     }
 
     // Crisp buzzy tick the moment text becomes selected, which is now the only

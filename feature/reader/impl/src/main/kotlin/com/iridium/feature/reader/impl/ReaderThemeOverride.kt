@@ -33,10 +33,25 @@ internal object ReaderThemeOverride {
         return overrideCssColors(hex(bg), hex(fg))
     }
 
-    /** Forced-override CSS for explicit bare-hex colors (custom palettes). */
-    fun overrideCssColors(bgHex: String, fgHex: String): String {
+    /**
+     * Forced-override CSS for explicit bare-hex colors (custom palettes).
+     *
+     * [selectionBgHex]/[selectionFgHex] style the text selection. Without them
+     * the page inherits the toolkit's fixed pale blue, which clashes with the
+     * page palette and, because every element's colour is forced here, renders
+     * pale text on pale blue - unreadable. Null falls back to a tint derived
+     * from the page's own foreground so contrast is always high.
+     */
+    fun overrideCssColors(
+        bgHex: String,
+        fgHex: String,
+        selectionBgHex: String? = null,
+        selectionFgHex: String? = null,
+    ): String {
         val bg = "#$bgHex"
         val fg = "#$fgHex"
+        val selectionBg = "#${selectionBgHex ?: defaultSelectionBackground(bgHex)}"
+        val selectionFg = "#${selectionFgHex ?: fgHex}"
         // `body.__Ir_Theme.__Ir_Theme...` — 16x repetition beats any book rule.
         val bodySelector = (0 until 16).joinToString(separator = "", prefix = "body") {
             ".$SPECIFICITY_CLASS"
@@ -52,7 +67,13 @@ internal object ReaderThemeOverride {
             append(" -webkit-text-fill-color: $fg !important;")
             append(" }\n")
             append("a, a:link, a:visited, a:hover, a * {")
-            append(" color: $fg !important; -webkit-text-fill-color: $fg !important; }")
+            append(" color: $fg !important; -webkit-text-fill-color: $fg !important; }\n")
+            // Selection follows the theme, and repeats the body class so the
+            // forced text colour above cannot override it.
+            append("$bodySelector ::selection, $bodySelector::selection {")
+            append(" background-color: $selectionBg !important;")
+            append(" color: $selectionFg !important;")
+            append(" -webkit-text-fill-color: $selectionFg !important; }")
         }
     }
 
@@ -71,8 +92,13 @@ internal object ReaderThemeOverride {
      * [overrideCssColors] into the current document. Safe to embed in a
      * single `evaluateJavascript` string.
      */
-    fun injectOverrideScriptColors(bgHex: String, fgHex: String): String {
-        val css = overrideCssColors(bgHex, fgHex)
+    fun injectOverrideScriptColors(
+        bgHex: String,
+        fgHex: String,
+        selectionBgHex: String? = null,
+        selectionFgHex: String? = null,
+    ): String {
+        val css = overrideCssColors(bgHex, fgHex, selectionBgHex, selectionFgHex)
         val escaped = css
             .replace("\\", "\\\\")
             .replace("'", "\\'")
@@ -119,6 +145,23 @@ internal object ReaderThemeOverride {
         val g = (backgroundArgb shr 8) and 0xFF
         val b = backgroundArgb and 0xFF
         return (0.299 * r + 0.587 * g + 0.114 * b) > 127
+    }
+
+    /**
+     * Fallback selection tint when the caller has no themed colour: 22% of the
+     * page foreground over its background. Guaranteed to differ from the page
+     * by a fixed amount in both light and dark palettes.
+     */
+    internal fun defaultSelectionBackground(bgHex: String): String {
+        val bg = bgHex.toLong(16)
+        val fg = if (isLightPage(0xFF000000.toInt() or bg.toInt())) 0x000000 else 0xFFFFFF
+        val mix = 0.22
+        fun channel(shift: Int): Int {
+            val b = ((bg shr shift) and 0xFF).toDouble()
+            val f = ((fg shr shift) and 0xFF).toDouble()
+            return (b + (f - b) * mix).toInt().coerceIn(0, 255)
+        }
+        return "%02x%02x%02x".format(channel(16), channel(8), channel(0))
     }
 
     /** Maximum extra dim as a fraction of the text's own alpha. */

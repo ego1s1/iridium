@@ -112,6 +112,18 @@ class ReaderSessionStore @Inject constructor() {
     private val _selectedText = MutableStateFlow<String?>(null)
     val selectedText: StateFlow<String?> = _selectedText.asStateFlow()
 
+    /**
+     * Selection colours (background to foreground) taken from the app's
+     * Material palette, so the selection matches the dynamic theme instead of
+     * the toolkit's fixed pale blue. Null until the reader screen sets them.
+     */
+    private val _selectionColors = MutableStateFlow<Pair<Int, Int>?>(null)
+    val selectionColors: StateFlow<Pair<Int, Int>?> = _selectionColors.asStateFlow()
+
+    fun setSelectionColors(backgroundArgb: Int, foregroundArgb: Int) {
+        _selectionColors.value = backgroundArgb to foregroundArgb
+    }
+
     /** Book `<img>` being showcased full-screen (src href), or null when closed. */
     private val _shownImage = MutableStateFlow<String?>(null)
     val shownImage: StateFlow<String?> = _shownImage.asStateFlow()

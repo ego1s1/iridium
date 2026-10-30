@@ -68,9 +68,12 @@ internal class ReaderPrefsController(
         } else {
             ReaderThemeOverride.hex(finalFg)
         }
+        val selection = store.selectionColors.value
         val script = ReaderThemeOverride.injectOverrideScriptColors(
-            ReaderThemeOverride.hex(bg),
-            fgCss,
+            bgHex = ReaderThemeOverride.hex(bg),
+            fgHex = fgCss,
+            selectionBgHex = selection?.let { ReaderThemeOverride.hex(it.first) },
+            selectionFgHex = selection?.let { ReaderThemeOverride.hex(it.second) },
         )
         safeCatching {
             store.navigator?.evaluateJavascript(script)
