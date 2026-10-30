@@ -6,8 +6,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.Reader
+
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+
+/**
+ * Streams [text] one character per read, the way a socket delivers a body in
+ * arbitrary chunks. A single read() call would return one character.
+ */
+private class TrickleReader(private val text: String) : Reader() {
+    private var index = 0
+    override fun read(cbuf: CharArray, off: Int, len: Int): Int {
+        if (index >= text.length) return -1
+        cbuf[off] = text[index++]
+        return 1
+    }
+    override fun close() = Unit
+}
 
 /**
  * Lookup parsing is verified against inline dictionaryapi.dev fixtures —
@@ -15,6 +31,20 @@ import org.robolectric.RobolectricTestRunner
  */
 @RunWith(RobolectricTestRunner::class)
 class DictionaryLookupTest {
+
+    @Test
+    fun `response body is drained fully, not just the first chunk`() {
+        // Regression: a single read() truncated larger payloads mid-JSON, which
+        // surfaced as "Couldn't understand the dictionary response".
+        val payload = "x".repeat(20_000)
+        assertEquals(payload, readCapped(TrickleReader(payload), 64 * 1024))
+    }
+
+    @Test
+    fun `response body stops at the cap`() {
+        val payload = "y".repeat(1_000)
+        assertEquals(100, readCapped(TrickleReader(payload), 100).length)
+    }
 
     private class FakeHttpClient(
         var result: HttpResult = HttpResult(200, "[]"),

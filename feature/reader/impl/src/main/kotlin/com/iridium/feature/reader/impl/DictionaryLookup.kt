@@ -88,9 +88,10 @@ class UrlConnectionDictionaryHttpClient(
                 connection.errorStream
             }
             val body = stream?.bufferedReader()?.use { reader ->
-                val capped = CharArray(MAX_DICTIONARY_BODY_CHARS)
-                val read = reader.read(capped)
-                if (read <= 0) "" else String(capped, 0, read)
+                // readCapped loops: a single read() returns only whatever chunk
+                // is buffered, which truncated larger payloads mid-JSON and
+                // surfaced as "Couldn't understand the dictionary response".
+                readCapped(reader, MAX_DICTIONARY_BODY_CHARS)
             }.orEmpty()
             return HttpResult(code, body)
         } finally {
@@ -105,6 +106,28 @@ class UrlConnectionDictionaryHttpClient(
         const val MAX_DICTIONARY_BODY_CHARS = 256 * 1024
     }
 }
+
+/**
+ * Reads at most [maxChars] from [reader], looping until the stream ends.
+ *
+ * `Reader.read(CharArray)` is not required to fill the array: on a socket it
+ * returns whatever arrived. A single call silently truncated responses, which
+ * broke JSON parsing for any word with a sizeable definition.
+ */
+internal fun readCapped(reader: java.io.Reader, maxChars: Int): String {
+    val chunk = CharArray(READ_CHUNK_CHARS)
+    val out = StringBuilder()
+    while (out.length < maxChars) {
+        val limit = minOf(chunk.size, maxChars - out.length)
+        val read = reader.read(chunk, 0, limit)
+        if (read <= 0) break
+        out.append(chunk, 0, read)
+    }
+    return out.toString()
+}
+
+/** Buffer size per read call while draining a response body. */
+private const val READ_CHUNK_CHARS = 8 * 1024
 
 /**
  * Free Wiktionary lookup (MediaWiki REST API, no key required) with a
