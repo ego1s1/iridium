@@ -10,10 +10,12 @@ import androidx.compose.material3.Surface
 import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivity
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +76,11 @@ fun IridiumApp(
                     IridiumLoading()
                     return@Surface
                 }
+                // Cold-start end marker: the shell is composed with the user's
+                // real theme and destination, not the loading surface. The
+                // benchmark harness and Play vitals both read this.
+                val activity = LocalActivity.current
+                LaunchedEffect(completed) { activity?.reportFullyDrawn() }
                 val navController = rememberNavController()
                 // The reader owns system-bar glyphs per book theme (sepia
                 // needs dark glyphs, pitch-black needs light ones). The app

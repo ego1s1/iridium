@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Benchmark-only manifest. Macrobenchmark can only install a baseline profile
+  into a profileable, non-debuggable app, so the `benchmark` build type gets
+  this marker. It never ships: it is merged into the `benchmark` variants
+  only (playBenchmark / fossBenchmark).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
+    </application>
+</manifest>

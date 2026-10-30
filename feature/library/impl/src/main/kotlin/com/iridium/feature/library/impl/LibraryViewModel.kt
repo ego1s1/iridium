@@ -311,6 +311,10 @@ class LibraryViewModel @Inject constructor(
 
     /** One filesystem pass, reporting failures to the UI. */
     private suspend fun runScan() {
+        // Trace marker for the benchmark harness: the scan is the largest
+        // background cost of a launch, and it competes with the first shelf
+        // frame, so it needs its own span in a Perfetto/systrace capture.
+        android.os.Trace.beginSection("iri.library.scan")
         try {
             val removed = preferences.removedBookPaths.first()
             val report = repository.indexFilesystem(
@@ -326,6 +330,8 @@ class LibraryViewModel @Inject constructor(
             throw e
         } catch (_: Exception) {
             messageChannel.send(LibraryMessage.ScanFailed)
+        } finally {
+            android.os.Trace.endSection()
         }
     }
 

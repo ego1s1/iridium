@@ -45,6 +45,16 @@ android {
                 "proguard-rules.pro",
             )
         }
+        // Macrobenchmark target: identical to release (minified, shrunk) but
+        // signed with the debug key so it installs on a test device, and
+        // marked profileable in src/benchmark/AndroidManifest.xml so
+        // CompilationMode can push a baseline profile into it.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
     }
 
     packaging {

@@ -44,3 +44,6 @@ include(":feature:history:impl")
 include(":feature:reader:api")
 include(":feature:reader:impl")
 include(":feature:settings:impl")
+
+// Macrobenchmark harness (measurement only, never shipped).
+include(":benchmark")

@@ -352,7 +352,7 @@ class ReaderViewModel @Inject constructor(
         val prefs = preferences.readerPreferences.first()
         val mapped = EpubPreferencesMapper.map(prefs)
 
-        when (val result = opener.open(book.sourcePath)) {
+        when (val result = openBook(book.sourcePath)) {
             is OpenResult.Opened -> {
                 // An explicit href (from a search hit) wins over saved progress.
                 val initialLocator = route.href
@@ -374,6 +374,16 @@ class ReaderViewModel @Inject constructor(
                 openFailed.value = true
                 openFileMissing.value = result == OpenResult.FileMissing
             }
+        }
+    }
+
+    /** Opens the EPUB under a trace span; parsing is the first big cost. */
+    private suspend fun openBook(sourcePath: String): OpenResult {
+        android.os.Trace.beginSection("iri.reader.open")
+        return try {
+            opener.open(sourcePath)
+        } finally {
+            android.os.Trace.endSection()
         }
     }
 
@@ -404,9 +414,10 @@ class ReaderViewModel @Inject constructor(
         withTimeoutOrNull(SECONDARY_DATA_WAIT_MS) {
             pageLoaded.first { it }
         }
-        positions.replaceAll(
-            safeCatching { result.publication.positions() }.getOrDefault(emptyList()),
-        )
+        android.os.Trace.beginSection("iri.reader.positions")
+        val positionTable = safeCatching { result.publication.positions() }.getOrDefault(emptyList())
+        android.os.Trace.endSection()
+        positions.replaceAll(positionTable)
         positions.measurePagination()
         // Content indexing parses every spine chapter (and spools the whole
         // file for pipe-like providers). It is only needed for library search,
