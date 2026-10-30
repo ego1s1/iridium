@@ -43,6 +43,8 @@ internal fun HistoryTopBookRow(
             BookCoverArt(
                 coverPath = top.book.coverPath,
                 contentDescription = top.book.title,
+                version = top.book.sourceModified,
+                sizeTag = "rank",
             )
         }
         Column(modifier = Modifier.weight(1f)) {

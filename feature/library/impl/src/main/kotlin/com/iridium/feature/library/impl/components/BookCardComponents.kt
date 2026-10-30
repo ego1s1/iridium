@@ -106,6 +106,8 @@ internal fun BookCoverImage(
         BookCoverArt(
             coverPath = book.coverPath,
             contentDescription = null,
+            version = book.sourceModified,
+            sizeTag = "grid",
         )
 
         // Subtle physical book spine crease/highlight along the left edge.
@@ -163,6 +165,8 @@ internal fun BookProgressIndicator(
 ) {
     if (book.isInProgress || book.isFinished) {
         IridiumProgressBar(
+            // Cards are many and long-lived: no wave animation per card.
+            animated = false,
             progress = { book.progress },
             modifier = modifier
                 .fillMaxWidth()

@@ -253,6 +253,8 @@ internal fun BookListRow(
                 BookCoverArt(
                     coverPath = book.coverPath,
                     contentDescription = null,
+                    version = book.sourceModified,
+                    sizeTag = "row",
                 )
             }
 

@@ -93,6 +93,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.coil.compose)
     coreLibraryDesugaring(libs.desugar.libs)
 
     testImplementation(libs.junit)

@@ -165,7 +165,12 @@ private fun HistoryRow(
                     .size(width = 48.dp, height = 72.dp)
                     .clip(RoundedCornerShape(6.dp)),
             ) {
-                BookCoverArt(coverPath = book.coverPath, contentDescription = book.title)
+                BookCoverArt(
+                    coverPath = book.coverPath,
+                    contentDescription = book.title,
+                    version = book.sourceModified,
+                    sizeTag = "row",
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

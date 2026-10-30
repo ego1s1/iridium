@@ -44,6 +44,19 @@ fun BookCoverArt(
     coverPath: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
+    /**
+     * Bumped when the cover file is regenerated (the row's `sourceModified`).
+     * Used instead of stat-ing the file: the old key called
+     * `File.lastModified()` during composition, once per visible card, which
+     * is blocking IO on the frame that binds the grid.
+     */
+    version: Long = 0L,
+    /**
+     * Size class of the slot. The cover is requested at 48 dp in a list row
+     * and at ~500 px in the grid; sharing one memory-cache entry between them
+     * meant whichever loaded first decided the decode resolution for both.
+     */
+    sizeTag: String = "cover",
 ) {
     val vectorPainter = rememberVectorPainter(image = IridiumIcons.MenuBook)
     val placeholderTint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -60,9 +73,8 @@ fun BookCoverArt(
 
     if (coverPath != null) {
         val appContext = LocalContext.current.applicationContext
-        val coverKey = remember(coverPath) {
-            val mtime = runCatching { File(coverPath).lastModified() }.getOrDefault(0L)
-            "$coverPath@$mtime"
+        val coverKey = remember(coverPath, version, sizeTag) {
+            "$coverPath@$version#$sizeTag"
         }
         val request = remember(coverKey) {
             ImageRequest.Builder(appContext)
