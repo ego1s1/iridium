@@ -6,6 +6,21 @@ User-facing entries only. One line per user-visible change.
 
 _Nothing yet._
 
+## 0.1.2
+
+### Added
+
+- Two downloads: a Play Store build with Drive sync, and an F-Droid build with no Google components at all. Both can be installed side by side.
+
+### Changed
+
+- Reader settings stay at half height and scroll inside themselves instead of expanding over the whole page.
+
+### Fixed
+
+- Fixed extra dim not visibly dimming the text.
+- Fixed removed books coming back the next time the library was scanned.
+
 ## 0.1.1
 
 ### Added
