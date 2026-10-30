@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -59,10 +60,19 @@ internal fun ReaderSettingsSheet(
     onAction: (ReaderAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IridiumSheet(onDismiss = { onAction(ReaderAction.CloseSettings) }, modifier = modifier) {
+    IridiumSheet(
+        onDismiss = { onAction(ReaderAction.CloseSettings) },
+        // Half-height and fixed: the list scrolls inside it instead of the
+        // sheet expanding to full screen.
+        pinnedHeightFraction = SETTINGS_SHEET_HEIGHT_FRACTION,
+        modifier = modifier,
+    ) {
         ReaderSettingsContent(prefs = prefs, onAction = onAction)
     }
 }
+
+/** Share of the screen the settings sheet occupies, fixed. */
+private const val SETTINGS_SHEET_HEIGHT_FRACTION = 0.55f
 
 /** Sheet body content, exposed for testing (modals do not settle under Robolectric). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -76,6 +86,7 @@ internal fun ReaderSettingsContent(
     Column(
         modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

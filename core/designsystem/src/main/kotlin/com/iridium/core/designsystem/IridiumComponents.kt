@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -266,15 +268,33 @@ fun IridiumSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     skipPartiallyExpanded: Boolean = false,
+    /**
+     * Pins the sheet to this fraction of the screen height and hands dragging
+     * to the content instead of the sheet. Without it the sheet can be dragged
+     * to full screen, which turns a settings list into a page-sized panel and
+     * competes with the list for the same gesture.
+     */
+    pinnedHeightFraction: Float? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val pinned = pinnedHeightFraction != null
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded),
+        // A pinned sheet has no expanded state to move to, so partial expansion
+        // is irrelevant; skipping it avoids a hidden intermediate stop.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded || pinned),
+        // With sheet dragging off, every drag inside the sheet belongs to the
+        // scroller underneath, so the whole surface is a scroll target.
+        sheetGesturesEnabled = !pinned,
         shape = MaterialTheme.shapes.topSheet,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier,
     ) {
-        content()
+        if (pinnedHeightFraction != null) {
+            val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+            Column(Modifier.height(screenHeight * pinnedHeightFraction)) { content() }
+        } else {
+            content()
+        }
     }
 }
