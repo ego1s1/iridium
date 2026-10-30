@@ -38,4 +38,9 @@ internal object DatabaseModule {
     @Singleton
     fun provideChapterTextDao(database: IridiumDatabase): ChapterTextDao =
         database.chapterTextDao()
+
+    @Provides
+    @Singleton
+    fun provideChapterLayoutDao(database: IridiumDatabase): ChapterLayoutDao =
+        database.chapterLayoutDao()
 }

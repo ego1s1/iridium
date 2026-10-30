@@ -5,43 +5,66 @@ import com.iridium.core.datastore.IridiumPreferencesDataSource
 import com.iridium.core.model.ReaderPreferences
 import com.iridium.core.model.resolvedColors
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.readium.r2.shared.publication.services.positions
+import org.readium.r2.navigator.epub.EpubPreferences
 
 /**
- * Reader-preference writes + navigator submission. Every write re-submits
- * the mapped Readium preferences and re-injects the forced-override theme
- * stylesheet so exact colors win over the book's own CSS.
+ * Reader preference writes and navigator submission.
+ *
+ * A preference is either structural (font, size, leading, margins, alignment,
+ * theme) or cosmetic (extra dim, night light, brightness, hardware keys). Only
+ * structural edits reach the navigator.
+ *
+ * That distinction is the whole point: every write used to re-submit the
+ * mapped [EpubPreferences] and then refresh the position table by walking the
+ * entire publication, even when nothing about the layout had changed - and the
+ * extra-dim slider ran that per drag frame. Cosmetic edits now stop at the CSS
+ * injection, and structural edits cost exactly one submit.
  */
 internal class ReaderPrefsController(
     private val scope: CoroutineScope,
     private val preferences: IridiumPreferencesDataSource,
     private val store: ReaderSessionStore,
-    private val positions: ReaderPositionTracker,
+    private val currentPrefs: () -> ReaderPreferences,
 ) {
+
+    /** Last preferences handed to the navigator; cosmetic edits match this. */
+    private var submitted: EpubPreferences? = null
 
     fun updateReaderPrefs(transform: (ReaderPreferences) -> ReaderPreferences) {
         scope.launch {
             preferences.updateReaderPreferences(transform)
-            val updated = EpubPreferencesMapper.map(preferences.readerPreferences.first())
-            runCatching { store.navigator?.submitPreferences(updated) }
-            applyThemeOverride()
-            // Pagination moves under the slider after font/margin/line/flow
-            // changes: refresh the positions table, then re-measure the
-            // rendered page count so the counter follows the new typography.
-            val fresh = safeCatching { store.publication?.positions() }.getOrNull()
-            if (fresh != null) positions.replaceAll(fresh)
-            positions.invalidatePagination()
-            delay(PAGINATION_SETTLE_MS)
-            positions.measurePagination()
+            sync(preferences.readerPreferences.first())
         }
     }
 
+    /**
+     * Live preview while a slider is dragged: restyles the page without
+     * writing DataStore or repaginating. The value is committed on release,
+     * which is what every other slider in the sheet already does.
+     */
+    fun preview(transform: (ReaderPreferences) -> ReaderPreferences) {
+        scope.launch { applyThemeOverride(transform(currentPrefs())) }
+    }
+
+    /** The navigator (re)attached: adopt the preferences the factory applied. */
+    suspend fun onAttached() {
+        submitted = store.initialPreferences
+        sync(preferences.readerPreferences.first())
+    }
+
+    private suspend fun sync(prefs: ReaderPreferences) {
+        val mapped = EpubPreferencesMapper.map(prefs)
+        if (mapped != submitted) {
+            runCatching { store.navigator?.submitPreferences(mapped) }
+            submitted = mapped
+        }
+        applyThemeOverride(prefs)
+    }
+
     /** Forces the current theme's colors onto the book page via injected CSS. */
-    suspend fun applyThemeOverride() {
-        val prefs = preferences.readerPreferences.first()
+    suspend fun applyThemeOverride(prefs: ReaderPreferences = currentPrefs()) {
         val (bg, fg) = prefs.resolvedColors()
         // Night light warms text in CSS (background keeps its exact color,
         // so pure black stays #000000 with OLED pixels off). The Compose
@@ -78,10 +101,5 @@ internal class ReaderPrefsController(
         safeCatching {
             store.navigator?.evaluateJavascript(script)
         }
-    }
-
-    private companion object {
-        /** Time for the navigator to re-lay out before measuring its pages. */
-        const val PAGINATION_SETTLE_MS = 350L
     }
 }

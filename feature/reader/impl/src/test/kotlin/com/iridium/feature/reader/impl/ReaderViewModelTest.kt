@@ -6,6 +6,7 @@ import com.iridium.core.fakes.FakeClock
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
+import com.iridium.core.fakes.TestChapterLayoutStore
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.testing.TestData
 import com.iridium.core.testing.TestDispatcherRule
@@ -44,6 +45,7 @@ class ReaderViewModelTest {
     private lateinit var store: ReaderSessionStore
     private lateinit var viewModel: ReaderViewModel
     private val opener = FakeOpener()
+    private val layoutStore = TestChapterLayoutStore()
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     @Before
@@ -58,6 +60,8 @@ class ReaderViewModelTest {
             preferences = preferences,
             opener = opener,
             dictionaryLookup = FakeDictionaryLookup(),
+            layoutStore = layoutStore,
+            viewport = ReaderViewportProvider { ReaderViewport(widthDp = 400, densityDpi = 420) },
             store = store,
             appScope = appScope,
         )
@@ -80,6 +84,8 @@ class ReaderViewModelTest {
             preferences = preferences,
             opener = opener,
             dictionaryLookup = FakeDictionaryLookup(),
+            layoutStore = layoutStore,
+            viewport = ReaderViewportProvider { ReaderViewport(widthDp = 400, densityDpi = 420) },
             store = store,
             appScope = appScope,
         )
@@ -100,6 +106,8 @@ class ReaderViewModelTest {
             preferences = preferences,
             opener = opener,
             dictionaryLookup = FakeDictionaryLookup(),
+            layoutStore = layoutStore,
+            viewport = ReaderViewportProvider { ReaderViewport(widthDp = 400, densityDpi = 420) },
             store = store,
             appScope = appScope,
         )

@@ -1,7 +1,6 @@
 package com.iridium.feature.reader.impl
 
 import com.iridium.core.common.AppClock
-import com.iridium.core.common.safeCatching
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,120 +8,128 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.readium.r2.shared.publication.Locator
 
 /**
- * Positions table + scrubber math for the reader. Owns the cached positions,
- * the recombine trigger version, the programmatic-nav grace clock, and
- * slider seeks; the ViewModel only forwards events.
+ * Page counting for the reader.
+ *
+ * The numbers are real rendered pages, not a scaled position table:
+ *
+ * - The navigator reports `pageIndex` / `totalPages` for the chapter it has
+ *   laid out (`onPageChanged`). That is exact, free and arrives on every page
+ *   change, so it is the source of truth for the current chapter.
+ * - Counts are cached per chapter and restored per typography fingerprint, so
+ *   the book-wide total is stable across sessions instead of being re-derived
+ *   from whichever chapter the book happened to open on.
+ * - Chapters that have never been laid out are estimated from the observed
+ *   pages-per-position ratio. As the reader moves through the book the
+ *   estimate is replaced by exact counts.
+ *
+ * The position table is still what the scrubber seeks with; it is no longer
+ * used to invent a page number.
  */
 internal class ReaderPositionTracker(
     private val store: ReaderSessionStore,
     private val clock: AppClock,
 ) {
 
-    private companion object {
-        /**
-         * Pages in the current chapter as rendered right now. A paged
-         * reflowable document is a row of page-wide columns, so the document
-         * width over the viewport width is the page count — and it changes
-         * with every typography change.
-         */
-        const val PAGE_COUNT_SCRIPT =
-            "(function(){var e=document.scrollingElement||document.documentElement;" +
-                "var w=window.innerWidth;if(!e||!w||w<=0){return 0;}" +
-                "return Math.max(1,Math.round(e.scrollWidth/w));})()"
-    }
-
-    /** Last programmatic jump (open/seek/TOC): locator ticks inside the grace window are the jump's own echo, not user page turns. */
+    /** Last programmatic jump (open/seek/TOC): locator ticks inside the grace window are its own echo. */
     private var lastProgrammaticNavMs: Long = 0L
 
-    /** Plain var, not a flow: every read and write happens on the Main thread
-     * (viewModelScope + combine), so no synchronization is needed; the version
-     * flow below drives recomposition. */
+    /** Plain vars, not flows: every read and write happens on the Main thread
+     * (viewModelScope + combine); [positionsVersion] drives recomposition. */
     private var positionsCache: List<Locator> = emptyList()
+    private var chapterOrder: List<String> = emptyList()
+    private var positionsPerChapter: Map<String, Int> = emptyMap()
     private val _positionsVersion = MutableStateFlow(0)
     val positionsVersion: StateFlow<Int> = _positionsVersion.asStateFlow()
 
+    /** Typography fingerprint the learned counts belong to. */
+    private var layoutKey: String = ""
+
+    /** Rendered pages per chapter, as reported by the navigator. */
+    private val chapterPages = mutableMapOf<String, Int>()
+
+    /** Chapter and page the navigator last reported (exact, not estimated). */
+    private var currentHref: String? = null
+    private var currentPageIndex: Int = 0
+
+    /** Derived per chapter and cumulative totals; rebuilt when inputs change. */
+    private var pagesByChapter: Map<String, Int> = emptyMap()
+    private var pagesBefore: Map<String, Int> = emptyMap()
+    private var totalPages: Int = 0
+
     /**
-     * Optimistic page target while the navigator's locator echo is in flight.
-     * The toolkit only reports a new locator once its own scroll settles, so
-     * the counter would otherwise lag hundreds of ms behind the tap. The
-     * display shows this target — never raw + delta — so an echo that has
-     * already advanced the raw index can never be double-counted or make the
-     * number jump forward and snap back.
+     * Optimistic index for the page a tap just requested. Same unit as the
+     * real index, so it is replaced by the navigator's own number without any
+     * reconciliation heuristic: no drift and no snap-back.
      */
     private var pendingIndex: Int? = null
-    private var pendingForward: Boolean = true
-
-    /**
-     * Rendered pages per position, measured from the live WebView. The
-     * positions table is font-independent (it chunks the text), so using it
-     * directly made the page counter static: it never reacted to a font-size
-     * or margin change, and one page turn moved it by a fraction. Scaling by
-     * the measured ratio makes both the current page and the total track the
-     * real pagination.
-     */
-    private var pagesPerPosition: Float = 0f
-
-    /** Per-chapter rendered-page samples: href -> pages. Averaging chapters
-     *  keeps the total stable instead of re-sampling a different chapter. */
-    private val renderedByChapter = mutableMapOf<String, Int>()
-
-    /** True once a measurement has been attempted (correct-or-nothing total). */
-    private var paginationAttempted: Boolean = false
 
     /** Sticky chapter title: locators between TOC anchors keep the last one. */
     private var lastChapterTitle: String? = null
 
+    val hasChapterPages: Boolean get() = chapterPages.isNotEmpty()
+
+    val currentLayoutKey: String get() = layoutKey
+
+    fun snapshotChapterPages(): Map<String, Int> = chapterPages.toMap()
+
     fun replaceAll(positions: List<Locator>) {
         positionsCache = positions
-        _positionsVersion.value += 1
-    }
-
-    /** Typography changed: the rendered samples no longer describe the layout. */
-    fun invalidatePagination() {
-        renderedByChapter.clear()
-        pagesPerPosition = 0f
+        chapterOrder = positions.map { it.href.toString() }.distinct()
+        positionsPerChapter = chapterOrder.associateWith { href ->
+            positions.count { it.href.toString() == href }
+        }
+        recompute()
         _positionsVersion.value += 1
     }
 
     /**
-     * Records the pagination measured for [renderedPages] in a chapter that
-     * holds [chapterPositions] table entries. Recomputed on attach and after
-     * every reflow, so the counter always reflects the current typography.
+     * A different typography is a different pagination: drop the learned
+     * counts and start from the layout cache for that fingerprint.
      */
-    fun updatePagination(renderedPages: Int, chapterPositions: Int, href: String? = null) {
-        paginationAttempted = true
-        if (renderedPages <= 0 || chapterPositions <= 0) return
-        if (href != null) renderedByChapter[href] = renderedPages
-        val sampledPositions = renderedByChapter.keys.sumOf { key ->
-            positionsCache.count { it.href.toString() == key }
+    fun applyLayout(key: String) {
+        if (key == layoutKey) return
+        layoutKey = key
+        chapterPages.clear()
+        currentHref = null
+        currentPageIndex = 0
+        pendingIndex = null
+        lastChapterTitle = null
+        recompute()
+        _positionsVersion.value += 1
+    }
+
+    /** Restores counts persisted for [key] on an earlier session. */
+    fun restorePersisted(key: String, pages: Map<String, Int>) {
+        if (key != layoutKey || pages.isEmpty()) return
+        var changed = false
+        pages.forEach { (href, count) ->
+            if (count > 0 && chapterPages[href] != count) {
+                chapterPages[href] = count
+                changed = true
+            }
         }
-        val sampledPages = renderedByChapter.values.sum()
-        val ratio = if (sampledPositions > 0 && sampledPages > 0) {
-            sampledPages.toFloat() / sampledPositions
-        } else {
-            renderedPages.toFloat() / chapterPositions
-        }
-        if (ratio.isFinite() && ratio > 0f && ratio != pagesPerPosition) {
-            pagesPerPosition = ratio
+        if (changed) {
+            recompute()
             _positionsVersion.value += 1
         }
     }
 
-    /** True once a rendered measurement exists (counter is meaningful). */
-    val hasPagination: Boolean get() = pagesPerPosition > 0f
-
-    /** Total rendered pages for the whole book at the current typography. */
-    private fun totalPages(): Int {
-        val base = positionsCache.size
-        if (base == 0) return 0
-        if (pagesPerPosition <= 0f) {
-            // Before the first measurement, show nothing rather than the
-            // font-independent table size: that value is wrong and used to
-            // flash before the real total arrived.
-            return if (paginationAttempted) base else 0
-        }
-        return (base * pagesPerPosition).roundToInt().coerceAtLeast(1)
+    /** Exact chapter pagination, straight from the navigator. */
+    fun onPageChanged(href: String, pageIndex: Int, totalPages: Int) {
+        val pagesChanged = totalPages > 0 && chapterPages[href] != totalPages
+        val moveChanged = href != currentHref || pageIndex != currentPageIndex
+        val hadPending = pendingIndex != null
+        if (pagesChanged) chapterPages[href] = totalPages
+        currentHref = href
+        currentPageIndex = pageIndex.coerceAtLeast(0)
+        // The navigator's answer supersedes any optimistic tap.
+        pendingIndex = null
+        if (pagesChanged) recompute()
+        if (pagesChanged || moveChanged || hadPending) _positionsVersion.value += 1
     }
+
+    /** True once a rendered measurement exists (the counter is meaningful). */
+    val hasPagination: Boolean get() = totalPages > 0
 
     /**
      * Current chapter title for [toc], resolved from the live locator. Sticky
@@ -148,52 +155,27 @@ internal class ReaderPositionTracker(
     fun withinNavGrace(windowMs: Long): Boolean =
         clock.uptimeNow() - lastProgrammaticNavMs <= windowMs
 
-    fun positionText(): String? {
-        val (index, count) = indexAndCount()
-        if (count == 0) return null
-        return "${index + 1} / $count"
-    }
-
     /**
-     * 0-based rendered page index + rendered page total for the counter.
+     * 0-based page index and book-wide page total for the counter.
      *
-     * Both values come from one place so they can never disagree: the total is
-     * the measured pagination, and the index is the locator's continuous
-     * progression across it. A tap publishes an absolute [pendingIndex]
-     * immediately; until the navigator's own index catches up, that value is
-     * shown verbatim. Deliberately *not* "raw + delta": an echo that arrives
-     * before the delta is cleared used to add to an index that had already
-     * moved, which is what made the number jump by two or three and snap back.
+     * Both are rendered pages. The index is the exact page within the current
+     * chapter plus the pages of every chapter before it; a tap publishes the
+     * next index immediately and the navigator's own value replaces it.
      */
     fun indexAndCount(): Pair<Int, Int> {
-        val (rawIndex, total) = rawIndexAndCount()
-        if (total <= 0) return 0 to 0
-        val pending = pendingIndex ?: return rawIndex to total
-        val caughtUp = if (pendingForward) rawIndex >= pending else rawIndex <= pending
-        if (caughtUp) {
-            // The navigator's own position reached the optimistic target.
-            android.util.Log.d("PageFlow", "caughtUp raw=$rawIndex pending=$pending total=$total")
-            pendingIndex = null
-            return rawIndex to total
+        if (totalPages <= 0) return 0 to 0
+        val locator = store.latestLocator.value
+        // The locator is authoritative for where the user is; the navigator's
+        // own report covers the instant before the first locator tick.
+        val href = locator?.href?.toString() ?: currentHref
+        val absolute = if (href != null && pagesByChapter.containsKey(href)) {
+            val before = pagesBefore[href] ?: 0
+            val within = pagesWithin(href, pagesByChapter.getValue(href), locator)
+            (before + within).coerceIn(0, totalPages - 1)
+        } else {
+            0
         }
-        return pending.coerceIn(0, total - 1) to total
-    }
-
-    /** Authoritative index from the live locator, ignoring any pending turn. */
-    private fun rawIndexAndCount(): Pair<Int, Int> {
-        val positions = positionsCache
-        if (positions.isEmpty()) return 0 to 0
-        val current = store.latestLocator.value ?: return 0 to totalPages()
-        val total = totalPages()
-        if (total <= 0) return 0 to 0
-        // totalProgression is continuous across pages; hrefs repeat within a
-        // chapter, so href-first matching freezes the counter mid-chapter.
-        val progression = current.locations.totalProgression?.takeIf { it.isFinite() }
-        if (progression != null) {
-            return (progression * (total - 1)).roundToInt().coerceIn(0, total - 1) to total
-        }
-        val index = positions.indexOfFirst { it.href == current.href }
-        return (if (index >= 0) index else 0) to total
+        return (pendingIndex ?: absolute).coerceIn(0, totalPages - 1) to totalPages
     }
 
     /**
@@ -202,39 +184,18 @@ internal class ReaderPositionTracker(
      * predictably instead of compounding with a late echo.
      */
     fun onTurnRequested(direction: Int) {
-        val (rawIndex, total) = rawIndexAndCount()
-        if (total <= 0) return
+        if (totalPages <= 0) return
+        val (rawIndex, _) = indexAndCount()
         val base = pendingIndex ?: rawIndex
-        pendingIndex = (base + direction).coerceIn(0, total - 1)
-        android.util.Log.d("PageFlow", "turnRequested dir=$direction raw=$rawIndex pending=$pendingIndex total=$total")
-        pendingForward = direction > 0
+        pendingIndex = (base + direction).coerceIn(0, totalPages - 1)
         _positionsVersion.value += 1
     }
 
-    /** The navigator refused the step (book end): undo the optimistic move. */
-    fun onTurnRefused(direction: Int) {
-        val pending = pendingIndex ?: return
-        val target = pending - direction
-        val (rawIndex, _) = rawIndexAndCount()
-        pendingIndex = if (target == rawIndex) null else target
-        _positionsVersion.value += 1
-    }
-
-    /** Drops the optimistic target once a programmatic jump re-bases position. */
-    fun clearPendingTurn() {
+    /** The navigator refused the step (book end): the true page never moved. */
+    fun onTurnRefused() {
         if (pendingIndex == null) return
         pendingIndex = null
         _positionsVersion.value += 1
-    }
-
-    /** Reads the live WebView's page count for the current chapter. */
-    suspend fun measurePagination() {
-        val nav = store.navigator ?: return
-        val current = store.latestLocator.value ?: return
-        val raw = safeCatching { nav.evaluateJavascript(PAGE_COUNT_SCRIPT) }.getOrNull() ?: return
-        val rendered = raw.trim().trim('"').toDoubleOrNull()?.roundToInt() ?: return
-        val chapterPositions = positionsCache.count { it.href == current.href }
-        updatePagination(rendered, chapterPositions, href = current.href.toString())
     }
 
     /** Slider seek: jumps the navigator to the position table entry. */
@@ -246,6 +207,11 @@ internal class ReaderPositionTracker(
         val index = (progression.coerceIn(0f, 1f) * (positions.size - 1)).roundToInt()
             .coerceIn(0, positions.size - 1)
         nav.go(positions[index])
+        // A seek rebases position: the optimistic page no longer applies.
+        if (pendingIndex != null) {
+            pendingIndex = null
+            _positionsVersion.value += 1
+        }
     }
 
     /**
@@ -258,5 +224,82 @@ internal class ReaderPositionTracker(
         val nav = store.navigator ?: return false
         markProgrammaticNav()
         return if (forward) nav.goForward(false) else nav.goBackward(false)
+    }
+
+    // Page arithmetic
+
+    private fun pagesWithin(href: String, pages: Int, locator: Locator?): Int {
+        // The navigator's own page index is exact; it is only stale for the
+        // instant between a locator tick and its page-change event.
+        if (href == currentHref) return currentPageIndex.coerceIn(0, pages - 1)
+        // Never laid out in this session: interpolate the in-chapter
+        // progression, which is what the saved locator carries on open.
+        val progression = locator?.locations?.progression?.takeIf { it.isFinite() }
+        return if (progression != null) {
+            (progression * pages).toInt().coerceIn(0, pages - 1)
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Rebuilds the per-chapter totals: exact where the navigator has laid the
+     * chapter out, estimated from the observed pages-per-position ratio where
+     * it has not. Nothing is shown until at least one chapter is known, so the
+     * counter never flashes a number in the wrong unit.
+     */
+    @Suppress("ReturnCount") // Two early exits: no table yet, nothing measured yet.
+    private fun recompute() {
+        if (chapterOrder.isEmpty() || chapterPages.isEmpty()) {
+            pagesByChapter = emptyMap()
+            pagesBefore = emptyMap()
+            totalPages = 0
+            return
+        }
+        val knownPositions = chapterPages.keys.sumOf { positionsPerChapter[it] ?: 0 }
+        // A single-position chapter (a cover, a title page) renders one page
+        // and would set the ratio to 1 page per position, which undercounts a
+        // real text chapter by several times. The samples have to cover
+        // enough text to mean anything; until one does, and until every
+        // chapter is known, there is no honest total to show.
+        val everyChapterMeasured = chapterOrder.all { chapterPages.containsKey(it) }
+        if (!everyChapterMeasured && knownPositions < MIN_RATIO_POSITIONS) {
+            pagesByChapter = emptyMap()
+            pagesBefore = emptyMap()
+            totalPages = 0
+            return
+        }
+        val knownPages = chapterPages.values.sum()
+        val ratio = if (knownPositions > 0) knownPages.toFloat() / knownPositions else 0f
+        val pages = chapterOrder.associateWith { href ->
+            chapterPages[href] ?: estimatePages(href, ratio)
+        }
+        val before = HashMap<String, Int>(pages.size)
+        var running = 0
+        chapterOrder.forEach { href ->
+            before[href] = running
+            running += pages.getValue(href)
+        }
+        pagesByChapter = pages
+        pagesBefore = before
+        totalPages = running
+    }
+
+    private companion object {
+        /**
+         * Positions a sample must cover before its pages-per-position ratio is
+         * used to estimate unread chapters. Two is enough to stop a cover page
+         * from defining the whole book.
+         */
+        const val MIN_RATIO_POSITIONS = 2
+    }
+
+    private fun estimatePages(href: String, ratio: Float): Int {
+        val positions = positionsPerChapter[href] ?: 0
+        if (positions <= 0) return 0
+        // Not enough data for a ratio yet: one position is one block of text,
+        // which is the closest thing to a page this table offers.
+        if (ratio <= 0f) return positions
+        return (positions * ratio).roundToInt().coerceAtLeast(1)
     }
 }

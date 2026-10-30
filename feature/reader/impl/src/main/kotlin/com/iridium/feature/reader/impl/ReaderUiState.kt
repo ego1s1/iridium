@@ -24,13 +24,11 @@ sealed interface ReaderUiState {
         val highlightsOpen: Boolean,
         /** 0f..1f progression for the slider/counter. */
         val progression: Float,
-        /** "12 / 173" style position text, when positions are known. */
-        val positionText: String?,
         /** Highlight id tapped in content (shown in the highlights sheet). */
         val focusedHighlightId: String? = null,
-        /** 0-based position index for the scrubber; 0 when positions unknown. */
+        /** 0-based rendered page index for the scrubber; 0 when unknown. */
         val positionIndex: Int = 0,
-        /** Total positions for the scrubber; 0 when positions unknown. */
+        /** Rendered page total for the scrubber; 0 when unknown. */
         val positionCount: Int = 0,
         /** Current chapter title (nearest TOC anchor); null before first tick. */
         val chapterTitle: String? = null,
@@ -111,6 +109,14 @@ sealed interface ReaderAction {
     data class SetNightLight(val enabled: Boolean) : ReaderAction, PrefsChange
     data class SetNightLightIntensity(val intensity: Float) : ReaderAction, PrefsChange
     data class SetExtraDim(val enabled: Boolean) : ReaderAction, PrefsChange
+
+    /**
+     * Live extra-dim preview while the slider moves. Cosmetic only: it
+     * restyles the page and writes nothing, so dragging cannot spam DataStore
+     * or repaginate the book.
+     */
+    data class PreviewExtraDim(val intensity: Float) : ReaderAction
+
     data class SetExtraDimIntensity(val intensity: Float) : ReaderAction, PrefsChange
 }
 

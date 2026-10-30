@@ -9,6 +9,7 @@ import com.iridium.core.common.safeCatching
 import com.iridium.core.data.LocatorStrings
 import com.iridium.core.data.BookOpener
 import com.iridium.core.data.BooksRepository
+import com.iridium.core.data.ChapterLayoutStore
 import com.iridium.core.data.OpenResult
 import com.iridium.core.datastore.ApplicationScope
 import com.iridium.core.datastore.IridiumPreferencesDataSource
@@ -62,6 +63,8 @@ class ReaderViewModel @Inject constructor(
     private val preferences: IridiumPreferencesDataSource,
     private val opener: BookOpener,
     private val dictionaryLookup: DictionaryLookup,
+    private val layoutStore: ChapterLayoutStore,
+    private val viewport: ReaderViewportProvider,
     private val store: ReaderSessionStore,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
@@ -72,7 +75,14 @@ class ReaderViewModel @Inject constructor(
     private val chrome = ReaderChromeController(viewModelScope)
     private val dictionary = ReaderDictionaryController(viewModelScope, dictionaryLookup, store)
     private val positions = ReaderPositionTracker(store, clock)
-    private val prefsApplier = ReaderPrefsController(viewModelScope, preferences, store, positions)
+    private val prefsApplier = ReaderPrefsController(
+        scope = viewModelScope,
+        preferences = preferences,
+        store = store,
+        // Reads the ViewModel's cached prefs: no DataStore round trip on the
+        // tap/preview path.
+        currentPrefs = { prefsFlow.value },
+    )
     private val navigatorAttached = MutableStateFlow(false)
 
     /** True once the WebView has actually painted the first page. */
@@ -93,6 +103,9 @@ class ReaderViewModel @Inject constructor(
 
     /** Fixed page-turn ceiling; see [TurnRateLimiter] for the chosen rate. */
     private val turnLimiter = TurnRateLimiter()
+
+    /** Debounced writer for the learned page counts (see [scheduleLayoutSave]). */
+    private var layoutSaveJob: Job? = null
 
     /**
      * Tap-time page-turn pulses (+1 forward, -1 backward), emitted the moment
@@ -138,10 +151,21 @@ class ReaderViewModel @Inject constructor(
         val themeSheetOpen: Boolean,
     )
 
+    /**
+     * Attachment state, bundled as one value so "the first page has painted"
+     * is a real input of the UI state. It used to be read out of band inside
+     * the combine, where setting it emitted nothing: the loading surface could
+     * then outlive the page it was hiding.
+     */
+    private data class AttachState(val attached: Boolean, val pageLoaded: Boolean)
+
+    private val attachState: Flow<AttachState> =
+        combine(navigatorAttached, pageLoaded, ::AttachState)
+
     /** Navigation/session bundle. */
     private data class ReaderNavBundle(
         val focusedHighlightId: String?,
-        val navigatorAttached: Boolean,
+        val attach: AttachState,
         val openFailed: Boolean,
         val progression: Float,
         val openFileMissing: Boolean,
@@ -156,7 +180,7 @@ class ReaderViewModel @Inject constructor(
         )
     private val navBundle: Flow<ReaderNavBundle> =
         combine(
-            chrome.focusedHighlightId, navigatorAttached, openFailed, progression,
+            chrome.focusedHighlightId, attachState, openFailed, progression,
             openFileMissing, ::ReaderNavBundle,
         )
 
@@ -188,14 +212,13 @@ class ReaderViewModel @Inject constructor(
                     // show the saved progress. After attach, the debounced
                     // locator value is truth (0f is a real "start of book",
                     // not "not loaded").
-                    progression = if (!n.navigatorAttached) c.book.progress else n.progression,
-                    positionText = positions.positionText(),
+                    progression = if (!n.attach.attached) c.book.progress else n.progression,
                     positionIndex = positionIndex,
                     positionCount = positionCount,
                     chapterTitle = positions.chapterTitle(c.toc),
                     focusedHighlightId = n.focusedHighlightId,
-                    navigatorAttached = n.navigatorAttached,
-                    contentReady = pageLoaded.value,
+                    navigatorAttached = n.attach.attached,
+                    contentReady = n.attach.pageLoaded,
                     themeSheetOpen = ch.themeSheetOpen,
                 )
             }
@@ -232,11 +255,49 @@ class ReaderViewModel @Inject constructor(
                 repository.updateProgress(bookId, prog, LocatorStrings.encode(locator))
             }
         }
+        viewModelScope.launch { observeLayout() }
         // Chrome visibility is driven only by explicit toggles and the idle
         // timer. Page turns never hide it: the locator echo arrives after the
         // navigator settles, so hiding from it made the chrome vanish in the
         // middle of a tapping sequence.
         chrome.scheduleHide()
+    }
+
+    /**
+     * Keeps the page counter's layout fingerprint in step with the settings.
+     *
+     * The key only changes when something that moves a line break changes, so
+     * a cosmetic edit (dim, night light, brightness) keeps the learned page
+     * counts. When it does change, the counts for that typography are loaded
+     * from disk instead of being re-derived from the current chapter.
+     */
+    private suspend fun observeLayout() {
+        prefsFlow
+            .map { prefs -> ReaderLayoutKey.of(prefs, viewport.current()) }
+            .distinctUntilChanged()
+            .collect { key ->
+                positions.applyLayout(key)
+                val saved = safeCatching { layoutStore.load(bookId, key) }
+                    .getOrDefault(emptyMap())
+                positions.restorePersisted(key, saved)
+            }
+    }
+
+    /**
+     * Saves the learned chapter pagination once it settles. Debounced because
+     * a chapter report and a turn often land together, and the write would
+     * otherwise repeat for every step.
+     */
+    private fun scheduleLayoutSave() {
+        if (!positions.hasChapterPages) return
+        layoutSaveJob?.cancel()
+        layoutSaveJob = viewModelScope.launch {
+            delay(LAYOUT_SAVE_DEBOUNCE_MS)
+            val key = positions.currentLayoutKey
+            if (key.isEmpty()) return@launch
+            val pages = positions.snapshotChapterPages()
+            safeCatching { layoutStore.save(bookId, key, pages) }
+        }
     }
 
     // UI actions
@@ -278,6 +339,12 @@ class ReaderViewModel @Inject constructor(
             is ReaderAction.GoBackward -> requestTurn(-1)
             is ReaderAction.AddHighlight -> annotations.addHighlight(action.color, action.note, viewModelScope)
             is ReaderAction.DeleteHighlight -> annotations.deleteHighlight(action.id, viewModelScope)
+            is ReaderAction.PreviewExtraDim -> {
+                // Slider drag: restyle only, no write, no repagination.
+                prefsApplier.preview {
+                    it.copy(extraDimIntensity = action.intensity.coerceIn(0f, 1f))
+                }
+            }
             is ReaderAction.PrefsChange -> onPrefsAction(action)
         }
     }
@@ -418,7 +485,6 @@ class ReaderViewModel @Inject constructor(
         val positionTable = safeCatching { result.publication.positions() }.getOrDefault(emptyList())
         android.os.Trace.endSection()
         positions.replaceAll(positionTable)
-        positions.measurePagination()
         // Content indexing parses every spine chapter (and spools the whole
         // file for pipe-like providers). It is only needed for library search,
         // so it runs once the page has settled instead of competing with the
@@ -460,23 +526,19 @@ class ReaderViewModel @Inject constructor(
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
                 positions.markProgrammaticNav()
-                // The factory already applied the initial preferences, so only
-                // re-submit when they actually changed while the page was
-                // loading. A redundant submit repaginates right at first paint.
-                val prefs = EpubPreferencesMapper.map(prefsFlow.value)
-                if (prefs != store.initialPreferences) {
-                    runCatching { store.navigator?.submitPreferences(prefs) }
-                }
-                prefsApplier.applyThemeOverride()
+                // The factory already applied the initial preferences; the
+                // controller only re-submits if they changed while the page
+                // was loading. A redundant submit repaginates at first paint.
+                viewModelScope.launch { prefsApplier.onAttached() }
                 annotations.refreshDecorations(highlights.first())
                 // Image-showcase bridge: wire taps in the freshly loaded document.
                 safeCatching { store.navigator?.evaluateJavascript(ReaderImageBridge.imageTapScript()) }
-                // Measure the rendered page count once the new layout settles:
-                // the counter's total depends on it, not on the position table.
-                viewModelScope.launch {
-                    kotlinx.coroutines.delay(ATTACH_PAGINATION_DELAY_MS)
-                    positions.measurePagination()
-                }
+            }
+            is ReaderSessionEvent.PageChanged -> {
+                // Exact rendered pages for this chapter. No measurement, no
+                // timers: the navigator reports this itself.
+                positions.onPageChanged(event.href, event.pageIndex, event.totalPages)
+                scheduleLayoutSave()
             }
             is ReaderSessionEvent.DecorationTapped -> {
                 chrome.showHighlightsForDecoration(event.decorationId)
@@ -541,7 +603,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val moved = positions.completeTurn(forward = direction > 0)
             // Book ends refuse the step: take the optimistic page back.
-            if (!moved) positions.onTurnRefused(direction)
+            if (!moved) positions.onTurnRefused()
         }
         return true
     }
@@ -680,8 +742,8 @@ class ReaderViewModel @Inject constructor(
 
         const val LOCATOR_SAVE_DEBOUNCE_MS = 500L
 
-        /** Lets the freshly attached navigator lay out before measuring pages. */
-        const val ATTACH_PAGINATION_DELAY_MS = 600L
+        /** Settles the learned page counts before writing them down. */
+        const val LAYOUT_SAVE_DEBOUNCE_MS = 700L
 
         /** Upper bound on waiting for the first page before loading the rest. */
         const val SECONDARY_DATA_WAIT_MS = 8_000L

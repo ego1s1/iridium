@@ -30,6 +30,18 @@ sealed interface ReaderSessionEvent {
      */
     data object PageLoaded : ReaderSessionEvent
 
+    /**
+     * Exact pagination for the chapter the navigator just laid out: the page
+     * index inside it and how many pages it renders into. This is the only
+     * honest source for "page x of y"; the position table is font-independent
+     * and cannot produce one.
+     */
+    data class PageChanged(
+        val href: String,
+        val pageIndex: Int,
+        val totalPages: Int,
+    ) : ReaderSessionEvent
+
     /** A tap on the content (chrome toggle). */
     data object ContentTapped : ReaderSessionEvent
 

@@ -1,9 +1,11 @@
 package com.iridium.core.data.di
 
 import com.iridium.core.data.AnnotationRepository
+import com.iridium.core.data.ChapterLayoutStore
 import com.iridium.core.data.LibraryObserver
 import com.iridium.core.data.OfflineFirstAnnotationRepository
 import com.iridium.core.data.OfflineFirstLibraryObserver
+import com.iridium.core.data.RoomChapterLayoutStore
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -26,4 +28,9 @@ internal abstract class RepositoryBindingsModule {
     abstract fun bindLibraryObserver(
         impl: OfflineFirstLibraryObserver,
     ): LibraryObserver
+
+    @Binds
+    abstract fun bindChapterLayoutStore(
+        impl: RoomChapterLayoutStore,
+    ): ChapterLayoutStore
 }

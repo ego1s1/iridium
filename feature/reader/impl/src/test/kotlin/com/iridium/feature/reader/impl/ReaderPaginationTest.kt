@@ -1,7 +1,6 @@
 package com.iridium.feature.reader.impl
 
 import com.iridium.core.fakes.FakeClock
-import com.iridium.core.model.TocEntry
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -12,10 +11,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Rendered pagination: the page counter must follow the live layout, not the
- * font-independent position table. The table only supplies the scale; the
- * measured pages-per-position ratio turns it into real pages, so a typography
- * change moves the total and a page turn moves the index by exactly one.
+ * Book-wide page totals: exact for chapters the navigator has laid out,
+ * estimated from the observed pages-per-position ratio for the rest, and
+ * stable once the counts are restored for the same typography.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -25,88 +23,111 @@ class ReaderPaginationTest {
     private val tracker = ReaderPositionTracker(store, FakeClock())
 
     @Test
-    fun `measurement scales the total with the rendered layout`() {
-        // 10 table entries; the chapter renders 5 pages over 2 entries, so the
-        // book runs at 2.5 pages per entry -> 25 pages.
-        tracker.replaceAll(
-            List(10) { locator(if (it < 2) "ch1.xhtml" else "ch2.xhtml", it / 10.0) },
-        )
-        tracker.updatePagination(renderedPages = 5, chapterPositions = 2)
-
-        store.onLocator(locator("ch1.xhtml", 0.0))
-        assertEquals(0 to 25, tracker.indexAndCount())
-    }
-
-    @Test
-    fun `without a measurement the counter stays empty instead of guessing`() {
-        // Launch must never flash the font-independent table size: until the
-        // first measurement there is no correct total to show.
+    fun `without a laid-out chapter the counter stays empty`() {
+        // The position table alone cannot produce pages; showing its size
+        // would display a number in the wrong unit.
         tracker.replaceAll(List(692) { locator("ch1.xhtml", it / 692.0) })
         store.onLocator(locator("ch1.xhtml", 0.5))
         assertEquals(0 to 0, tracker.indexAndCount())
-        assertEquals(null, tracker.positionText())
     }
 
     @Test
-    fun `a failed measurement falls back to the table size`() {
-        tracker.replaceAll(List(10) { locator("ch1.xhtml", it / 10.0) })
-        tracker.updatePagination(renderedPages = 0, chapterPositions = 0)
-        store.onLocator(locator("ch1.xhtml", 0.0))
-        assertEquals(0 to 10, tracker.indexAndCount())
-    }
-
-    @Test
-    fun `one page step advances the counter by exactly one`() {
-        tracker.replaceAll(List(4) { locator("ch1.xhtml", it / 4.0) })
-        tracker.updatePagination(renderedPages = 4, chapterPositions = 4)
-
-        // 4 entries rendering 4 pages = 1 page per entry, 4 pages total.
-        store.onLocator(locator("ch1.xhtml", 0.0))
-        assertEquals(0 to 4, tracker.indexAndCount())
-
-        store.onLocator(locator("ch1.xhtml", 0.25))
-        assertEquals(1 to 4, tracker.indexAndCount())
-
-        store.onLocator(locator("ch1.xhtml", 0.5))
-        assertEquals(2 to 4, tracker.indexAndCount())
-
-        store.onLocator(locator("ch1.xhtml", 1.0))
-        assertEquals(3 to 4, tracker.indexAndCount())
-    }
-
-    @Test
-    fun `a larger font raises the total`() {
-        tracker.replaceAll(List(20) { locator("ch1.xhtml", it / 20.0) })
-        tracker.updatePagination(renderedPages = 2, chapterPositions = 4)
-        store.onLocator(locator("ch1.xhtml", 0.0))
-        val small = tracker.indexAndCount().second
-
-        // Same text, more pages: the chapter now holds twice as many.
-        tracker.updatePagination(renderedPages = 4, chapterPositions = 4)
-        val large = tracker.indexAndCount().second
-
-        assertEquals(10, small)
-        assertEquals(20, large)
-    }
-
-    @Test
-    fun `chapter title resolves from the toc and stays while between anchors`() {
-        val toc = listOf(
-            TocEntry(href = "Text/ch1.xhtml", title = "Foreword"),
-            TocEntry(href = "Text/ch2.xhtml", title = "Chapter Two"),
-            TocEntry(href = "Text/ch2.xhtml#part2", title = "Part Two"),
+    fun `restored counts give the total before the first turn`() {
+        tracker.applyLayout("layout-a")
+        tracker.replaceAll(
+            listOf(
+                locator("ch1.xhtml", 0.0),
+                locator("ch1.xhtml", 0.5),
+                locator("ch2.xhtml", 0.5),
+            ),
         )
-        store.onLocator(locator("Text/ch2.xhtml", 0.4))
-        assertEquals("Part Two", tracker.chapterTitle(toc))
+        tracker.restorePersisted("layout-a", mapOf("ch1.xhtml" to 4))
 
-        // An href the TOC does not list keeps the last known chapter.
-        store.onLocator(locator("Text/ch2.xhtml?split=1", 0.5))
-        assertEquals("Part Two", tracker.chapterTitle(toc))
+        // ch1: 4 rendered pages over 2 positions -> ratio 2, so ch2's single
+        // position is estimated at 2 pages. Total 6, opening at page 1.
+        store.onLocator(locator("ch1.xhtml", 0.0))
+        assertEquals(0 to 6, tracker.indexAndCount())
     }
 
     @Test
-    fun `chapter title is null before any locator`() {
-        assertEquals(null, tracker.chapterTitle(listOf(TocEntry("Text/ch1.xhtml", "One"))))
+    fun `unread chapters are estimated from the measured ratio`() {
+        tracker.replaceAll(
+            listOf(
+                locator("ch1.xhtml", 0.0),
+                locator("ch1.xhtml", 0.5),
+                locator("ch2.xhtml", 0.3),
+                locator("ch2.xhtml", 0.6),
+                locator("ch2.xhtml", 0.9),
+            ),
+        )
+        tracker.onPageChanged("ch1.xhtml", 0, totalPages = 4)
+
+        // 4 pages over 2 positions -> 2 pages per position; ch2 holds 3
+        // positions, so 6 pages. Nothing is written for ch2.
+        assertEquals(4 + 6, tracker.indexAndCount().second)
+    }
+
+    @Test
+    fun `a single-position chapter does not invent a total`() {
+        // A cover page renders one page from one position, which would read as
+        // "1 page per position" and undercount the whole book several times
+        // over. Observed on device: 1 / 692 until real text was laid out.
+        tracker.replaceAll(
+            listOf(locator("cover.xhtml", 0.0)) +
+                List(5) { locator("ch1.xhtml", it / 5.0) },
+        )
+        tracker.onPageChanged("cover.xhtml", pageIndex = 0, totalPages = 1)
+
+        assertEquals(0 to 0, tracker.indexAndCount())
+    }
+
+    @Test
+    fun `a fully measured book shows its exact total`() {
+        tracker.replaceAll(
+            listOf(
+                locator("cover.xhtml", 0.0),
+                locator("ch1.xhtml", 0.5),
+            ),
+        )
+        tracker.onPageChanged("cover.xhtml", pageIndex = 0, totalPages = 1)
+        // Every chapter known: no estimate is needed, so the small sample no
+        // longer matters.
+        tracker.onPageChanged("ch1.xhtml", pageIndex = 0, totalPages = 9)
+
+        // The cover is page 0, so the first page of ch1 is index 1.
+        assertEquals(1 to 10, tracker.indexAndCount())
+    }
+
+    @Test
+    fun `a chapter is counted once even when reported repeatedly`() {
+        tracker.replaceAll(List(4) { locator("ch1.xhtml", it / 4.0) })
+        repeat(5) { tracker.onPageChanged("ch1.xhtml", 0, totalPages = 7) }
+
+        assertEquals(0 to 7, tracker.indexAndCount())
+    }
+
+    @Test
+    fun `a new typography drops the learned counts`() {
+        tracker.applyLayout("small")
+        tracker.replaceAll(List(2) { locator("ch1.xhtml", it / 2.0) })
+        tracker.onPageChanged("ch1.xhtml", 0, totalPages = 6)
+        assertEquals(6, tracker.indexAndCount().second)
+
+        // Bigger font: the same text renders into more pages, so the old
+        // counts must not survive.
+        tracker.applyLayout("large")
+        assertEquals(0 to 0, tracker.indexAndCount())
+        assertEquals(emptyMap<String, Int>(), tracker.snapshotChapterPages())
+    }
+
+    @Test
+    fun `restored counts for a stale layout are ignored`() {
+        tracker.applyLayout("current")
+        tracker.replaceAll(List(2) { locator("ch1.xhtml", it / 2.0) })
+
+        tracker.restorePersisted("previous", mapOf("ch1.xhtml" to 9))
+
+        assertEquals(0 to 0, tracker.indexAndCount())
     }
 
     private fun locator(href: String, progression: Double?): Locator = Locator(
@@ -115,7 +136,7 @@ class ReaderPaginationTest {
         title = null,
         locations = Locator.Locations(
             fragments = emptyList(),
-            progression = null,
+            progression = progression,
             position = null,
             totalProgression = progression,
         ),

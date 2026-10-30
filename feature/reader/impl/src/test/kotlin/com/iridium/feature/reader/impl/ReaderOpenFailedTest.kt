@@ -14,6 +14,7 @@ import com.iridium.core.fakes.FakeClock
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.core.fakes.FakeOpener
 import com.iridium.core.fakes.TestBooksRepository
+import com.iridium.core.fakes.TestChapterLayoutStore
 import com.iridium.core.fakes.TestPreferencesDataSource
 import com.iridium.core.testing.TestDispatcherRule
 import kotlinx.coroutines.CoroutineScope
@@ -123,6 +124,8 @@ class ReaderOpenFailedTest {
             preferences = TestPreferencesDataSource(),
             opener = FakeOpener(),
             dictionaryLookup = FakeDictionaryLookup(),
+            layoutStore = TestChapterLayoutStore(),
+            viewport = ReaderViewportProvider { ReaderViewport(widthDp = 400, densityDpi = 420) },
             store = ReaderSessionStore(),
             appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
         )

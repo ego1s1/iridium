@@ -52,11 +52,13 @@ internal suspend fun capturePage(
     if (activity == null || view == null) return null
     if (view.width <= 0 || view.height <= 0) return null
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    val width = view.width
+    val height = view.height
+    val target = nextCaptureBuffer(width, height)
     val bitmap = suspendCancellableCoroutine<Bitmap?> { cont ->
         val loc = IntArray(2)
         view.getLocationInWindow(loc)
-        val src = Rect(loc[0], loc[1], loc[0] + view.width, loc[1] + view.height)
-        val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.RGB_565)
+        val src = Rect(loc[0], loc[1], loc[0] + width, loc[1] + height)
         PixelCopy.request(
             activity.window,
             src,
@@ -84,4 +86,33 @@ internal suspend fun capturePage(
         )
     }
     return bitmap
+}
+
+/**
+ * Two reused RGB_565 buffers for page captures.
+ *
+ * A full-screen capture is ~5 MB at 1080x2400, and one was allocated for every
+ * page turn — roughly 20 MB/s of garbage while paging. Two slots (rather than
+ * one) so the bitmap backing the snapshot currently on screen is never the one
+ * the next capture writes into.
+ */
+private val captureBuffers = arrayOfNulls<Bitmap>(2)
+private var captureSlot = 0
+
+/** Only ever called from the main thread, like the capture itself. */
+private fun nextCaptureBuffer(width: Int, height: Int): Bitmap {
+    val slot = captureSlot
+    captureSlot = (captureSlot + 1) % captureBuffers.size
+    val existing = captureBuffers[slot]
+    if (existing != null &&
+        !existing.isRecycled &&
+        existing.width == width &&
+        existing.height == height
+    ) {
+        return existing
+    }
+    existing?.recycle()
+    return Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565).also {
+        captureBuffers[slot] = it
+    }
 }

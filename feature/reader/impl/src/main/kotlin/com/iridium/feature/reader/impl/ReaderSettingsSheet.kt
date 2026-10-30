@@ -118,10 +118,14 @@ internal fun ReaderSettingsContent(
                         onValueChange = {
                             dimDragging = true
                             dimDraft = it
-                            onAction(ReaderAction.SetExtraDimIntensity(it))
+                            // Cosmetic preview only: no DataStore write per
+                            // frame, no repagination. The value is committed
+                            // on release below.
+                            onAction(ReaderAction.PreviewExtraDim(it))
                         },
                         onValueChangeFinished = {
                             dimDragging = false
+                            onAction(ReaderAction.SetExtraDimIntensity(dimDraft))
                             haptics(IridiumHaptic.Tick)
                         },
                         valueRange = 0f..1f,
