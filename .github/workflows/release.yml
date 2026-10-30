@@ -268,17 +268,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Checkout first: it runs `git clean -ffdx` by default, so a download that
+      # happened earlier would be wiped along with the rest of the workspace.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: release
           path: ./dist
-
-      # The release job has no working tree of its own, and the notes come from
-      # the changelog that was committed for this tag.
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build.outputs.tag }}
 
       - name: Compose release notes
         run: |
