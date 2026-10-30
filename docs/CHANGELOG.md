@@ -4,8 +4,17 @@ User-facing entries only. One line per user-visible change.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.1.1
+
 ### Added
 
+- Reading preview in onboarding that updates live as you change text size, spacing and book colour.
+- Extra dim: lowers the reading text itself for dark rooms, without lighting up a black page.
+- Selection bar with Dictionary and Web search, so a definition only opens when you ask for it.
+- Theme-aware text selection that uses your palette instead of a fixed pale blue.
+- Web search from a selection.
 - Now-Reading hero on the library: jump straight back into your current book.
 - Floating search island: the search bar lifts with color and elevation as you scroll.
 - Quick-filter chips (All / Unread / In progress / Finished) at the top of the library grid.
@@ -16,7 +25,6 @@ User-facing entries only. One line per user-visible change.
 - Refreshed book details: cover hero, Resume/Start button, chapter list, and bookmark/highlight management with delete.
 - Remove-book confirmation dialog, so deletions are always deliberate.
 - Reader settings, contents, and highlights sheets, plus a highlight-selection menu entry.
-- Position pill: your percentage and location stay visible while the reader controls hide.
 - Volume-key page turning and keep-screen-on while reading (opt-in crash reports stay on device).
 - Open-source licenses screen listing every library the app is built with.
 - Haptics toggle plus tactile feedback on navigation, scrubbing, toggles, and dialogs.
@@ -27,6 +35,14 @@ User-facing entries only. One line per user-visible change.
 
 ### Changed
 
+- Reading is always paged; the Auto/Paged/Scrolled control is gone because two of those behaved identically.
+- Grid columns are now a straight 2 / 3 / 4 choice, defaulting to two.
+- Book colour now defaults to pure black (AMOLED) on a fresh install.
+- Default reading typography is larger and airier, matched to a printed page.
+- Page turns slide a full page and are capped at four per second so rapid tapping never tears the animation.
+- The page counter follows the real rendered layout, so it changes with the font and reflow and advances instantly on a tap.
+- Chrome stays up while you turn pages and hides only once you stop, and its timer restarts on every tap.
+- The scrubber is a static progress track with the current chapter shown beside it.
 - Reader controls now float over the page with backdrop blur instead of resizing the text; showing or hiding them never reflows your book.
 - The book fills the whole screen edge-to-edge with stable safe insets for the camera and gesture areas.
 - Library top bar collapses on scroll with an activity dot on the tune icon.
@@ -34,6 +50,12 @@ User-facing entries only. One line per user-visible change.
 
 ### Fixed
 
+- Fixed back and home gestures being swallowed when the reader chrome was hidden.
+- Fixed the status bar and gesture pill reappearing after a cancelled back gesture.
+- Fixed the reader showing a blank page between the spinner and the text.
+- Fixed dictionary lookups failing on longer entries with "couldn't understand the response".
+- Fixed the page counter freezing or jumping by two or three during fast page turns.
+- Fixed selection handles being torn down mid-drag, which made extending a selection impossible.
 - Fixed installs on devices with 16 KB memory pages (native library packaging).
 - Fixed a crash opening the details of books whose chapters share the same file.
 - Fixed the reader never attaching before its session exists, which left a blank page.
