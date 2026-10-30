@@ -257,7 +257,14 @@ class LibraryViewModel @Inject constructor(
     }
 
     private fun remove(bookId: String) {
-        viewModelScope.launch { repository.removeBook(bookId) }
+        viewModelScope.launch {
+            // Remember the path first: the row is about to disappear and the
+            // scanner needs it to keep the book out of the library.
+            books.value.firstOrNull { it.id == bookId }?.sourcePath?.let { path ->
+                preferences.rememberRemovedBookPath(path)
+            }
+            repository.removeBook(bookId)
+        }
     }
 
     /**
@@ -305,9 +312,13 @@ class LibraryViewModel @Inject constructor(
     /** One filesystem pass, reporting failures to the UI. */
     private suspend fun runScan() {
         try {
-            val report = repository.indexFilesystem { done, total ->
-                indexProgress.value = IndexProgress(done, total)
-            }
+            val removed = preferences.removedBookPaths.first()
+            val report = repository.indexFilesystem(
+                removedPaths = removed,
+                onProgress = { done, total ->
+                    indexProgress.value = IndexProgress(done, total)
+                },
+            )
             if (report.failed > 0) {
                 messageChannel.send(LibraryMessage.IndexFailed(report.failed))
             }

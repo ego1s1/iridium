@@ -37,6 +37,10 @@ gradlePlugin {
             id = "iridium.android.compose"
             implementationClass = "IridiumAndroidComposePlugin"
         }
+        register("androidStore") {
+            id = "iridium.android.store"
+            implementationClass = "IridiumAndroidStorePlugin"
+        }
         register("hilt") {
             id = "iridium.hilt"
             implementationClass = "IridiumHiltPlugin"

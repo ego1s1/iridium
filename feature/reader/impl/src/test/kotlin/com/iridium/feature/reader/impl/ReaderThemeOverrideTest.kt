@@ -55,11 +55,21 @@ class ReaderThemeOverrideTest {
 
     @Test
     fun `css carries the alpha channel when the foreground is dimmed`() {
+        // Translucent colours are emitted as rgba(): #RRGGBBAA is CSS Color 4
+        // and older WebViews drop the declaration, which silently disabled
+        // text dimming.
         val css = ReaderThemeOverride.overrideCssColors("000000", "ffffff80")
-        assertTrue(css.contains("#ffffff80"))
+        assertTrue(css.contains("rgba(255, 255, 255,"))
         // currentcolor can drop the alpha on some WebView builds, so the fill
         // colour must be the literal value.
-        assertTrue(css.contains("-webkit-text-fill-color: #ffffff80"))
+        assertTrue(css.contains("-webkit-text-fill-color: rgba(255, 255, 255,"))
+    }
+
+    @Test
+    fun `cssColor keeps hex for opaque colours and converts translucent ones`() {
+        assertEquals("#ffffff", ReaderThemeOverride.cssColor("ffffff"))
+        assertEquals("rgba(255, 0, 0, 1)", ReaderThemeOverride.cssColor("ff0000ff"))
+        assertTrue(ReaderThemeOverride.cssColor("00000000").startsWith("rgba(0, 0, 0, 0"))
     }
 
     @Test

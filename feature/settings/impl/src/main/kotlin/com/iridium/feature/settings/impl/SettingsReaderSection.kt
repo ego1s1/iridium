@@ -56,10 +56,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
-import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumEmphasized

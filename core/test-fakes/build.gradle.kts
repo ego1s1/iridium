@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.iridium.android.library)
+    alias(libs.plugins.iridium.android.store)
 }
 
 android {

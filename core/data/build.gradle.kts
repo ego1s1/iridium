@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.iridium.android.library)
+    alias(libs.plugins.iridium.android.store)
     alias(libs.plugins.iridium.hilt)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -23,10 +24,12 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.play.services.auth)
-    implementation(libs.google.api.client.android)
-    implementation(libs.google.http.client.gson)
-    implementation(libs.google.api.services.drive)
+
+    // Drive sync transport: Play-channel builds only.
+    "playImplementation"(libs.play.services.auth)
+    "playImplementation"(libs.google.api.client.android)
+    "playImplementation"(libs.google.http.client.gson)
+    "playImplementation"(libs.google.api.services.drive)
 
     testImplementation(libs.bundles.test.common)
     testImplementation(libs.turbine)

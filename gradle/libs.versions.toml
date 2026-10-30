@@ -138,5 +138,6 @@ iridium-android-application = { id = "iridium.android.application", version = "u
 iridium-android-library = { id = "iridium.android.library", version = "unspecified" }
 iridium-android-feature = { id = "iridium.android.feature", version = "unspecified" }
 iridium-android-compose = { id = "iridium.android.compose", version = "unspecified" }
+iridium-android-store = { id = "iridium.android.store", version = "unspecified" }
 iridium-hilt = { id = "iridium.hilt", version = "unspecified" }
 iridium-jvm-library = { id = "iridium.jvm.library", version = "unspecified" }

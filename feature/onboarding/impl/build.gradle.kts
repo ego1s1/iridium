@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.iridium.android.feature)
+    // Test sources consume :core:test-fakes, which exposes the flavored
+    // :core:data API, so this module needs the dimension too.
+    alias(libs.plugins.iridium.android.store)
 }
 
 group = "com.iridium.feature.onboarding.impl"

@@ -1,5 +1,6 @@
 package com.iridium.feature.settings.impl
 
+import com.iridium.core.fakes.FakeDriveSignIn
 import com.iridium.core.fakes.FakeSafGrantStore
 import com.iridium.core.data.DriveGatewayFactory
 import com.iridium.core.data.DriveSyncManager
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import kotlinx.coroutines.Dispatchers
 import org.junit.Before
@@ -33,11 +36,12 @@ class SettingsViewModelTest {
         DriveGatewayFactory { throw UnsupportedOperationException("no network in settings tests") },
         ioDispatcher = Dispatchers.Unconfined,
     )
+    private val driveSignIn = FakeDriveSignIn()
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setup() {
-        viewModel = SettingsViewModel(preferences, FakeSafGrantStore(), backup, sync)
+        viewModel = SettingsViewModel(preferences, FakeSafGrantStore(), backup, sync, driveSignIn)
     }
 
     @Test
@@ -122,7 +126,7 @@ class SettingsViewModelTest {
     @Test
     fun `revoked folders surface with live grants hidden`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/kept"))
-        val scoped = SettingsViewModel(preferences, grants, backup, sync)
+        val scoped = SettingsViewModel(preferences, grants, backup, sync, driveSignIn)
         preferences.addLinkedFolder("content://trees/kept")
         preferences.addLinkedFolder("content://trees/lost")
 
@@ -131,9 +135,36 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `drive support follows the sign-in capability`() {
+        assertTrue(viewModel.driveSupported)
+        assertNotNull(viewModel.driveSignInIntent())
+
+        val unsupported = SettingsViewModel(
+            preferences,
+            FakeSafGrantStore(),
+            backup,
+            sync,
+            FakeDriveSignIn(isSupported = false),
+        )
+        assertFalse(unsupported.driveSupported)
+        assertNull(unsupported.driveSignInIntent())
+    }
+
+    @Test
+    fun `signing out clears the client and the stored account`() = runTest {
+        viewModel.onDriveSignedIn("user@example.com")
+        assertEquals("user@example.com", preferences.driveAccount.first())
+
+        viewModel.onDriveSignOut()
+
+        assertNull(preferences.driveAccount.first())
+        assertEquals(1, driveSignIn.signOuts)
+    }
+
+    @Test
     fun `forgetting a folder releases its grant and drops it`() = runTest {
         val grants = FakeSafGrantStore(mutableSetOf("content://trees/old"))
-        val scoped = SettingsViewModel(preferences, grants, backup, sync)
+        val scoped = SettingsViewModel(preferences, grants, backup, sync, driveSignIn)
         preferences.addLinkedFolder("content://trees/old")
 
         scoped.onAction(SettingsAction.RemoveLinkedFolder("content://trees/old"))

@@ -56,10 +56,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
-import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
 import com.iridium.core.designsystem.IridiumEmphasized
@@ -90,6 +86,7 @@ internal fun StorageSection(
     onDriveSignIn: () -> Unit,
     onDriveSignOut: () -> Unit,
     onSyncNow: () -> Unit,
+    driveAvailable: Boolean = true,
 ) {
         IridiumSectionCard(title = stringResource(R.string.settings_card_storage)) {
             val folderCount = state.linkedFolders.size
@@ -130,26 +127,30 @@ internal fun StorageSection(
                 icon = com.iridium.core.designsystem.IridiumIcons.ImportFile,
                 onClick = onImportBackup,
             )
-            if (driveAccount == null) {
-                IridiumSettingRow(
-                    title = stringResource(R.string.settings_backup_sign_in),
-                    subtitle = stringResource(R.string.settings_backup_sign_in_body),
-                    icon = com.iridium.core.designsystem.IridiumIcons.Storage,
-                    onClick = onDriveSignIn,
-                )
-            } else {
-                IridiumSettingRow(
-                    title = stringResource(R.string.settings_backup_sync),
-                    subtitle = driveAccount,
-                    icon = com.iridium.core.designsystem.IridiumIcons.Refresh,
-                    onClick = onSyncNow,
-                )
-                IridiumSettingRow(
-                    title = stringResource(R.string.settings_backup_sign_out),
-                    subtitle = driveAccount,
-                    icon = com.iridium.core.designsystem.IridiumIcons.Close,
-                    onClick = onDriveSignOut,
-                )
+            // Builds without a vendor sign-in client have no Drive at all:
+            // show the local export/import rows only, never a dead control.
+            if (driveAvailable) {
+                if (driveAccount == null) {
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sign_in),
+                        subtitle = stringResource(R.string.settings_backup_sign_in_body),
+                        icon = com.iridium.core.designsystem.IridiumIcons.Storage,
+                        onClick = onDriveSignIn,
+                    )
+                } else {
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sync),
+                        subtitle = driveAccount,
+                        icon = com.iridium.core.designsystem.IridiumIcons.Refresh,
+                        onClick = onSyncNow,
+                    )
+                    IridiumSettingRow(
+                        title = stringResource(R.string.settings_backup_sign_out),
+                        subtitle = driveAccount,
+                        icon = com.iridium.core.designsystem.IridiumIcons.Close,
+                        onClick = onDriveSignOut,
+                    )
+                }
             }
         }
 }

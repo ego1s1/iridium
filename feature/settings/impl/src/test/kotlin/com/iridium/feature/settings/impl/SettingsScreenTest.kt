@@ -1,5 +1,6 @@
 package com.iridium.feature.settings.impl
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -112,5 +113,40 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithText("Keep screen on").performScrollTo().performClick()
         assertTrue(actions.any { it is SettingsAction.SetKeepScreenOn && !it.enabled })
+    }
+
+    @Test
+    fun driveRowsHiddenWhenTheBuildHasNoTransport() {
+        composeTestRule.setContent {
+            IridiumTheme(expressiveMotion = false) {
+                SettingsScreen(
+                    state = SettingsUiState(),
+                    appVersion = "1.0.0-test",
+                    onAction = {},
+                    driveAvailable = false,
+                )
+            }
+        }
+
+        // Local export/import stay; nothing offers a sign-in that cannot work.
+        composeTestRule.onNodeWithText("Backup").performScrollTo().assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Sync with Drive").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Sign out of Drive").assertCountEquals(0)
+    }
+
+    @Test
+    fun driveRowsShownWhenTheBuildHasATransport() {
+        composeTestRule.setContent {
+            IridiumTheme(expressiveMotion = false) {
+                SettingsScreen(
+                    state = SettingsUiState(),
+                    appVersion = "1.0.0-test",
+                    onAction = {},
+                    driveAvailable = true,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Sync with Drive").performScrollTo().assertIsDisplayed()
     }
 }

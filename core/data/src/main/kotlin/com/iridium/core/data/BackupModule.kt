@@ -16,10 +16,4 @@ object BackupModule {
         repository: BooksRepository,
         database: com.iridium.core.database.IridiumDatabase,
     ): LibraryBackupManager = LibraryBackupManager(repository, database)
-
-    @Provides
-    @javax.inject.Singleton
-    fun provideDriveGatewayFactory(
-        impl: GoogleDriveGatewayFactory,
-    ): DriveGatewayFactory = impl
 }

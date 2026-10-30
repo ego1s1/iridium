@@ -34,6 +34,7 @@ interface BooksRepository {
      * Rows whose files are gone are pruned (never on a failed walk).
      */
     suspend fun indexFilesystem(
+        removedPaths: Set<String> = emptySet(),
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): IndexReport
 
@@ -105,8 +106,9 @@ internal class OfflineFirstBooksRepository @Inject constructor(
         observer.observeBookmarks(bookId)
 
     override suspend fun indexFilesystem(
+        removedPaths: Set<String>,
         onProgress: (done: Int, total: Int) -> Unit,
-    ): IndexReport = scanner.indexFilesystem(onProgress)
+    ): IndexReport = scanner.indexFilesystem(onProgress, removedPaths)
 
     override suspend fun updateProgress(id: String, progress: Float, locator: String?) {
         management.updateProgress(id, progress, locator)

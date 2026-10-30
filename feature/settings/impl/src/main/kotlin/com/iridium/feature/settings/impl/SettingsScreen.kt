@@ -58,10 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
-import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.designsystem.IridiumAlertDialog
 import com.iridium.core.designsystem.IridiumCollapsingTopBar
 import com.iridium.core.designsystem.rememberLinkedFolderPicker
@@ -111,8 +107,7 @@ internal fun SettingsRoute(
     val signInLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        runCatching { task.result }.getOrNull()?.email?.let(viewModel::onDriveSignedIn)
+        viewModel.onDriveAuthResult(result.data)
     }
     syncMessage?.let { message ->
         androidx.compose.runtime.LaunchedEffect(message) {
@@ -185,19 +180,11 @@ internal fun SettingsRoute(
         },
         onImportBackup = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
         driveAccount = account,
+        driveAvailable = viewModel.driveSupported,
         onDriveSignIn = {
-            val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .requestScopes(Scope(DriveSyncManager.APPDATA_SCOPE))
-                .build()
-            val client = GoogleSignIn.getClient(context, options)
-            signInLauncher.launch(client.signInIntent)
+            viewModel.driveSignInIntent()?.let(signInLauncher::launch)
         },
-        onDriveSignOut = {
-            val client = GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN)
-            client.signOut()
-            viewModel.onDriveSignOut()
-        },
+        onDriveSignOut = viewModel::onDriveSignOut,
         onSyncNow = viewModel::onSyncNow,
         modifier = modifier,
     )
@@ -215,6 +202,7 @@ internal fun SettingsScreen(
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {},
     driveAccount: String? = null,
+    driveAvailable: Boolean = true,
     onDriveSignIn: () -> Unit = {},
     onDriveSignOut: () -> Unit = {},
     onSyncNow: () -> Unit = {},
@@ -249,6 +237,7 @@ internal fun SettingsScreen(
                 onExportBackup = onExportBackup,
                 onImportBackup = onImportBackup,
                 driveAccount = driveAccount,
+                driveAvailable = driveAvailable,
                 onDriveSignIn = onDriveSignIn,
                 onDriveSignOut = onDriveSignOut,
                 onSyncNow = onSyncNow,

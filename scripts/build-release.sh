@@ -12,12 +12,12 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 export PATH="$ANDROID_HOME/platform-tools:$PATH"
 
 BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-OUT="$ROOT/app/build/outputs/apk/release"
-UNSIGNED="$OUT/app-release-unsigned.apk"
+OUT="$ROOT/app/build/outputs/apk/play/release"
+UNSIGNED="$OUT/app-play-release-unsigned.apk"
 ALIGNED="$OUT/iridium-release.apk"
 SIGNED="$OUT/iridium-release-signed.apk"
 
-"$ROOT/gradlew" -p "$ROOT" :app:assembleRelease
+"$ROOT/gradlew" -p "$ROOT" :app:assemblePlayRelease
 
 "$BT/zipalign" -f 4 "$UNSIGNED" "$ALIGNED"
 "$BT/apksigner" sign \

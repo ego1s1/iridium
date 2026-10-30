@@ -40,14 +40,20 @@ Iridium links the folders you choose through Android's Storage Access Framework 
 Requires JDK 17 and the Android SDK (with NDK 27.2 and CMake 3.22 for the native EPUB core):
 
 ```bash
-./gradlew :app:assembleDebug     # debug APK
-./gradlew test                   # unit tests
-./gradlew detekt                 # static analysis
-./gradlew :app:lintDebug         # Android lint
+./gradlew :app:assemblePlayDebug     # debug APK, Play channel (Drive sync)
+./gradlew :app:assembleFossDebug     # debug APK, F-Droid channel (no proprietary libs)
+./gradlew test                       # unit tests (both channels)
+./gradlew detekt                     # static analysis
+./gradlew :app:lintPlayDebug         # Android lint, or :app:lintFossDebug
 
 # full gate
-./gradlew :app:assembleDebug :app:lintDebug test detekt
+./gradlew :app:assemblePlayDebug :app:lintPlayDebug test detekt
 ```
+
+The two channels come from a `store` product flavor. `foss` resolves no Google
+Play Services, `com.google.api.*` or `google-http-client` artifacts at all, so
+Drive sync is compiled out and its settings rows are hidden; everything else is
+identical.
 
 Releases are cut by tag; CI builds, signs and publishes them:
 

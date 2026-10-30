@@ -1,7 +1,9 @@
 package com.iridium.feature.settings.impl
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iridium.core.data.DriveSignIn
 import com.iridium.core.data.DriveSyncManager
 import com.iridium.core.data.DriveSyncResult
 import com.iridium.core.data.LibraryBackupManager
@@ -34,6 +36,7 @@ class SettingsViewModel @Inject constructor(
     private val grants: SafGrantStore,
     private val backup: LibraryBackupManager,
     private val sync: DriveSyncManager,
+    private val driveSignIn: DriveSignIn,
 ) : ViewModel() {
 
     /** Serializes the whole library's metadata for export. */
@@ -61,7 +64,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferences.setDriveAccount(email) }
     }
 
+    /** Whether this build can reach Drive at all; false hides every Drive row. */
+    val driveSupported: Boolean get() = driveSignIn.isSupported
+
+    /** Account-picker intent, or null when this build has no Drive support. */
+    fun driveSignInIntent(): Intent? =
+        if (driveSignIn.isSupported) driveSignIn.signInIntent() else null
+
+    /** Records the account chosen in the picker; cancelled results are ignored. */
+    fun onDriveAuthResult(data: Intent?) {
+        driveSignIn.emailFromResult(data)?.let(::onDriveSignedIn)
+    }
+
     fun onDriveSignOut() {
+        driveSignIn.signOut()
         viewModelScope.launch { preferences.setDriveAccount(null) }
     }
 

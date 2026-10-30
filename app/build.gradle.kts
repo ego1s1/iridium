@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.iridium.android.application)
+    alias(libs.plugins.iridium.android.store)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.iridium.android.compose)

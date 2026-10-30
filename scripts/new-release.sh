@@ -57,7 +57,7 @@ if [ -d "/opt/homebrew/opt/openjdk@17" ]; then
   export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
 fi
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
-"$ROOT/gradlew" -p "$ROOT" :app:assembleRelease -PappVersionName="$TAG" >/dev/null
+"$ROOT/gradlew" -p "$ROOT" :app:assemblePlayRelease -PappVersionName="$TAG" >/dev/null
 echo "Release build verified."
 
 git tag -a "$TAG" -m "Iridium $TAG${MONIKER:+ ($MONIKER)}"

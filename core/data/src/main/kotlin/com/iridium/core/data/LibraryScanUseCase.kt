@@ -50,8 +50,20 @@ internal class LibraryScanUseCase @Inject constructor(
     @Suppress("TooGenericExceptionCaught")
     suspend fun indexFilesystem(
         onProgress: (done: Int, total: Int) -> Unit,
+        /**
+         * Source paths the user removed. A removed book is unlinked, not
+         * deleted: the file is still on disk, so without this a scan would
+         * find it again and put the row back.
+         */
+        removedPaths: Set<String> = emptySet(),
     ): IndexReport = withContext(ioDispatcher) {
-        val (docs, walkFailed) = treeLister.listBooks()
+        val (discovered, walkFailed) = treeLister.listBooks()
+        val removed = removedPaths
+        val docs = if (removed.isEmpty()) {
+            discovered
+        } else {
+            discovered.filterNot { it.uri.toString() in removed }
+        }
         // Batch: one table fetch, one upsert, one emission.
         val snapshotMs = clock.wallNow()
         val knownById = bookDao.getAll().associateBy { it.id }

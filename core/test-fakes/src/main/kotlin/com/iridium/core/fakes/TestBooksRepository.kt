@@ -30,6 +30,9 @@ class TestBooksRepository : BooksRepository {
     var indexResult: IndexReport = IndexReport(total = 0, failed = 0)
     var filesystemScans: Int = 0
 
+    /** Paths the scanner was told to ignore; asserted by delete tests. */
+    var skippedPaths: Set<String> = emptySet()
+
     /** When set, [indexFilesystem] suspends until completed: lets tests hold a
      * scan open and drive a second, concurrent rescan. */
     var scanGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
@@ -74,9 +77,11 @@ class TestBooksRepository : BooksRepository {
         bookmarksFlow.map { list -> list.filter { it.bookId == bookId } }
 
     override suspend fun indexFilesystem(
+        removedPaths: Set<String>,
         onProgress: (done: Int, total: Int) -> Unit,
     ): IndexReport {
         filesystemScans += 1
+        skippedPaths = removedPaths
         scanGate?.await()
         return indexResult
     }
