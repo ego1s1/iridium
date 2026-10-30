@@ -109,10 +109,22 @@ jobs:
         run: ./gradlew detekt
 
       - name: Run lint
-        run: ./gradlew :app:lintDebug :app:lintRelease
+        run: ./gradlew :app:lintPlayDebug :app:lintPlayRelease :app:lintFossDebug :app:lintFossRelease
 
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug
+      - name: Assemble debug APKs (both variants)
+        run: ./gradlew :app:assemblePlayDebug :app:assembleFossDebug
 
-      - name: Assemble release bundle (release-only config gate)
-        run: ./gradlew :app:bundleRelease
+      - name: F-Droid variant must carry no proprietary libraries
+        # F-Droid rejects anything depending on Google Play Services, so this
+        # guards the property the foss variant exists to guarantee.
+        run: |
+          set -eu
+          if ./gradlew -q :app:dependencies --configuration fossDebugRuntimeClasspath \
+             | grep -iE "com\.google\.android\.gms|com\.google\.api|google-http-client"; then
+            echo "::error::The foss variant resolved a Google Play Services dependency"
+            exit 1
+          fi
+          echo "foss variant is free of proprietary Google libraries."
+
+      - name: Assemble release outputs (release-only config gate)
+        run: ./gradlew :app:bundlePlayRelease :app:assembleFossRelease

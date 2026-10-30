@@ -1,0 +1,40 @@
+Categories:
+  - Reading
+License: Apache-2.0
+AuthorName: Iridium
+SourceCode: https://github.com/ego1s1/iridium
+IssueTracker: https://github.com/ego1s1/iridium/issues
+Changelog: https://github.com/ego1s1/iridium/blob/main/docs/CHANGELOG.md
+Donate: https://github.com/sponsors/ego1s1
+
+AutoName: Iridium
+
+RepoType: git
+Repo: https://github.com/ego1s1/iridium.git
+
+# The `foss` build variant exists for this listing: it carries no Google Play
+# Services, so Drive sync and Google sign-in are compiled out. The Play build
+# lives in the same repository under the `play` variant and is not what
+# F-Droid builds.
+#
+# `-PappVersionCode`/`-PappVersionName` are passed explicitly because the
+# default version is derived from the git commit count, which is not stable in
+# a shallow clone.
+
+Builds:
+  - versionName: 0.1.1
+    versionCode: 183
+    commit: 4c83716c41cdb5d7b591a4d275c54872db4e169b
+    subdir: app
+    gradle:
+      - foss
+      - -PappVersionCode=183
+      - -PappVersionName=0.1.1
+    ndk: 27.2.12479018
+    # No signing config is declared in the app module; F-Droid signs the
+    # unsigned release APK with its own key.
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.1
+CurrentVersionCode: 183

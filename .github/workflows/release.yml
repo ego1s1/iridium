@@ -174,13 +174,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Assemble release APK and bundle (unsigned)
+      - name: Assemble Play release (APK + bundle)
         run: |
           # versionCode tracks the commit count (same as dev builds): it is
           # monotonic across tags and rebuilds, unlike run_number which
           # resets and collides across re-runs.
           CODE="$(git rev-list --count HEAD)"
-          ./gradlew :app:assembleRelease :app:bundleRelease \
+          ./gradlew :app:assemblePlayRelease :app:bundlePlayRelease \
+            -PappVersionName="${{ steps.resolve.outputs.tag }}" \
+            -PappVersionCode="$CODE"
+
+      - name: Assemble F-Droid release (APK)
+        run: |
+          # The foss variant has no Google Play Services, which is what makes
+          # it acceptable to F-Droid; it ships as an APK only.
+          CODE="$(git rev-list --count HEAD)"
+          ./gradlew :app:assembleFossRelease \
             -PappVersionName="${{ steps.resolve.outputs.tag }}" \
             -PappVersionCode="$CODE"
 
@@ -189,27 +198,32 @@ jobs:
         run: |
           set -eu
           BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-          UNSIGNED=$(ls app/build/outputs/apk/release/app-release-unsigned.apk)
-          ALIGNED=app-release-aligned.apk
-          SIGNED="iridium-${{ steps.resolve.outputs.tag }}.apk"
-          "$BUILD_TOOLS/zipalign" -f 4 "$UNSIGNED" "$ALIGNED"
-          # apksigner reads passwords from files, keeping them out of the
-          # process table.
-          "$BUILD_TOOLS/apksigner" sign \
-            --ks release.keystore \
-            --ks-key-alias "${{ steps.keystore.outputs.alias }}" \
-            --ks-pass "file:.store.pass" \
-            --key-pass "file:.key.pass" \
-            --out "$SIGNED" "$ALIGNED"
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$SIGNED" | head -5
-          rm -f "$ALIGNED"
-          echo "apk=$SIGNED" >> "$GITHUB_OUTPUT"
+          TAG="${{ steps.resolve.outputs.tag }}"
+          # Both variants are signed with the same key so a user can move
+          # between the Play and F-Droid builds without uninstalling.
+          for VARIANT in play foss; do
+            UNSIGNED="app/build/outputs/apk/$VARIANT/release/app-$VARIANT-release-unsigned.apk"
+            ALIGNED="app-$VARIANT-aligned.apk"
+            SIGNED="iridium-$TAG-$VARIANT.apk"
+            "$BUILD_TOOLS/zipalign" -f 4 "$UNSIGNED" "$ALIGNED"
+            # apksigner reads passwords from files, keeping them out of the
+            # process table.
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks release.keystore \
+              --ks-key-alias "${{ steps.keystore.outputs.alias }}" \
+              --ks-pass "file:.store.pass" \
+              --key-pass "file:.key.pass" \
+              --out "$SIGNED" "$ALIGNED"
+            "$BUILD_TOOLS/apksigner" verify --print-certs "$SIGNED" | head -5
+            rm -f "$ALIGNED"
+          done
+          echo "apk=iridium-$TAG-play.apk iridium-$TAG-foss.apk" >> "$GITHUB_OUTPUT"
 
       - name: Sign App Bundle
         id: bundle
         run: |
           set -eu
-          UNSIGNED_BUNDLE=$(ls app/build/outputs/bundle/release/app-release.aab)
+          UNSIGNED_BUNDLE=$(ls app/build/outputs/bundle/playRelease/app-play-release.aab)
           SIGNED_BUNDLE="iridium-${{ steps.resolve.outputs.tag }}.aab"
           # AABs take JAR signing (apksigner is APK-only).
           jarsigner \
@@ -221,6 +235,20 @@ jobs:
             "${{ steps.keystore.outputs.alias }}"
           jarsigner -verify "$SIGNED_BUNDLE"
           echo "aab=$SIGNED_BUNDLE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to Google Play (internal track)
+        # Optional: skipped entirely when no Play service account is
+        # configured, so releases still publish to GitHub and F-Droid.
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        if: env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.iridium.reader
+          releaseFiles: ${{ steps.bundle.outputs.aab }}
+          track: internal
+          status: draft
 
       - name: Clean up signing material
         if: always()
