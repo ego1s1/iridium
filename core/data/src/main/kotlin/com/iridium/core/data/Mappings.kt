@@ -1,6 +1,7 @@
 package com.iridium.core.data
 
 import com.iridium.core.database.BookEntity
+import com.iridium.core.database.LibraryBookRow
 import com.iridium.core.database.BookmarkEntity
 import com.iridium.core.database.HighlightEntity
 import com.iridium.core.model.Book
@@ -33,6 +34,24 @@ internal fun BookEntity.toModel(): Book = Book(
     coverPath = coverPath,
     // Legacy rows predate write-time clamping: coerce on read so one bad
     // value cannot poison progress UI (require() here would crash reads).
+    progress = progress.coerceIn(0f, 1f),
+    lastLocator = lastLocator,
+    sourceDisplayName = sourceDisplayName,
+    sourceModified = sourceModified,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    error = error?.let { runCatching { BookError.valueOf(it) }.getOrNull() },
+    bookmarked = bookmarked,
+)
+
+internal fun LibraryBookRow.toModel(): Book = Book(
+    id = id,
+    title = title,
+    author = author,
+    format = runCatching { BookFormat.valueOf(format) }.getOrDefault(BookFormat.EPUB),
+    spineCount = spineCount.coerceAtLeast(0),
+    sourcePath = sourcePath,
+    coverPath = coverPath,
     progress = progress.coerceIn(0f, 1f),
     lastLocator = lastLocator,
     sourceDisplayName = sourceDisplayName,

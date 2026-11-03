@@ -2,7 +2,6 @@ package com.iridium.core.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FtsQueryTest {
@@ -30,26 +29,4 @@ class FtsQueryTest {
         assertNull(FtsQuery.build("..."))
     }
 
-    @Test
-    fun `snippet centres on the match with ellipses`() {
-        val body = "The Hispaniola was rolling scuppers under in the ocean swell."
-        val snippet = FtsQuery.snippet(body, "scuppers", radius = 10)
-        assertTrue(snippet.contains("scuppers"))
-        assertTrue(snippet.startsWith("…"))
-        assertTrue(snippet.endsWith("…"))
-    }
-
-    @Test
-    fun `snippet falls back to the head when there is no match`() {
-        val body = "Nothing relevant in this chapter body at all."
-        val snippet = FtsQuery.snippet(body, "zzz", radius = 20)
-        assertTrue(snippet.isNotEmpty())
-        assertTrue(body.startsWith(snippet.take(10)))
-    }
-
-    @Test
-    fun `snippet is case insensitive`() {
-        val body = "The HISPANIOLA was rolling."
-        assertTrue(FtsQuery.snippet(body, "hispaniola", radius = 5).contains("HISPANIOLA"))
-    }
 }

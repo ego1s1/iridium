@@ -43,6 +43,43 @@ class BookDaoTest {
     }
 
     @Test
+    fun `library query filters and orders rows in the database`() = runTest {
+        dao.upsertAll(
+            listOf(
+                linkedBook("unread", title = "Unread").copy(createdAt = 3L),
+                linkedBook("started", title = "Started")
+                    .copy(progress = 0.4f, createdAt = 2L, updatedAt = 9L),
+                linkedBook("finished", title = "Finished")
+                    .copy(progress = 1f, createdAt = 1L, updatedAt = 5L),
+                linkedBook("favorite", title = "Favorite")
+                    .copy(bookmarked = true, createdAt = 4L),
+                linkedBook("error", title = "Error")
+                    .copy(error = "CORRUPT", bookmarked = true, createdAt = 5L),
+            ),
+        )
+
+        val inProgress = dao.observeForLibrary("IN_PROGRESS", false, "RECENTLY_ADDED")
+            .first().map { it.id }
+        val unread = dao.observeForLibrary("UNREAD", false, "RECENTLY_ADDED")
+            .first().map { it.id }
+        val finished = dao.observeForLibrary("FINISHED", false, "RECENTLY_ADDED")
+            .first().map { it.id }
+        val favorites = dao.observeForLibrary("FAVORITES", true, "TITLE")
+            .first().map { it.id }
+        val unfinishedFirst = dao.observeForLibrary("ALL", false, "UNFINISHED_FIRST")
+            .first().map { it.id }
+        val recentlyAdded = dao.observeForLibrary("ALL", false, "RECENTLY_ADDED")
+            .first().map { it.id }
+
+        assertEquals(listOf("started"), inProgress)
+        assertEquals(listOf("unread"), unread)
+        assertEquals(listOf("finished"), finished)
+        assertEquals(listOf("favorite"), favorites)
+        assertEquals(listOf("started", "error", "favorite", "unread", "finished"), unfinishedFirst)
+        assertEquals(listOf("error", "favorite", "unread", "started", "finished"), recentlyAdded)
+    }
+
+    @Test
     fun `deleteByIds removes exactly the rows the scan found missing`() = runTest {
         dao.upsert(linkedBook("content://docs/a.epub"))
         dao.upsert(linkedBook("content://docs/b.epub"))

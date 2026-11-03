@@ -38,6 +38,7 @@ class LibraryScrollBenchmark {
         startupMode = StartupMode.WARM,
         setupBlock = {
             startActivityAndWait()
+            device.wait(Until.findObject(By.scrollable(true)), 10_000)
             device.waitForIdle()
         },
     ) {

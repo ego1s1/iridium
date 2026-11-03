@@ -79,6 +79,8 @@ capture lines up with the metrics:
 | `iri.library.scan` | `LibraryViewModel.runScan` | Whole filesystem pass |
 | `iri.reader.open` | `ReaderViewModel.openBook` | EPUB parse |
 | `iri.reader.positions` | `ReaderViewModel` secondary load | Position table walk |
+| `iri.library.query` | `OfflineFirstLibraryObserver` | Entity-to-model mapping and text matching |
+| `iri.search.content` | `ContentSearchUseCase` | Full-text query and result grouping |
 
 Capture with:
 

@@ -10,6 +10,32 @@ interface BookDao {
     @Query("SELECT * FROM books")
     fun observeAll(): Flow<List<BookEntity>>
 
+    /** Applies the library's non-text filters and ordering before rows are mapped. */
+    @Query(
+        "SELECT id, title, author, format, spineCount, sourcePath, coverPath, progress, " +
+            "lastLocator, sourceDisplayName, sourceModified, createdAt, updatedAt, error, bookmarked " +
+            "FROM books " +
+            "WHERE (:hideErrors = 0 OR error IS NULL) " +
+            "AND (:filter = 'ALL' " +
+            "OR (:filter = 'IN_PROGRESS' AND progress > 0 AND progress < 1) " +
+            "OR (:filter = 'UNREAD' AND progress <= 0 AND error IS NULL) " +
+            "OR (:filter = 'FINISHED' AND progress >= 1) " +
+            "OR (:filter = 'FAVORITES' AND bookmarked = 1)) " +
+            "ORDER BY " +
+            "CASE WHEN :sortOrder = 'RECENTLY_ADDED' THEN createdAt END DESC, " +
+            "CASE WHEN :sortOrder = 'RECENTLY_READ' THEN updatedAt END DESC, " +
+            "CASE WHEN :sortOrder = 'TITLE' THEN title COLLATE NOCASE END ASC, " +
+            "CASE WHEN :sortOrder = 'UNFINISHED_FIRST' " +
+                "THEN CASE WHEN progress >= 1 THEN 1 ELSE 0 END END ASC, " +
+            "CASE WHEN :sortOrder = 'UNFINISHED_FIRST' THEN updatedAt END DESC, " +
+            "title COLLATE NOCASE ASC, id ASC",
+    )
+    fun observeForLibrary(
+        filter: String,
+        hideErrors: Boolean,
+        sortOrder: String,
+    ): Flow<List<LibraryBookRow>>
+
     @Query("SELECT * FROM books WHERE id = :id")
     fun observeById(id: String): Flow<BookEntity?>
 

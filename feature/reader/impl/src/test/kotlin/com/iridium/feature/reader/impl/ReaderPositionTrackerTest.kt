@@ -76,6 +76,25 @@ class ReaderPositionTrackerTest {
     }
 
     @Test
+    fun `position counts preserve chapter order and estimate totals`() {
+        tracker.replaceAll(
+            listOf(
+                locator("ch1.xhtml", 0.0),
+                locator("ch2.xhtml", 0.0),
+                locator("ch1.xhtml", 0.5),
+                locator("ch2.xhtml", 0.5),
+                locator("ch1.xhtml", 1.0),
+            ),
+        )
+        tracker.onPageChanged("ch1.xhtml", pageIndex = 0, totalPages = 6)
+        store.onLocator(locator("ch2.xhtml", 0.5))
+
+        // Three positions in chapter one give a two-pages-per-position ratio;
+        // chapter two's two positions are therefore estimated at four pages.
+        assertEquals(8 to 10, tracker.indexAndCount())
+    }
+
+    @Test
     fun `a chapter without progression resolves to its first page`() {
         tracker.applyLayout("layout-a")
         tracker.replaceAll(

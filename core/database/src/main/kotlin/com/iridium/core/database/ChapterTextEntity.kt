@@ -31,10 +31,11 @@ data class ChapterTextEntity(
     val body: String,
 )
 
-/** One search hit: which chapter matched, and the text to show around it. */
+/** One search hit with a bounded excerpt, not the full indexed chapter body. */
 data class ChapterSearchRow(
     @ColumnInfo(name = "book_id") val bookId: String,
+    @ColumnInfo(name = "book_title") val bookTitle: String,
     val href: String,
     val title: String,
-    val body: String,
+    val snippet: String,
 )

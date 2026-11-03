@@ -44,3 +44,22 @@ data class BookEntity(
     val updatedAt: Long,
     val bookmarked: Boolean = false,
 )
+
+/** Library projection; omits the potentially large TOC JSON column. */
+data class LibraryBookRow(
+    val id: String,
+    val title: String,
+    val author: String?,
+    val format: String,
+    val spineCount: Int,
+    val sourcePath: String,
+    val coverPath: String?,
+    val progress: Float,
+    val lastLocator: String?,
+    val sourceDisplayName: String,
+    val sourceModified: Long,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val error: String?,
+    val bookmarked: Boolean,
+)

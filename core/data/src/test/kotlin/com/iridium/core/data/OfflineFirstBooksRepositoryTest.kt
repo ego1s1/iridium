@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.iridium.core.database.BookEntity
+import com.iridium.core.database.ChapterTextEntity
 import com.iridium.core.database.IridiumDatabase
 import com.iridium.core.fakes.FakeClock
 import com.iridium.core.model.BookError
@@ -248,6 +248,28 @@ class OfflineFirstBooksRepositoryTest {
         assertEquals(1, hits.size)
         assertEquals("Treasure Island", hits.first().bookTitle)
         assertTrue(hits.first().snippet.contains("Hispaniola"))
+    }
+
+    @Test
+    fun `content search caps requested result count`() = runTest {
+        val file = writeEpub("Search Limit")
+        lister.documents = listOf(LinkedDocument(Uri.fromFile(file), file.name, modified = 1L))
+        repository.indexFilesystem() { _, _ -> }
+        val book = repository.observeLibrary(LibraryQuery()).first().single()
+        database.chapterTextDao().insertAll(
+            List(48) { index ->
+                ChapterTextEntity(
+                    bookId = book.id,
+                    href = "chapter-$index.xhtml",
+                    title = "Chapter $index",
+                    body = "Searchable needle in chapter $index.",
+                )
+            },
+        )
+
+        val hits = repository.searchContent("needle", limit = 1_000)
+
+        assertEquals(40, hits.size)
     }
 
     @Test

@@ -40,39 +40,48 @@ internal class ContentSearchUseCase @Inject constructor(
     /** Full-text search across every indexed chapter, fairly shared per book. */
     suspend fun searchContent(query: String, limit: Int): List<ContentHit> =
         withContext(ioDispatcher) {
-            val expression = FtsQuery.build(query) ?: return@withContext emptyList()
-            val rows = runCatching { chapterTextDao.search(expression, limit * SEARCH_FANOUT) }
-                .getOrDefault(emptyList())
-            if (rows.isEmpty()) return@withContext emptyList()
+            android.os.Trace.beginSection("iri.search.content")
+            try {
+                val expression = FtsQuery.build(query) ?: return@withContext emptyList()
+                val resultLimit = limit.coerceIn(0, MAX_SEARCH_RESULTS)
+                if (resultLimit == 0) return@withContext emptyList()
+                val rows = runCatching {
+                    chapterTextDao.search(expression, resultLimit * SEARCH_FANOUT)
+                }
+                    .getOrDefault(emptyList())
+                if (rows.isEmpty()) return@withContext emptyList()
 
-            val titles = bookDao.getAll().associate { it.id to it.title }
-            // Round-robin across books: one hit-heavy book must not starve
-            // the rest out of the global limit.
-            val byBook = rows.mapNotNull { row ->
-                ContentHit(
-                    bookId = row.bookId,
-                    bookTitle = titles[row.bookId] ?: return@mapNotNull null,
-                    href = row.href,
-                    chapterTitle = row.title,
-                    snippet = FtsQuery.snippet(row.body, query),
-                )
-            }.groupBy { it.bookId }
-            val rounds = ArrayDeque(byBook.values.map { it.toMutableList() })
-            val out = ArrayList<ContentHit>(limit.coerceAtLeast(0))
-            while (out.size < limit && rounds.isNotEmpty()) {
-                val queue = rounds.removeFirst()
-                // removeAt(0), not removeFirst(): the latter binds to the
-                // JDK 21 SequencedCollection member when compiling against a
-                // recent android.jar, then throws NoSuchMethodError on every
-                // runtime older than API 35.
-                out += queue.removeAt(0)
-                if (queue.isNotEmpty()) rounds.addLast(queue)
+                // Round-robin across books: one hit-heavy book must not starve
+                // the rest out of the global limit.
+                val byBook = rows.map { row ->
+                    ContentHit(
+                        bookId = row.bookId,
+                        bookTitle = row.bookTitle,
+                        href = row.href,
+                        chapterTitle = row.title,
+                        snippet = row.snippet,
+                    )
+                }.groupBy { it.bookId }
+                val rounds = ArrayDeque(byBook.values.map { it.toMutableList() })
+                val out = ArrayList<ContentHit>(resultLimit)
+                while (out.size < resultLimit && rounds.isNotEmpty()) {
+                    val queue = rounds.removeFirst()
+                    // removeAt(0), not removeFirst(): the latter binds to the
+                    // JDK 21 SequencedCollection member when compiling against a
+                    // recent android.jar, then throws NoSuchMethodError on every
+                    // runtime older than API 35.
+                    out += queue.removeAt(0)
+                    if (queue.isNotEmpty()) rounds.addLast(queue)
+                }
+                out
+            } finally {
+                android.os.Trace.endSection()
             }
-            out
         }
 
     private companion object {
         /** Overscan factor: fetch extra rows so round-robin fairness has a pool. */
         const val SEARCH_FANOUT = 4
+        const val MAX_SEARCH_RESULTS = 40
     }
 }

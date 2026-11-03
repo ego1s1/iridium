@@ -8,8 +8,8 @@ import com.iridium.core.model.Book
 import com.iridium.core.model.Bookmark
 import com.iridium.core.model.Highlight
 import com.iridium.core.model.LibraryQuery
+import com.iridium.core.model.LibrarySortOrder
 import com.iridium.core.model.TocEntry
-import com.iridium.core.model.applyQuery
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -43,8 +43,35 @@ internal class OfflineFirstLibraryObserver @Inject constructor(
 ) : LibraryObserver {
 
     override fun observeLibrary(query: LibraryQuery): Flow<List<Book>> =
-        bookDao.observeAll()
-            .map { entities -> entities.map { it.toModel() }.applyQuery(query) }
+        bookDao.observeForLibrary(
+            filter = query.filter.name,
+            hideErrors = query.hideErrors,
+            sortOrder = query.sortOrder.name,
+        )
+            .map { entities ->
+                android.os.Trace.beginSection("iri.library.query")
+                try {
+                    val text = query.text.trim()
+                    val matching = if (text.isBlank()) {
+                        entities
+                    } else {
+                        entities.filter { entity ->
+                            entity.title.contains(text, ignoreCase = true) ||
+                                entity.author?.contains(text, ignoreCase = true) == true
+                        }
+                    }
+                    val books = matching.map { it.toModel() }
+                    // SQLite's NOCASE collation is ASCII-only; retain Kotlin's
+                    // locale-independent case-insensitive ordering for titles.
+                    if (query.sortOrder == LibrarySortOrder.TITLE) {
+                        books.sortedBy { it.title.lowercase() }
+                    } else {
+                        books
+                    }
+                } finally {
+                    android.os.Trace.endSection()
+                }
+            }
             .distinctUntilChanged()
             .flowOn(defaultDispatcher)
 

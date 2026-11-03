@@ -500,9 +500,12 @@ class ReaderViewModel @Inject constructor(
             pageLoaded.first { it }
         }
         android.os.Trace.beginSection("iri.reader.positions")
-        val positionTable = safeCatching { result.publication.positions() }.getOrDefault(emptyList())
-        android.os.Trace.endSection()
-        positions.replaceAll(positionTable)
+        try {
+            val positionTable = safeCatching { result.publication.positions() }.getOrDefault(emptyList())
+            positions.replaceAll(positionTable)
+        } finally {
+            android.os.Trace.endSection()
+        }
         // Content indexing parses every spine chapter (and spools the whole
         // file for pipe-like providers). It is only needed for library search,
         // so it runs once the page has settled instead of competing with the

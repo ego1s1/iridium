@@ -74,10 +74,13 @@ internal class ReaderPositionTracker(
 
     fun replaceAll(positions: List<Locator>) {
         positionsCache = positions
-        chapterOrder = positions.map { it.href.toString() }.distinct()
-        positionsPerChapter = chapterOrder.associateWith { href ->
-            positions.count { it.href.toString() == href }
+        val countsByChapter = LinkedHashMap<String, Int>()
+        positions.forEach { locator ->
+            val href = locator.href.toString()
+            countsByChapter[href] = (countsByChapter[href] ?: 0) + 1
         }
+        chapterOrder = countsByChapter.keys.toList()
+        positionsPerChapter = countsByChapter
         recompute()
         _positionsVersion.value += 1
     }
