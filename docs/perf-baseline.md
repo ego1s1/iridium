@@ -9,7 +9,10 @@ type, and with the same definition of "done".
 | Benchmark | File | Metric | Definition |
 |---|---|---|---|
 | Cold start | `benchmark/.../StartupBenchmark.kt` | `StartupTimingMetric` | Process cold, measured until the app's own `reportFullyDrawn()` |
+| Library readiness | `benchmark/.../LibraryReadyBenchmark.kt` | `TraceSectionMetric` | Library ViewModel creation until the first database-backed frame |
 | Library fling | `benchmark/.../LibraryScrollBenchmark.kt` | `FrameTimingMetric` | Three downward flings over the book grid, then one upward |
+| Reader open | `benchmark/.../ReaderOpenBenchmark.kt` | trace sections + `FrameTimingMetric` | EPUB parse, first page paint and transition frames |
+| Full-text search | `benchmark/.../ContentSearchBenchmark.kt` | `TraceSectionMetric` | Indexed query through bounded result mapping; needs indexed matching content |
 
 `reportFullyDrawn()` fires from `IridiumApp` once the onboarding gate resolves
 and the shell is composed with the user's theme and destination. It is **not**
@@ -28,6 +31,15 @@ debug-signed, `profileable`).
 
 ./gradlew :benchmark:connectedPlayBenchmarkAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.iridium.benchmark.LibraryScrollBenchmark
+
+./gradlew :benchmark:connectedPlayBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.iridium.benchmark.LibraryReadyBenchmark
+
+./gradlew :benchmark:connectedPlayBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.iridium.benchmark.ReaderOpenBenchmark
+
+./gradlew :benchmark:connectedPlayBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.iridium.benchmark.ContentSearchBenchmark
 ```
 
 Results are written to
@@ -36,6 +48,11 @@ plus a readable HTML/text summary.
 
 The library fling benchmark is skipped when the library has no books: it needs
 a real shelf to scroll.
+
+The reader-open benchmark also needs a readable book. Content search needs an
+indexed chapter containing `hispaniola`; it skips when that fixture is absent.
+Complete onboarding before measuring library readiness so the trace covers the
+library destination rather than the first-run wizard.
 
 Two compilation modes are measured for startup on purpose. A change that only
 improves the profile (`CompilationMode.Partial`) is a different fix from one
@@ -51,8 +68,11 @@ Fill this in on the reference device (Pixel), not an emulator.
 | cold start median | baseline profile | _pending_ | |
 | cold start median | no compilation | _pending_ | |
 | cold start P90 | baseline profile | _pending_ | |
+| library first-frame median / P90 | baseline profile | _pending_ | |
 | library fling frame P90 | baseline profile | _pending_ | |
 | library fling frame P99 / missed | baseline profile | _pending_ | |
+| reader first-page median / P90 | baseline profile | _pending_ | |
+| full-text search median / P90 | baseline profile | _pending_ | |
 
 ## Static facts measured from the build (no device needed)
 
@@ -81,6 +101,8 @@ capture lines up with the metrics:
 | `iri.reader.positions` | `ReaderViewModel` secondary load | Position table walk |
 | `iri.library.query` | `OfflineFirstLibraryObserver` | Entity-to-model mapping and text matching |
 | `iri.search.content` | `ContentSearchUseCase` | Full-text query and result grouping |
+| `iri.library.ready` | `LibraryViewModel` + `LibraryRoute` | ViewModel creation through first database-backed frame |
+| `iri.reader.firstPage` | `ReaderViewModel` | Open request through the first rendered page |
 
 Capture with:
 

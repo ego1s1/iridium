@@ -69,6 +69,7 @@ internal object ReaderChromeTestTags {
     const val TapZoneInvertSwitch = "tapZoneInvertSwitch"
     const val ChapterPill = "chromeChapterPill"
     const val PageLoading = "readerPageLoading"
+    const val PageReady = "readerPageReady"
 }
 
 // Pure helpers (unit-testable without composition)

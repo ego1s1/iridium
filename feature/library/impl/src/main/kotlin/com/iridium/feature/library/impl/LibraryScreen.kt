@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +87,7 @@ internal fun LibraryRoute(
     // Linked folders are the storage grant: empty means the grant UI shows.
     // Persisted across restarts via DataStore (no local remember needed).
     val folders by viewModel.linkedFolders.collectAsStateWithLifecycle()
+    val libraryReady by viewModel.libraryReady.collectAsStateWithLifecycle()
     val launchPicker = rememberLinkedFolderPicker {
         viewModel.onAction(LibraryAction.AddLinkedFolder(it))
     }
@@ -112,6 +115,12 @@ internal fun LibraryRoute(
                     context.getString(R.string.library_snack_scan_failed)
             }
             snackbarHost.showSnackbar(text)
+        }
+    }
+    LaunchedEffect(libraryReady) {
+        if (libraryReady) {
+            androidx.compose.runtime.withFrameNanos { }
+            viewModel.markLibraryReadyFrame()
         }
     }
     // Resume rides its own cached flow so chrome-only changes never rescan.
@@ -255,7 +264,11 @@ private fun LibraryContent(
         targetValue = if (scrolled) 6.dp else 0.dp,
         label = "searchIslandElevation",
     )
-    Box(modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .semantics { testTagsAsResourceId = true },
+    ) {
         Column(Modifier.fillMaxSize()) {
             // Thin determinate bar: scanning never hides the books already on
             // screen, and large rescans never read as a stuck spinner.
@@ -312,7 +325,7 @@ private fun LibraryContent(
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().testTag(LibraryTestTags.Grid),
                     ) {
                         item(
                             span = { GridItemSpan(maxLineSpan) },
@@ -335,7 +348,9 @@ private fun LibraryContent(
                                         contentHits.size,
                                     ),
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                    modifier = Modifier
+                                        .padding(top = 8.dp, bottom = 4.dp)
+                                        .testTag(LibraryChromeTestTags.ContentHitsHeader),
                                 )
                             }
                             items(

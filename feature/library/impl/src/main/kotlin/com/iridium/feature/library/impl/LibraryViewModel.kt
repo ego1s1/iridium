@@ -1,5 +1,7 @@
 package com.iridium.feature.library.impl
 
+import android.os.Build
+import android.os.Trace
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -77,6 +80,10 @@ class LibraryViewModel @Inject constructor(
     private val scanQueued = AtomicBoolean(false)
     private val indexProgress = MutableStateFlow<IndexProgress?>(null)
     private val contentHits = MutableStateFlow<List<ContentHit>>(emptyList())
+    private val _libraryReady = MutableStateFlow(false)
+    val libraryReady: StateFlow<Boolean> = _libraryReady
+    private val libraryReadyTraceCookie = System.identityHashCode(this)
+    private var libraryReadyTraceActive = false
 
     /**
      * Database subscription query: the text field echoes instantly through
@@ -97,6 +104,7 @@ class LibraryViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val books: StateFlow<List<Book>> = dbQuery
         .flatMapLatest { repository.observeLibrary(it) }
+        .onEach { _libraryReady.value = true }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -159,6 +167,7 @@ class LibraryViewModel @Inject constructor(
         )
 
     init {
+        beginLibraryReadyTrace()
         // Rescan on launch: the library reads every EPUB on shared storage
         // in place, so a launch pass picks up files added, moved or removed
         // outside the app.
@@ -182,6 +191,21 @@ class LibraryViewModel @Inject constructor(
                         }
                     }
                 }
+        }
+    }
+
+    /** Ends the readiness span after the first database-backed state is drawn. */
+    fun markLibraryReadyFrame() {
+        if (libraryReadyTraceActive) {
+            Trace.endAsyncSection(LIBRARY_READY_TRACE_SECTION, libraryReadyTraceCookie)
+            libraryReadyTraceActive = false
+        }
+    }
+
+    private fun beginLibraryReadyTrace() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !libraryReadyTraceActive) {
+            Trace.beginAsyncSection(LIBRARY_READY_TRACE_SECTION, libraryReadyTraceCookie)
+            libraryReadyTraceActive = true
         }
     }
 
@@ -309,6 +333,11 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        markLibraryReadyFrame()
+        super.onCleared()
+    }
+
     /** One filesystem pass, reporting failures to the UI. */
     private suspend fun runScan() {
         // Trace marker for the benchmark harness: the scan is the largest
@@ -347,6 +376,7 @@ class LibraryViewModel @Inject constructor(
         /** Books between scan-progress UI updates; the end always reports. */
         const val INDEX_PROGRESS_STRIDE = 8
         const val CONTENT_DEBOUNCE_MS = 300L
+        const val LIBRARY_READY_TRACE_SECTION = "iri.library.ready"
 
         /** Below this, content search would match almost everything. */
         const val MIN_CONTENT_QUERY = 2

@@ -1,5 +1,7 @@
 package com.iridium.feature.reader.impl
 
+import android.os.Build
+import android.os.Trace
 import android.view.KeyEvent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -92,6 +94,8 @@ class ReaderViewModel @Inject constructor(
     private val pageLoaded = MutableStateFlow(false)
     private val openFailed = MutableStateFlow(false)
     private val openFileMissing = MutableStateFlow(false)
+    private val firstPageTraceCookie = System.identityHashCode(this)
+    private var firstPageTraceActive = false
 
     /** Cached prefs for tap paths that must not suspend on DataStore IO. */
     private val prefsFlow: StateFlow<ReaderPreferences> =
@@ -416,6 +420,7 @@ class ReaderViewModel @Inject constructor(
     // Session wiring
 
     private suspend fun openPublication() {
+        beginFirstPageTrace()
         // Mark the open before any suspension: until publish() runs there is
         // no navigator factory, and the UI must not attach the host fragment.
         store.beginOpen()
@@ -423,6 +428,7 @@ class ReaderViewModel @Inject constructor(
         val book = repository.observeBook(bookId).first()
         if (book == null) {
             store.failOpen()
+            endFirstPageTrace()
             return // Gone state via UiState combine.
         }
 
@@ -458,7 +464,22 @@ class ReaderViewModel @Inject constructor(
                 store.failOpen()
                 openFailed.value = true
                 openFileMissing.value = result == OpenResult.FileMissing
+                endFirstPageTrace()
             }
+        }
+    }
+
+    private fun beginFirstPageTrace() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !firstPageTraceActive) {
+            Trace.beginAsyncSection(FIRST_PAGE_TRACE_SECTION, firstPageTraceCookie)
+            firstPageTraceActive = true
+        }
+    }
+
+    private fun endFirstPageTrace() {
+        if (firstPageTraceActive) {
+            Trace.endAsyncSection(FIRST_PAGE_TRACE_SECTION, firstPageTraceCookie)
+            firstPageTraceActive = false
         }
     }
 
@@ -546,7 +567,10 @@ class ReaderViewModel @Inject constructor(
             }
             is ReaderSessionEvent.ContentTappedAt ->
                 handleZonedTap(event.fractionX, event.fractionY, event.dismissedPopup)
-            ReaderSessionEvent.PageLoaded -> pageLoaded.value = true
+            ReaderSessionEvent.PageLoaded -> {
+                pageLoaded.value = true
+                endFirstPageTrace()
+            }
             ReaderSessionEvent.NavigatorAttached -> {
                 navigatorAttached.value = true
                 positions.markProgrammaticNav()
@@ -735,6 +759,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        endFirstPageTrace()
         keyInterceptor.clear()
         if (store.bookId == bookId) {
             // Flush the latest locator before closing in the application
@@ -756,6 +781,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     private companion object {
+        const val FIRST_PAGE_TRACE_SECTION = "iri.reader.firstPage"
         /**
          * Cap on the bytes held for a full-screen image. The decode is already
          * downsampled to the viewport, so this only bounds the source read;

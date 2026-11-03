@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -318,7 +320,15 @@ internal fun ReaderScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(pageBg),
+            .background(pageBg)
+            .semantics { testTagsAsResourceId = true }
+            .then(
+                if (state.contentReady) {
+                    Modifier.testTag(ReaderChromeTestTags.PageReady)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         // Readium content fills the entire window with zero reserved insets:
         // chrome (top bar, scrubber) is a pure overlay and may cover text.

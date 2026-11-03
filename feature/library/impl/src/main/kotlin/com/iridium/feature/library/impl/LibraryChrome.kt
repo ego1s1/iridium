@@ -68,6 +68,7 @@ object LibraryChromeTestTags {
     const val SearchClear = "libraryChromeSearchClear"
     const val QuickFilters = "libraryChromeQuickFilters"
     const val ActionLink = "libraryChromeActionLink"
+    const val ContentHitsHeader = "libraryContentHitsHeader"
 
     fun quickFilterChip(filter: LibraryFilter): String =
         "libraryChromeQuickFilter:${filter.name}"
