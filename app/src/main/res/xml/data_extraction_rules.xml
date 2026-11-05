@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Android 12+ backup/transfer rules. Same policy as backup_rules.xml: reading
-  state and preferences travel, regenerable covers do not, and the cache is
-  handled by the platform. Device transfer keeps covers so a new phone shows
-  the shelf immediately.
+  state and preferences travel, regenerable covers and imported book copies
+  do not, and the cache is handled by the platform. Device transfer keeps
+  covers so a new phone shows the shelf immediately.
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -11,6 +11,7 @@
         <include domain="file" path="." />
         <include domain="sharedpref" path="." />
         <exclude domain="file" path="covers" />
+        <exclude domain="file" path="books" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="." />

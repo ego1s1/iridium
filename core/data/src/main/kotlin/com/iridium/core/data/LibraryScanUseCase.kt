@@ -227,7 +227,9 @@ internal class LibraryScanUseCase @Inject constructor(
             }
         }
         if (prunedLinked.isNotEmpty()) {
-            chapterTextDao.deleteForBooks(prunedLinked.map { it.id })
+            prunedLinked.map { it.id }.chunked(DELETE_CHUNK).forEach { chunk ->
+                chapterTextDao.deleteForBooks(chunk)
+            }
         }
         return prunedLinked
     }

@@ -5,14 +5,15 @@
   Backed up: the library database (progress, highlights, notes, bookmarks, the
   search index), DataStore preferences and everything else in app storage.
   Covers are regenerable thumbnails, so they are excluded to keep the archive
-  small; the cache is never backed up by the platform.
-
-  Note: book files themselves are never copied by the app, and linked SAF
-  folders cannot be resolved on a different device — a restore re-links them.
+  small; the cache is never backed up by the platform. Imported book copies
+  under files/books are excluded: they are large and re-importable, and
+  linked SAF folders cannot be resolved on a different device — a restore
+  re-links them.
 -->
 <full-backup-content>
     <include domain="database" path="." />
     <include domain="file" path="." />
     <include domain="sharedpref" path="." />
     <exclude domain="file" path="covers" />
+    <exclude domain="file" path="books" />
 </full-backup-content>

@@ -72,7 +72,7 @@ class BookDaoTest {
             .first().map { it.id }
 
         assertEquals(listOf("started"), inProgress)
-        assertEquals(listOf("unread"), unread)
+        assertEquals(listOf("favorite", "unread"), unread)
         assertEquals(listOf("finished"), finished)
         assertEquals(listOf("favorite"), favorites)
         assertEquals(listOf("started", "error", "favorite", "unread", "finished"), unfinishedFirst)

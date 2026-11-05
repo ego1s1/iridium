@@ -41,6 +41,7 @@
     <string name="library_menu_delete">Delete</string>
     <string name="library_menu_delete_title">Remove book?</string>
     <string name="library_menu_delete_body">%1$s will be removed from your library. Files on disk are kept.</string>
+    <string name="library_menu_delete_body_imported">%1$s will be removed from your library. Its imported copy will be deleted.</string>
     <string name="library_menu_delete_confirm">Remove</string>
     <string name="library_dialog_cancel">Cancel</string>
     <string name="library_menu_progress">%1$d%% read</string>

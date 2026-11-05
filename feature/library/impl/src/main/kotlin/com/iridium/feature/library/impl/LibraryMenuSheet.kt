@@ -151,7 +151,14 @@ internal fun LibraryMenuContent(
             },
             text = {
                 Text(
-                    text = stringResource(R.string.library_menu_delete_body, book.title),
+                    text = stringResource(
+                        if (book.sourcePath.startsWith("content://")) {
+                            R.string.library_menu_delete_body
+                        } else {
+                            R.string.library_menu_delete_body_imported
+                        },
+                        book.title,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
