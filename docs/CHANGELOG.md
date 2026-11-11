@@ -6,6 +6,20 @@ User-facing entries only. One line per user-visible change.
 
 _Nothing yet._
 
+## 0.1.3
+
+### Changed
+
+- Faster cold start, library scans, and reader opening.
+- Smoother library scrolling with cheaper cover loading.
+- Reader counts real pages, and cosmetic tweaks no longer repaginate the book.
+
+### Fixed
+
+- Opening the same shared book twice no longer imports it twice.
+- Failed imports clean up after themselves and check free space first.
+- Library rescans reliably keep removed books removed.
+
 ## 0.1.2
 
 ### Added
