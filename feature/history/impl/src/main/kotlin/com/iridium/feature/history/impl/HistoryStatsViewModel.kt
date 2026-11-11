@@ -2,23 +2,27 @@ package com.iridium.feature.history.impl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iridium.core.common.DefaultDispatcher
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.model.LibraryQuery
 import com.iridium.core.model.LibrarySortOrder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 @HiltViewModel
 class HistoryStatsViewModel @Inject constructor(
     repository: BooksRepository,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val range = MutableStateFlow(HistoryStatsRange.WEEK)
@@ -38,7 +42,7 @@ class HistoryStatsViewModel @Inject constructor(
     ) { books, selected ->
         // One clock read inside toHistoryStats: buckets and streak agree.
         books.toHistoryStats(selected)
-    }.catch { error ->
+    }.flowOn(defaultDispatcher).catch { error ->
         // A failed read would otherwise cancel the state flow and leave the
         // bento on its initial value forever. The zero snapshot is the closest
         // existing state: the bento already renders it as "no reading yet",

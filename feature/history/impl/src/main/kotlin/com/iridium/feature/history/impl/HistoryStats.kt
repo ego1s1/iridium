@@ -5,8 +5,9 @@ import java.util.Calendar
 import kotlin.math.roundToInt
 
 /**
- * Reading-stats shaping over Iridium history data, mirroring the reference's Stats
- * bento (UI hierarchy §3.4) without the reference's stats tables.
+ * Reading-stats shaping over Iridium history data for the Stats bento
+ * (UI hierarchy §3.4), computed from the library rows instead of dedicated
+ * stats tables.
  *
  * Iridium has no session log or page-turn counter — only [Book.progress]
  * (0f..1f), [Book.updatedAt], and [Book.spineCount]. Every metric below is
@@ -22,7 +23,7 @@ import kotlin.math.roundToInt
  * All shaping is pure and unit-tested; the composable stays declarative.
  */
 
-/** Chart window, mirroring the reference's StatsRange (week / month / year). */
+/** Chart window for the stats bento (week / month / year). */
 enum class HistoryStatsRange {
     WEEK,
     MONTH,

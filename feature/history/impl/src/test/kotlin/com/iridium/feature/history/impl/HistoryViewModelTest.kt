@@ -21,7 +21,7 @@ class HistoryViewModelTest {
 
     @Before
     fun setup() {
-        viewModel = HistoryViewModel(repository)
+        viewModel = HistoryViewModel(repository, dispatcherRule.testDispatcher)
     }
 
     @Test

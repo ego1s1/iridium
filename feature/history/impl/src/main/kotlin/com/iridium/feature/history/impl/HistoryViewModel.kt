@@ -2,6 +2,7 @@ package com.iridium.feature.history.impl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iridium.core.common.DefaultDispatcher
 import com.iridium.core.data.BooksRepository
 import com.iridium.core.model.Book
 import com.iridium.core.model.LibraryQuery
@@ -10,15 +11,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Calendar
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     repository: BooksRepository,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val uiState: StateFlow<HistoryUiState> = repository
@@ -26,6 +30,7 @@ class HistoryViewModel @Inject constructor(
         .map { books ->
             HistoryUiState(books.filter { it.progress > 0f }.groupByDay())
         }
+        .flowOn(defaultDispatcher)
         .catch { error ->
             // A failed read would otherwise cancel the state flow and leave the
             // tab on its initial (loading) value forever. Empty history is the

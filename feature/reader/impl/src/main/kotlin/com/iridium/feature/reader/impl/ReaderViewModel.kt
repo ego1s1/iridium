@@ -24,6 +24,7 @@ import com.iridium.core.model.TocEntry
 import com.iridium.core.model.resolvedColors
 import com.iridium.feature.reader.api.ReaderKeyInterceptor
 import com.iridium.feature.reader.api.ReaderRoute
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -131,8 +132,18 @@ class ReaderViewModel @Inject constructor(
     val sessionReady: StateFlow<Boolean> = store.sessionReady
 
     private val book: Flow<Book?> = repository.observeBook(bookId)
-    private val toc: Flow<List<TocEntry>> = repository.observeToc(bookId)
-    private val highlights: Flow<List<Highlight>> = repository.observeHighlights(bookId)
+    /**
+     * TOC and highlights arrive as immutable snapshots that only change when
+     * the underlying rows do. The outer uiState combine re-evaluates on every
+     * progression tick, so converting here (instead of inside the combine
+     * lambda) keeps those ticks from re-copying both lists each time.
+     */
+    private val toc: Flow<ImmutableList<TocEntry>> = repository.observeToc(bookId)
+        .map { it.toImmutableList() }
+        .distinctUntilChanged()
+    private val highlights: Flow<ImmutableList<Highlight>> = repository.observeHighlights(bookId)
+        .map { it.toImmutableList() }
+        .distinctUntilChanged()
 
     /** Debounced locator → persisted progress (never per-frame writes). */
     private val progression: StateFlow<Float> = store.latestLocator
@@ -144,8 +155,8 @@ class ReaderViewModel @Inject constructor(
     /** Publication content: book + navigation + annotations + prefs. */
     private data class ReaderContent(
         val book: Book?,
-        val toc: List<TocEntry>,
-        val highlights: List<Highlight>,
+        val toc: ImmutableList<TocEntry>,
+        val highlights: ImmutableList<Highlight>,
         val prefs: ReaderPreferences,
     )
 
@@ -208,8 +219,8 @@ class ReaderViewModel @Inject constructor(
                 val (positionIndex, positionCount) = positions.indexAndCount()
                 ReaderUiState.Ready(
                     book = c.book,
-                    toc = c.toc.toImmutableList(),
-                    highlights = c.highlights.toImmutableList(),
+                    toc = c.toc,
+                    highlights = c.highlights,
                     prefs = c.prefs,
                     chromeVisible = ch.chromeVisible,
                     settingsOpen = ch.settingsOpen,

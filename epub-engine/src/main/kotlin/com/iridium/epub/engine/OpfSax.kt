@@ -1,6 +1,7 @@
 package com.iridium.epub.engine
 
 import java.io.ByteArrayInputStream
+import javax.xml.parsers.SAXParser
 import javax.xml.parsers.SAXParserFactory
 import org.xml.sax.Attributes
 import org.xml.sax.InputSource
@@ -63,13 +64,26 @@ internal object OpfSax {
         }
     }
 
-    private fun newParser() = SAXParserFactory.newInstance().apply {
-        isNamespaceAware = true
-        isFeatureQuietly("http://apache.org/xml/features/disallow-doctype-decl", true)
-        isFeatureQuietly("http://xml.org/sax/features/external-general-entities", false)
-        isFeatureQuietly("http://xml.org/sax/features/external-parameter-entities", false)
-        isFeatureQuietly("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-    }.newSAXParser()
+    /**
+     * One parser per thread, reused across parses. Building a
+     * [SAXParserFactory] and parser dominates small OPF documents on folder
+     * scans of hundreds of books; parsers are not thread-safe, so each thread
+     * keeps its own. A parse call fully drives its handler, so sharing one
+     * instance across sequential parses on the same thread is safe.
+     */
+    private val parserHolder = ThreadLocal.withInitial<SAXParser> {
+        SAXParserFactory.newInstance().apply {
+            isNamespaceAware = true
+            isFeatureQuietly("http://apache.org/xml/features/disallow-doctype-decl", true)
+            isFeatureQuietly("http://xml.org/sax/features/external-general-entities", false)
+            isFeatureQuietly("http://xml.org/sax/features/external-parameter-entities", false)
+            isFeatureQuietly("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        }.newSAXParser()
+    }
+
+    private fun newParser(): SAXParser = parserHolder.get()
+
+    private val whitespaceCollapse = Regex("\\s+")
 
     private fun SAXParserFactory.isFeatureQuietly(name: String, value: Boolean) {
         runCatching { setFeature(name, value) }
@@ -145,7 +159,7 @@ internal object OpfSax {
 
         override fun endElement(uri: String?, localName: String, qName: String?) {
             if (localName == textTarget) {
-                val value = text?.toString()?.trim()?.replace(WHITESPACE, " ")
+                val value = text?.toString()?.trim()?.replace(whitespaceCollapse, " ")
                 when (localName) {
                     "title" -> if (title == null) title = value
                     "creator" -> if (author == null) author = value
@@ -157,7 +171,5 @@ internal object OpfSax {
 
         private fun Attributes.value(name: String): String? =
             getValue(name)?.takeIf { it.isNotEmpty() }
-
-        private val WHITESPACE = Regex("\\s+")
     }
 }

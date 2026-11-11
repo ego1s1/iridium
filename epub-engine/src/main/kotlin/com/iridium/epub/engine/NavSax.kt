@@ -1,6 +1,7 @@
 package com.iridium.epub.engine
 
 import java.io.ByteArrayInputStream
+import javax.xml.parsers.SAXParser
 import javax.xml.parsers.SAXParserFactory
 import org.xml.sax.Attributes
 import org.xml.sax.InputSource
@@ -32,21 +33,32 @@ internal object NavSax {
         }.getOrDefault(emptyList())
     }
 
-    private fun newParser() = SAXParserFactory.newInstance().apply {
-        isNamespaceAware = true
-        runCatching {
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-        }
-        runCatching {
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-        }
-        runCatching {
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        }
-        runCatching {
-            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-        }
-    }.newSAXParser()
+    /**
+     * One parser per thread, reused across parses. Building a
+     * [SAXParserFactory] and parser dominates small navigation documents on
+     * folder scans of hundreds of books; parsers are not thread-safe, so each
+     * thread keeps its own. A parse call fully drives its handler, so sharing
+     * one instance across sequential parses on the same thread is safe.
+     */
+    private val parserHolder = ThreadLocal.withInitial<SAXParser> {
+        SAXParserFactory.newInstance().apply {
+            isNamespaceAware = true
+            runCatching {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-general-entities", false)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            }
+            runCatching {
+                setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            }
+        }.newSAXParser()
+    }
+
+    private fun newParser(): SAXParser = parserHolder.get()
 
     private class NavHandler : DefaultHandler() {
         val chapters = ArrayList<Pair<String, String>>()
