@@ -45,6 +45,9 @@ internal const val MAX_IMPORT_NAME_CHARS = 120
 /** Directory under filesDir holding imported copies. */
 internal const val IMPORT_DIR = "books"
 
+/** Minimum free bytes required before starting an import copy. */
+internal const val MIN_IMPORT_FREE_BYTES = 1L * 1024L * 1024L
+
 /**
  * Stream copy that aborts past [maxBytes] instead of filling storage.
  * Throws [java.io.IOException] when the cap is exceeded.

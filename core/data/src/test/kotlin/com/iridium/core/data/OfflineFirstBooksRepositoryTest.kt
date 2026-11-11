@@ -172,6 +172,21 @@ class OfflineFirstBooksRepositoryTest {
     }
 
     @Test
+    fun `scan sweeps orphan import copies but keeps owned ones`() = runTest {
+        val bytes = writeEpub("Treasure Island").readBytes()
+        val id = repository.importEpub("shared-book.epub") { bytes.inputStream() }
+        val owned = File(repository.observeBook(id).first()?.sourcePath.orEmpty())
+        assertTrue(owned.isFile)
+        val orphan = File(owned.parentFile, "orphan.epub").apply { writeBytes(bytes) }
+
+        lister.documents = emptyList()
+        repository.indexFilesystem() { _, _ -> }
+
+        assertTrue(owned.isFile)
+        assertFalse(orphan.exists())
+    }
+
+    @Test
     fun `rescan of an unchanged file reuses the row`() = runTest {
         val file = writeEpub("Book")
         val document = LinkedDocument(Uri.fromFile(file), file.name, modified = 5L)

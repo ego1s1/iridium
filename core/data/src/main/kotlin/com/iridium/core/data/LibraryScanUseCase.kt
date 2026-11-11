@@ -60,6 +60,7 @@ internal class LibraryScanUseCase @Inject constructor(
          */
         removedPaths: Set<String> = emptySet(),
     ): IndexReport = withContext(ioDispatcher) {
+        sweepOrphanImportCopies()
         val (discovered, walkFailed) = treeLister.listBooks()
         val removed = removedPaths
         val docs = if (removed.isEmpty()) {
@@ -145,6 +146,7 @@ internal class LibraryScanUseCase @Inject constructor(
             val name = sanitizeImportDisplayName(displayName)
             val id = UUID.randomUUID().toString()
             val booksDir = File(context.filesDir, IMPORT_DIR).apply { mkdirs() }
+            requireFreeSpace(booksDir)
             val dest = File(booksDir, "$id.epub")
             val stream = openStream() ?: throw IOException("Unable to read $name")
             try {
@@ -154,9 +156,10 @@ internal class LibraryScanUseCase @Inject constructor(
                     }
                 }
             } catch (e: CancellationException) {
+                runCatching { dest.delete() }
                 throw e
             } catch (e: IOException) {
-                dest.delete()
+                runCatching { dest.delete() }
                 throw e
             }
             val now = clock.wallNow()
@@ -189,12 +192,26 @@ internal class LibraryScanUseCase @Inject constructor(
                 )
                 id
             } catch (e: CancellationException) {
+                runCatching { dest.delete() }
                 throw e
             } catch (e: Exception) {
-                dest.delete()
+                runCatching { dest.delete() }
                 throw (e as? IOException ?: IOException("Could not import $name", e))
             }
         }
+
+    /**
+     * Rejects an import before writing when free space is too low to hold it.
+     * The stream length is unknown upfront, so this is a guard, not a promise.
+     * A non-positive reading means the platform could not report space
+     * (e.g. unit tests); it never blocks an import.
+     */
+    private fun requireFreeSpace(booksDir: File) {
+        val free = runCatching { booksDir.usableSpace }.getOrDefault(Long.MAX_VALUE)
+        if (free > 0 && free < MIN_IMPORT_FREE_BYTES) {
+            throw IOException("Not enough free space to import")
+        }
+    }
 
     /**
      * Prunes rows deleted from the tree out from under us — never on a
@@ -313,5 +330,23 @@ internal class LibraryScanUseCase @Inject constructor(
         }
         return sourceFactory.open(doc.uri.toString(), doc.name)
             .use { source -> backend.inspect(source, fallback) }
+    }
+
+    /**
+     * Deletes import copies with no owning row (cancelled/failed imports or a
+     * process kill between copy and upsert). Best-effort and never throws.
+     */
+    private suspend fun sweepOrphanImportCopies() {
+        val booksDir = runCatching { File(context.filesDir, IMPORT_DIR) }.getOrNull()
+            ?: return
+        if (!booksDir.isDirectory) return
+        val owned = runCatching { bookDao.getAll().map { it.sourcePath }.toSet() }
+            .getOrDefault(emptySet())
+        runCatching {
+            booksDir.listFiles { file -> file.isFile && file.extension.equals("epub", true) }
+                ?.forEach { file ->
+                    if (file.absolutePath !in owned) runCatching { file.delete() }
+                }
+        }
     }
 }
