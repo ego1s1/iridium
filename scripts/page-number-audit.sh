@@ -11,6 +11,9 @@
 # Usage:
 #   scripts/page-number-audit.sh [--direction forward|backward] [--turns N] [--out DIR]
 #
+# Slow emulators can raise the waits without editing:
+#   TURN_WAIT=4 CHROME_WAIT=2 scripts/page-number-audit.sh --turns 6
+#
 # Preconditions: the reader is open on a book and the app is in the foreground.
 # The counter is only meaningful once the navigator has reported its first page.
 
@@ -21,8 +24,8 @@ SERIAL=${SERIAL:-}
 DIRECTION=forward
 TURNS=6
 OUT=""
-TURN_WAIT=2
-CHROME_WAIT=1
+TURN_WAIT=${TURN_WAIT:-2}
+CHROME_WAIT=${CHROME_WAIT:-1}
 REMOTE_XML=/sdcard/page_number_audit.xml
 
 usage() {

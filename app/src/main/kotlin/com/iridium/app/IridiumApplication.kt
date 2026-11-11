@@ -2,6 +2,7 @@ package com.iridium.app
 
 import android.app.Application
 import android.content.Context
+import android.os.StrictMode
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
@@ -9,6 +10,32 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class IridiumApplication : Application(), SingletonImageLoader.Factory {
+
+    override fun onCreate() {
+        super.onCreate()
+        if (BuildConfig.DEBUG) {
+            // Debug-only hygiene net: log main-thread disk/network use and
+            // leaked closables/activities while developing. Penalty is
+            // log-only (never death) so a slow emulator cannot fail a run,
+            // and release builds never install these policies.
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .penaltyLog()
+                    .build(),
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedSqlLiteObjects()
+                    .detectActivityLeaks()
+                    .penaltyLog()
+                    .build(),
+            )
+        }
+    }
 
     /**
      * Cover image loader.
