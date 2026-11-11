@@ -74,6 +74,26 @@ class ImportDeepLinkHandlerTest {
     }
 
     @Test
+    fun `VIEW file uri is declined`() {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(
+                Uri.parse("file:///sdcard/book.epub"),
+                "application/epub+zip",
+            )
+        }
+        assertNull(handler().parseIntent(intent))
+    }
+
+    @Test
+    fun `SEND file stream is declined`() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/epub+zip"
+            putExtra(Intent.EXTRA_STREAM, Uri.parse("file:///sdcard/shared.epub"))
+        }
+        assertNull(handler().parseIntent(intent))
+    }
+
+    @Test
     fun `MAIN launcher intent is declined`() {
         assertNull(handler().parseIntent(Intent(Intent.ACTION_MAIN)))
     }

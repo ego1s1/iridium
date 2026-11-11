@@ -39,12 +39,16 @@ class ImportDeepLinkHandler @Inject constructor(
         return when (intent.action) {
             Intent.ACTION_VIEW -> {
                 val uri = intent.data ?: return null
+                // Content providers only: a file:// or other scheme bypasses
+                // the grant model and must never reach the importer.
+                if (uri.scheme != "content") return null
                 if (!isEpubIntent(intent.type, uri)) return null
                 ImportRequest(uri, null)
             }
             Intent.ACTION_SEND -> {
                 if (!isEpubIntent(intent.type, null)) return null
                 val uri = intent.parcelableExtraCompat<Uri>(Intent.EXTRA_STREAM) ?: return null
+                if (uri.scheme != "content") return null
                 ImportRequest(uri, null)
             }
             else -> null
